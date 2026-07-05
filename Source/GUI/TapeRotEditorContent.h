@@ -7,6 +7,12 @@
 #include "ToggleSwitch.h"
 #include "FailureDotToggle.h"
 #include "NoiseCharacterSwitch.h"
+#include "SmallKnob.h"
+#include "GenSelector.h"
+#include "AuxButton.h"
+#include "FailLamp.h"
+#include "Scope.h"
+#include "GenDigitDisplay.h"
 #include "../PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -37,4 +43,17 @@ private:
     std::array<std::unique_ptr<FailureDotToggle>, TapeRotTheme::Layout::failureDots.size()> failureDotToggles;
     std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>,
                TapeRotTheme::Layout::failureDots.size()> failureDotAttachments;
+
+    GenSelector genSelector;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> genAttachment;
+
+    SmallKnob lpKnob, rampKnob, hpKnob;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> lpAttachment, rampAttachment, hpAttachment;
+
+    AuxButton stopButton{"Stop"}, filterButton{"Filter"}, failButton{"Fail"};
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> stopAttachment, filterAttachment, failAttachment;
+
+    FailLamp failLamp;
+    Scope scope;
+    GenDigitDisplay genDigitDisplay;
 };

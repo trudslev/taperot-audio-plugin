@@ -17,6 +17,7 @@ private:
     void paintKnobLabels(juce::Graphics&);
     void paintSwitchLabels(juce::Graphics&);
     void paintFailureDotLabels(juce::Graphics&);
+    void paintNewControlLabels(juce::Graphics&);
     void paintCounterHousing(juce::Graphics&);
     void paintFailLabel(juce::Graphics&);
     void paintScrews(juce::Graphics&);

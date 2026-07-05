@@ -53,6 +53,12 @@ target_sources(TapeRot PRIVATE
     Source/GUI/ToggleSwitch.cpp
     Source/GUI/FailureDotToggle.cpp
     Source/GUI/NoiseCharacterSwitch.cpp
+    Source/GUI/SmallKnob.cpp
+    Source/GUI/GenSelector.cpp
+    Source/GUI/AuxButton.cpp
+    Source/GUI/FailLamp.cpp
+    Source/GUI/Scope.cpp
+    Source/GUI/GenDigitDisplay.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC

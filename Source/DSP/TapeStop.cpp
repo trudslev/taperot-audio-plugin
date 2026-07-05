@@ -40,6 +40,7 @@ void TapeStop::process(juce::AudioBuffer<float>& buffer, bool engaged, float ram
         const float baseSpeed = 1.0f - auxValue;
         const float wobble = 1.0f + wobbleDepth * auxValue * (float) std::sin(wobblePhase);
         const float speed = juce::jlimit(0.0f, 1.0f, baseSpeed * wobble);
+        lastSpeedDisplay.store(speed, std::memory_order_relaxed);
 
         for (int ch = 0; ch < numCh; ++ch)
             history[(size_t) ch][(size_t) (writePos % bufferLengthSamples)] = buffer.getWritePointer(ch)[i];

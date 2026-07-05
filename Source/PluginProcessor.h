@@ -49,6 +49,19 @@ public:
     float getWowDisplay() const noexcept { return wowDisplay.load(std::memory_order_relaxed); }
     float getFlutterDisplay() const noexcept { return flutterDisplay.load(std::memory_order_relaxed); }
     float getFailureDisplay() const noexcept { return failureDisplay.load(std::memory_order_relaxed); }
+    float getFailAuxDisplay() const noexcept { return failAuxDisplay.load(std::memory_order_relaxed); }
+    float getStopSpeedDisplay() const noexcept { return tapeStop.getSpeedDisplay(); }
+    float getGenDisplay() const noexcept { return genSmoothed.getCurrentValue(); }
+
+    static constexpr int scopeHistorySize = 96;
+    // Copies a snapshot of recent block-peak levels for the GUI scope; safe enough for a purely
+    // cosmetic meter (worst case a torn read of one element on a rare repaint, no audio impact).
+    void copyScopeLevels(std::array<float, scopeHistorySize>& dest, int& outWriteIndex) const noexcept
+    {
+        for (int i = 0; i < scopeHistorySize; ++i)
+            dest[(size_t) i] = scopeLevels[(size_t) i].load(std::memory_order_relaxed);
+        outWriteIndex = scopeWriteIndex.load(std::memory_order_relaxed);
+    }
 
 private:
     std::atomic<float>* driveParam = nullptr;
@@ -93,7 +106,11 @@ private:
     std::atomic<float> wowDisplay{0.0f};
     std::atomic<float> flutterDisplay{0.0f};
     std::atomic<float> failureDisplay{0.0f};
+    std::atomic<float> failAuxDisplay{0.0f};
     double displaySampleRate = 44100.0;
+
+    std::array<std::atomic<float>, scopeHistorySize> scopeLevels{};
+    std::atomic<int> scopeWriteIndex{0};
 
     juce::AudioBuffer<float> dryBuffer;
 

@@ -169,6 +169,23 @@ namespace TapeRotTheme
 
         constexpr int speckleSeed = 4242;
         constexpr int speckleCount = 150;
+
+        // GEN/LP/HP/aux controls (step 6) sit in the previously-empty sub-row space under
+        // INPUT/TRANSPORT/OUTPUT rather than the already-packed MACHINE/DECAY sub-rows (which
+        // already hold the NOISE/HUM switches and the SPREAD switch + failure dots respectively),
+        // so nothing needs to be resized or crowded to fit them.
+        constexpr float smallKnobCentreY = 335.0f, smallKnobRadius = 18.0f;
+        constexpr float smallKnobLabelOffsetY = 28.0f;
+
+        constexpr float lpKnobX = 760.0f, rampKnobX = 814.0f, hpKnobX = 868.0f; // under OUTPUT
+
+        constexpr float genSelectorCentreX = 244.0f, genSelectorY = 327.0f; // under TRANSPORT
+        constexpr float genSelectorSegmentW = 14.0f, genSelectorSegmentH = 22.0f, genSelectorGap = 4.0f;
+        constexpr float genSelectorLabelOffsetY = 30.0f;
+
+        constexpr float auxButtonCentreY = 335.0f, auxButtonRadius = 16.0f; // under INPUT
+        constexpr float stopButtonX = 36.0f, filterButtonX = 72.0f, failButtonX = 108.0f;
+        constexpr float auxButtonLabelOffsetY = 26.0f;
     }
 
     // Angle (degrees, clockwise from 12 o'clock) for a normalised 0..1 value across the knob arc.

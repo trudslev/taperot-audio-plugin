@@ -35,6 +35,7 @@ void SectionPanel::paint(juce::Graphics& g)
     paintKnobLabels(g);
     paintSwitchLabels(g);
     paintFailureDotLabels(g);
+    paintNewControlLabels(g);
     paintCounterHousing(g);
     paintFailLabel(g);
     paintScrews(g);
@@ -141,6 +142,29 @@ void SectionPanel::paintFailureDotLabels(juce::Graphics& g)
                          juce::Rectangle<float>(x - 20.0f, Layout::failureDotLabelY - 8.0f, 40.0f, 12.0f),
                          juce::Justification::centred, Colour::mutedLabel);
     }
+}
+
+void SectionPanel::paintNewControlLabels(juce::Graphics& g)
+{
+    const auto font = dotLabelFont();
+    constexpr float labelY = 366.0f;
+
+    auto drawBelow = [&](float x, const char* text)
+    {
+        drawTrackedText(g, text, font, dotLabelTracking,
+                         juce::Rectangle<float>(x - 16.0f, labelY - 6.0f, 32.0f, 12.0f),
+                         juce::Justification::centred, Colour::mutedLabel);
+    };
+
+    drawBelow(Layout::stopButtonX, "STP");
+    drawBelow(Layout::filterButtonX, "FLT");
+    drawBelow(Layout::failButtonX, "FAI");
+
+    drawBelow(Layout::genSelectorCentreX, "GEN");
+
+    drawBelow(Layout::lpKnobX, "LP");
+    drawBelow(Layout::rampKnobX, "RAMP");
+    drawBelow(Layout::hpKnobX, "HP");
 }
 
 void SectionPanel::paintCounterHousing(juce::Graphics& g)

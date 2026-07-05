@@ -157,6 +157,18 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     smoothDisplay(wowDisplay, wow01);
     smoothDisplay(flutterDisplay, flutter01);
     smoothDisplay(failureDisplay, failure01);
+    smoothDisplay(failAuxDisplay, failAuxValue);
+
+    float peak = 0.0f;
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        const auto* data = buffer.getReadPointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+            peak = juce::jmax(peak, std::abs(data[i]));
+    }
+    const int writeIdx = scopeWriteIndex.load(std::memory_order_relaxed);
+    scopeLevels[(size_t) writeIdx].store(peak, std::memory_order_relaxed);
+    scopeWriteIndex.store((writeIdx + 1) % scopeHistorySize, std::memory_order_relaxed);
 }
 
 juce::AudioProcessorEditor* TapeRotAudioProcessor::createEditor()

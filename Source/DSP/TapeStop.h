@@ -2,6 +2,7 @@
 
 #include "AuxEnvelope.h"
 #include <juce_dsp/juce_dsp.h>
+#include <atomic>
 #include <vector>
 
 // Motor spin-down "tape stop" effect: continuously records input into a large circular buffer and
@@ -17,6 +18,9 @@ public:
     void reset();
     void process(juce::AudioBuffer<float>& buffer, bool engaged, float rampSeconds);
 
+    // For GUI display only (e.g. stretching the scope trace as speed falls).
+    float getSpeedDisplay() const noexcept { return lastSpeedDisplay.load(std::memory_order_relaxed); }
+
 private:
     static constexpr float bufferSeconds = 8.0f;
     static constexpr float safetyMarginSeconds = 0.25f;
@@ -31,4 +35,5 @@ private:
     double wobblePhase = 0.0;
 
     AuxEnvelope envelope;
+    std::atomic<float> lastSpeedDisplay{1.0f};
 };
