@@ -7,9 +7,11 @@ target_sources(TapeRotTests PRIVATE
     TapeModelEQTests.cpp
     CPUCheckTests.cpp
     FailureEngineFifoTests.cpp
+    NoiseSourceTests.cpp
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
-    ../Source/DSP/TapeModelEQ.cpp)
+    ../Source/DSP/TapeModelEQ.cpp
+    ../Source/DSP/NoiseSource.cpp)
 
 target_compile_definitions(TapeRotTests PRIVATE
     JUCE_WEB_BROWSER=0

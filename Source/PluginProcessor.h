@@ -4,7 +4,8 @@
 #include "DSP/Saturator.h"
 #include "DSP/WowFlutter.h"
 #include "DSP/TapeModelEQ.h"
-#include "DSP/NoiseGenerator.h"
+#include "DSP/NoiseSource.h"
+#include "DSP/Hum.h"
 #include "DSP/FailureEngine.h"
 #include "DSP/StereoSpread.h"
 #include "DSP/OutputStage.h"
@@ -51,6 +52,7 @@ private:
     std::atomic<float>* flutterParam = nullptr;
     std::atomic<float>* modelParam = nullptr;
     std::atomic<float>* noiseParam = nullptr;
+    std::atomic<float>* noiseCharacterParam = nullptr;
     std::atomic<float>* humParam = nullptr;
     std::atomic<float>* failureParam = nullptr;
     std::atomic<float>* mixParam = nullptr;
@@ -64,7 +66,8 @@ private:
     Saturator saturator;
     WowFlutter wowFlutter;
     TapeModelEQ tapeModelEQ;
-    NoiseGenerator noiseGenerator;
+    NoiseSource noiseSource;
+    Hum hum;
     FailureEngine failureEngine;
     StereoSpread stereoSpread;
     OutputStage outputStage;
@@ -73,6 +76,8 @@ private:
     std::atomic<float> flutterDisplay{0.0f};
     std::atomic<float> failureDisplay{0.0f};
     double displaySampleRate = 44100.0;
+
+    juce::AudioBuffer<float> dryBuffer;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TapeRotAudioProcessor)
 };

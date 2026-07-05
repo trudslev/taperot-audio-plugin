@@ -18,6 +18,14 @@ namespace ParamIDs
     constexpr auto failureSnags = "failureSnags";
     constexpr auto failureCrinkles = "failureCrinkles";
     constexpr auto failureImbalance = "failureImbalance";
+    constexpr auto noiseCharacter = "noiseCharacter";
+}
+
+namespace NoiseCharacterNames
+{
+    constexpr auto tape = "TAPE";
+    constexpr auto vcr = "VCR";
+    constexpr auto dust = "DUST";
 }
 
 inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParameterLayout()
@@ -48,7 +56,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::noise, 1}, "Noise",
-        juce::NormalisableRange<float>(0.0f, 100.0f, 50.0f), 0.0f, percentAttrs));
+        juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ParamIDs::hum, 1}, "Hum", false));
@@ -79,6 +87,13 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ParamIDs::failureImbalance, 1}, "Imbalance", true));
+
+    // New parameters are appended below this line, never inserted above, to keep existing
+    // sessions' parameter IDs stable (see BUILDING.md / CLAUDE.md backward-compatibility note).
+    params.push_back(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID{ParamIDs::noiseCharacter, 1}, "Noise Character",
+        juce::StringArray{NoiseCharacterNames::tape, NoiseCharacterNames::vcr, NoiseCharacterNames::dust},
+        0));
 
     return {params.begin(), params.end()};
 }

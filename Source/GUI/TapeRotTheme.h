@@ -1,0 +1,230 @@
+#pragma once
+
+#include <juce_graphics/juce_graphics.h>
+#include <array>
+
+// All layout numbers are in the SVG's reference space (960x400). Components draw
+// in this space unconditionally; PluginEditor applies a single uniform scale
+// transform so everything scales together on resize.
+namespace TapeRotTheme
+{
+    namespace Colour
+    {
+        inline const juce::Colour charcoal{0xFF26231F};
+        inline const juce::Colour headerTop{0xFF2B2822};
+        inline const juce::Colour headerBottom{0xFF221F1A};
+        inline const juce::Colour panelTop{0xFFEDE4CE};
+        inline const juce::Colour panelBottom{0xFFE2D8BF};
+        inline const juce::Colour knobFaceTop{0xFFF7F1E1};
+        inline const juce::Colour knobFaceBottom{0xFFE4DAC2};
+        inline const juce::Colour amber{0xFFD98324};
+        inline const juce::Colour amberBright{0xFFF0A94B};
+        inline const juce::Colour lamp{0xFFF5A83C};
+        inline const juce::Colour lampGlowInner{0xFFFFB347};
+        inline const juce::Colour dark{0xFF17140F};
+        inline const juce::Colour rim{0xFF4A443C};
+        inline const juce::Colour ink{0xFF3A342C};
+        inline const juce::Colour mutedLabel{0xFF8A7E63};
+        inline const juce::Colour sectionLabel{0xFF6E6450};
+        inline const juce::Colour tick{0xFF9A8E71};
+        inline const juce::Colour divider{0xFFB7AB8E};
+        inline const juce::Colour bezelFill{0xFFE8DFC9};
+        inline const juce::Colour bezelStroke{0xFFB9AE93};
+        inline const juce::Colour innerRing{0xFFC8BCA0};
+        inline const juce::Colour switchThumb{0xFFEFE7D3};
+        inline const juce::Colour switchThumbStroke{0xFF6E675A};
+        inline const juce::Colour dotOff{0xFFB3A88C};
+        inline const juce::Colour screwFill{0xFFCFC8B8};
+        inline const juce::Colour screwStroke{0xFF7A7263};
+        inline const juce::Colour versionText{0xFFA2967A};
+        inline const juce::Colour lampRing{0xFF7A4A0F};
+        inline const juce::Colour specular{0xFFFFE0AC};
+        inline const juce::Colour digitText{0xFFEDE6D2};
+        inline const juce::Colour digitCellFill{0xFF17140F};
+        inline const juce::Colour counterHousingFill{0xFF1C1915};
+        inline const juce::Colour resetStubFill{0xFFC9C2B2};
+        inline const juce::Colour resetStubStroke{0xFF6E675A};
+        inline const juce::Colour cream{0xFFF5F2EA};
+    }
+
+    inline juce::String sansFontName() { return "Helvetica Neue"; }
+    inline juce::String monoFontName() { return juce::Font::getDefaultMonospacedFontName(); }
+
+    inline juce::Font sectionLabelFont() { return juce::FontOptions(sansFontName(), 10.0f, juce::Font::bold); }
+    inline juce::Font knobLabelFont() { return juce::FontOptions(sansFontName(), 11.0f, juce::Font::bold); }
+    inline juce::Font microLabelFont() { return juce::FontOptions(sansFontName(), 8.5f, juce::Font::plain); }
+    inline juce::Font switchLabelFont() { return juce::FontOptions(sansFontName(), 9.0f, juce::Font::bold); }
+    inline juce::Font switchCaptionFont() { return juce::FontOptions(sansFontName(), 7.5f, juce::Font::plain); }
+    inline juce::Font dotLabelFont() { return juce::FontOptions(sansFontName(), 6.5f, juce::Font::plain); }
+    inline juce::Font dymoFont() { return juce::FontOptions(sansFontName(), 17.0f, juce::Font::bold); }
+    inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
+    inline juce::Font versionFont() { return juce::FontOptions(sansFontName(), 8.0f, juce::Font::plain); }
+
+    // Section-header letter spacing (px), applied via juce::AttributedString/Font tracking helpers.
+    constexpr float sectionLabelTracking = 3.5f;
+    constexpr float knobLabelTracking = 2.5f;
+    constexpr float microLabelTracking = 2.5f;
+    constexpr float switchLabelTracking = 2.0f;
+    constexpr float switchCaptionTracking = 1.0f;
+    constexpr float dotLabelTracking = 0.5f;
+    constexpr float dymoTracking = 6.0f;
+    constexpr float versionTracking = 2.0f;
+
+    namespace Layout
+    {
+        constexpr float canvasWidth = 960.0f;
+        constexpr float canvasHeight = 400.0f;
+
+        constexpr float bezelOuterX = 2.0f, bezelOuterY = 2.0f;
+        constexpr float bezelOuterW = 956.0f, bezelOuterH = 396.0f, bezelOuterRadius = 14.0f;
+        constexpr float panelX = 8.0f, panelY = 8.0f;
+        constexpr float panelW = 944.0f, panelH = 384.0f, panelRadius = 10.0f;
+
+        constexpr float headerX = 8.0f, headerY = 8.0f;
+        constexpr float headerW = 944.0f, headerH = 108.0f;
+        constexpr float headerSeparatorY = 116.0f;
+
+        constexpr float dymoX = 32.0f, dymoY = 40.0f, dymoW = 168.0f, dymoH = 34.0f;
+        constexpr float dymoRotationDegrees = -1.6f;
+
+        constexpr float scopeX = 224.0f, scopeXEnd = 640.0f, scopeCentreY = 62.0f;
+
+        constexpr float counterHousingX = 672.0f, counterHousingY = 34.0f;
+        constexpr float counterHousingW = 110.0f, counterHousingH = 52.0f, counterHousingRadius = 6.0f;
+        constexpr float digitCellW = 26.0f, digitCellH = 38.0f, digitCellGap = 6.0f, digitCellRadius = 3.0f;
+        constexpr float digitCellFirstX = 682.0f, digitCellY = 41.0f;
+        constexpr float resetStubX = 800.0f, resetStubY = 80.0f, resetStubRadius = 5.0f;
+
+        constexpr float lampX = 838.0f, lampY = 58.0f, lampRadius = 8.0f, lampGlowRadius = 20.0f;
+        constexpr float lampSpecularX = 835.5f, lampSpecularY = 55.0f, lampSpecularRadius = 2.2f;
+
+        constexpr float sectionLabelY = 146.0f;
+        constexpr float inputLabelX = 82.0f, transportLabelX = 244.0f, machineLabelX = 460.0f,
+                        decayLabelX = 634.0f, outputLabelX = 814.0f;
+
+        constexpr float dividerTop = 132.0f, dividerBottom = 362.0f;
+        constexpr std::array<float, 4> dividerX{136.0f, 352.0f, 568.0f, 700.0f};
+
+        constexpr float knobCentreY = 212.0f, knobRadius = 33.0f;
+        constexpr float knobLabelOffsetY = 63.0f;
+        constexpr float knobTickInnerRadius = knobRadius + 6.0f;
+        constexpr float knobTickOuterRadius = knobRadius + 11.0f;
+        constexpr float knobInnerRingRadius = knobRadius - 7.0f;
+        constexpr float knobPointerInnerRadius = 9.0f;
+        constexpr float knobPointerOuterRadius = knobRadius - 4.0f;
+        constexpr int knobNumTicks = 11;
+        constexpr float knobArcStartDegrees = -135.0f;
+        constexpr float knobArcEndDegrees = 135.0f;
+
+        struct KnobSpec
+        {
+            const char* paramID;
+            const char* label;
+            float x;
+        };
+
+        inline constexpr std::array<KnobSpec, 8> knobs{{
+            {"drive", "DRIVE", 82.0f},
+            {"wow", "WOW", 190.0f},
+            {"flutter", "FLUTTER", 298.0f},
+            {"model", "MODEL", 406.0f},
+            {"noise", "NOISE", 514.0f},
+            {"failure", "FAILURE", 634.0f},
+            {"mix", "MIX", 760.0f},
+            {"output", "OUTPUT", 868.0f},
+        }};
+
+        constexpr float switchY = 309.5f, switchH = 13.0f, switchW = 48.0f, switchRadius = 6.5f;
+        constexpr float switchThumbRadius = 8.0f, switchThumbDotRadius = 2.4f;
+        constexpr float switchCentreY = 316.0f;
+        constexpr float switchLabelY = 338.0f, switchCaptionY = 350.0f;
+
+        constexpr float noiseSwitchX = 396.0f;
+        constexpr float humSwitchX = 486.0f;
+        constexpr float spreadSwitchX = 610.0f;
+
+        constexpr float failureDotY = 365.0f, failureDotRadius = 4.0f, failureDotLabelY = 377.0f;
+        constexpr float failureDotFirstX = 592.0f, failureDotSpacing = 28.0f;
+
+        struct FailureDotSpec
+        {
+            const char* paramID;
+            const char* label;
+        };
+
+        inline constexpr std::array<FailureDotSpec, 4> failureDots{{
+            {"failureDropouts", "DRP"},
+            {"failureSnags", "SNG"},
+            {"failureCrinkles", "CRK"},
+            {"failureImbalance", "WBL"},
+        }};
+
+        constexpr float screwRadius = 6.5f;
+        inline constexpr std::array<std::pair<float, float>, 4> screwPositions{{
+            {24.0f, 24.0f}, {936.0f, 24.0f}, {24.0f, 376.0f}, {936.0f, 376.0f}
+        }};
+        constexpr int screwSeed = 1337;
+
+        constexpr float versionTextX = 480.0f, versionTextY = 390.0f;
+
+        constexpr int speckleSeed = 4242;
+        constexpr int speckleCount = 150;
+    }
+
+    // Angle (degrees, clockwise from 12 o'clock) for a normalised 0..1 value across the knob arc.
+    inline float knobAngleForValue01(float value01) noexcept
+    {
+        return Layout::knobArcStartDegrees
+             + value01 * (Layout::knobArcEndDegrees - Layout::knobArcStartDegrees);
+    }
+
+    // Unit direction vector for an angle measured clockwise from 12 o'clock.
+    inline juce::Point<float> directionForAngleDegrees(float degrees) noexcept
+    {
+        const float radians = juce::degreesToRadians(degrees);
+        return {std::sin(radians), -std::cos(radians)};
+    }
+
+    inline juce::Point<float> pointOnCircle(juce::Point<float> centre, float radius, float angleDegrees) noexcept
+    {
+        return centre + directionForAngleDegrees(angleDegrees) * radius;
+    }
+
+    inline float trackedTextWidth(const juce::String& text, const juce::Font& font, float trackingPx)
+    {
+        float width = 0.0f;
+        for (int i = 0; i < text.length(); ++i)
+        {
+            width += juce::GlyphArrangement::getStringWidth(font, juce::String::charToString(text[i]));
+            if (i < text.length() - 1)
+                width += trackingPx;
+        }
+        return width;
+    }
+
+    // juce::Font has no absolute-pixel letter-spacing, so this draws glyph-by-glyph
+    // to reproduce the SVG's `letter-spacing` attribute exactly.
+    inline void drawTrackedText(juce::Graphics& g, const juce::String& text, const juce::Font& font,
+                                 float trackingPx, juce::Rectangle<float> area,
+                                 juce::Justification justification, juce::Colour colour)
+    {
+        g.setFont(font);
+        g.setColour(colour);
+
+        const float totalWidth = trackedTextWidth(text, font, trackingPx);
+        float x = area.getX();
+        if (justification.testFlags(juce::Justification::horizontallyCentred))
+            x = area.getCentreX() - totalWidth * 0.5f;
+        else if (justification.testFlags(juce::Justification::right))
+            x = area.getRight() - totalWidth;
+
+        for (int i = 0; i < text.length(); ++i)
+        {
+            const auto ch = juce::String::charToString(text[i]);
+            const float charWidth = juce::GlyphArrangement::getStringWidth(font, ch);
+            g.drawText(ch, juce::Rectangle<float>(x, area.getY(), charWidth + 1.0f, area.getHeight()),
+                       juce::Justification::centredLeft, false);
+            x += charWidth + trackingPx;
+        }
+    }
+}

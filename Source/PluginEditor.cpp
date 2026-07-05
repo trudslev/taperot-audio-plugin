@@ -2,36 +2,31 @@
 
 namespace
 {
-    juce::StringArray getAllParamIDsInOrder()
-    {
-        return {
-            ParamIDs::drive, ParamIDs::wow, ParamIDs::flutter, ParamIDs::model,
-            ParamIDs::noise, ParamIDs::hum, ParamIDs::failure, ParamIDs::mix, ParamIDs::output,
-            ParamIDs::spread, ParamIDs::failureDropouts, ParamIDs::failureSnags,
-            ParamIDs::failureCrinkles, ParamIDs::failureImbalance
-        };
-    }
+    constexpr int referenceWidth = (int) TapeRotTheme::Layout::canvasWidth;
+    constexpr int referenceHeight = (int) TapeRotTheme::Layout::canvasHeight;
 }
 
 TapeRotAudioProcessorEditor::TapeRotAudioProcessorEditor(TapeRotAudioProcessor& p)
-    : AudioProcessorEditor(&p), processorRef(p), panel(p.apvts, getAllParamIDsInOrder())
+    : AudioProcessorEditor(&p), processorRef(p), content(p)
 {
-    setLookAndFeel(&lookAndFeel);
-    addAndMakeVisible(panel);
-    setSize(720, 420);
+    addAndMakeVisible(content);
+
+    setResizable(true, true);
+    if (auto* constrainer = getConstrainer())
+    {
+        constrainer->setFixedAspectRatio((double) referenceWidth / (double) referenceHeight);
+        constrainer->setSizeLimits(referenceWidth / 2, referenceHeight / 2,
+                                    referenceWidth * 2, referenceHeight * 2);
+    }
+
+    setSize(referenceWidth, referenceHeight);
 }
 
-TapeRotAudioProcessorEditor::~TapeRotAudioProcessorEditor()
-{
-    setLookAndFeel(nullptr);
-}
-
-void TapeRotAudioProcessorEditor::paint(juce::Graphics& g)
-{
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-}
+TapeRotAudioProcessorEditor::~TapeRotAudioProcessorEditor() = default;
 
 void TapeRotAudioProcessorEditor::resized()
 {
-    panel.setBounds(getLocalBounds());
+    const float scale = (float) getWidth() / (float) referenceWidth;
+    content.setTransform(juce::AffineTransform::scale(scale));
+    content.setBounds(0, 0, referenceWidth, referenceHeight);
 }

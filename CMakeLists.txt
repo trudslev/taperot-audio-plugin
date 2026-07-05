@@ -17,6 +17,8 @@ juce_add_plugin(TapeRot
     PRODUCT_NAME "TapeRot"
     COMPANY_NAME "TapeRot"
     BUNDLE_ID "com.taperot.taperot"
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-1024.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-256.png"
     PLUGIN_MANUFACTURER_CODE Trot
     PLUGIN_CODE Rota
     FORMATS AU VST3 Standalone
@@ -36,8 +38,18 @@ target_sources(TapeRot PRIVATE
     Source/DSP/Saturator.cpp
     Source/DSP/WowFlutter.cpp
     Source/DSP/TapeModelEQ.cpp
+    Source/DSP/NoiseSource.cpp
+    Source/DSP/Hum.cpp
+    Source/DSP/FailureEngine.cpp
+    Source/DSP/StereoSpread.cpp
+    Source/DSP/OutputStage.cpp
     Source/GUI/TapeRotLookAndFeel.cpp
-    Source/GUI/GenericParameterPanel.cpp)
+    Source/GUI/DymoLabel.cpp
+    Source/GUI/SectionPanel.cpp
+    Source/GUI/ToggleSwitch.cpp
+    Source/GUI/FailureDotToggle.cpp
+    Source/GUI/NoiseCharacterSwitch.cpp
+    Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC
     JUCE_WEB_BROWSER=0

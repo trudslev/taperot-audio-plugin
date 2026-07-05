@@ -12,6 +12,7 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     flutterParam = apvts.getRawParameterValue(ParamIDs::flutter);
     modelParam = apvts.getRawParameterValue(ParamIDs::model);
     noiseParam = apvts.getRawParameterValue(ParamIDs::noise);
+    noiseCharacterParam = apvts.getRawParameterValue(ParamIDs::noiseCharacter);
     humParam = apvts.getRawParameterValue(ParamIDs::hum);
     failureParam = apvts.getRawParameterValue(ParamIDs::failure);
     mixParam = apvts.getRawParameterValue(ParamIDs::mix);
@@ -31,7 +32,8 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     saturator.prepare(spec);
     wowFlutter.prepare(spec);
     tapeModelEQ.prepare(spec);
-    noiseGenerator.prepare(spec);
+    noiseSource.prepare(spec);
+    hum.prepare(spec);
     failureEngine.prepare(spec);
     stereoSpread.prepare(spec);
     outputStage.prepare(spec);
@@ -60,6 +62,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const float flutter01 = flutterParam->load() / 100.0f;
     const int model = (int) modelParam->load();
     const float noise01 = noiseParam->load() / 100.0f;
+    const int noiseCharacter = (int) noiseCharacterParam->load();
     const bool humEnabled = humParam->load() > 0.5f;
     const float failure01 = failureParam->load() / 100.0f;
     const float mix01 = mixParam->load() / 100.0f;
@@ -70,13 +73,20 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const bool crinkles = failureCrinklesParam->load() > 0.5f;
     const bool imbalance = failureImbalanceParam->load() > 0.5f;
 
+    const int numSamples = buffer.getNumSamples();
+    const int numChannels = buffer.getNumChannels();
+    dryBuffer.setSize(numChannels, numSamples, false, false, true);
+    for (int ch = 0; ch < numChannels; ++ch)
+        dryBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+
     saturator.process(buffer, drive01);
     wowFlutter.process(buffer, wow01, flutter01);
     tapeModelEQ.process(buffer, model);
-    noiseGenerator.process(buffer, noise01, humEnabled);
+    noiseSource.process(buffer, noise01, noiseCharacter);
+    hum.process(buffer, humEnabled);
     failureEngine.process(buffer, failure01, dropouts, snags, crinkles, imbalance);
     stereoSpread.process(buffer, spread);
-    outputStage.process(buffer, mix01, outputDb);
+    outputStage.process(buffer, dryBuffer, mix01, outputDb);
 
     constexpr float displayTimeConstantSeconds = 0.15f;
     const float blockSeconds = (float) buffer.getNumSamples() / (float) displaySampleRate;
