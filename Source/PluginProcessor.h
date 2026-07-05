@@ -16,12 +16,11 @@
 #include <memory>
 
 class TapeRotAudioProcessor final : public juce::AudioProcessor,
-                                     private juce::AudioProcessorValueTreeState::Listener,
                                      private juce::AsyncUpdater
 {
 public:
     TapeRotAudioProcessor();
-    ~TapeRotAudioProcessor() override;
+    ~TapeRotAudioProcessor() override = default;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -63,24 +62,17 @@ public:
     }
 
 private:
-    // Selecting a MODEL snaps DRIVE/WOW/FLUTTER/NOISE to that machine's preset (see
-    // TapeModelData.h) - knobs stay adjustable afterward, every model switch just re-applies its
-    // preset unconditionally. Conversely, nudging any of those four knobs away from the current
-    // model's preset means the sound no longer matches a named machine, so MODEL snaps to NONE.
-    // Both directions are deferred via AsyncUpdater since AudioProcessorValueTreeState's
-    // parameterChanged callback isn't guaranteed to run on the message thread (it fires from
-    // whichever thread changed the parameter, including host automation on the audio thread), and
-    // setValueNotifyingHost is only safe to call from the message thread.
-    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    // Applying a factory/user preset (see setCurrentProgram) sets every parameter via
+    // setValueNotifyingHost, which is message-thread-only - but a host can call setCurrentProgram
+    // itself from a non-message thread (VST3 delivers program-change as an ordinary automatable
+    // parameter, which can arrive on the audio/process thread during playback automation). So the
+    // actual application is deferred through AsyncUpdater: setCurrentProgram just records which
+    // program is pending and triggers an async update; handleAsyncUpdate (guaranteed message
+    // thread) does the real work.
     void handleAsyncUpdate() override;
-    std::atomic<int> pendingModelPresetIndex{-1};
-    std::atomic<bool> knobsMayHaveDrifted{false};
-    // Suppresses the drift check while handleAsyncUpdate is itself applying a model's preset -
-    // otherwise the four setValueNotifyingHost calls that apply the preset would immediately be
-    // seen as "drift" and snap MODEL straight back to NONE.
-    std::atomic<bool> isApplyingModelPreset{false};
-    // Guards against either listener reacting to setStateInformation's apvts.replaceState(...)
-    // while it's still firing per-parameter callbacks for a freshly-restored session.
+    std::atomic<int> pendingProgramIndex{-1};
+    // Guards setStateInformation's apvts.replaceState(...) from being seen as anything other than
+    // a plain session restore by any future per-parameter listener.
     std::atomic<bool> isRestoringState{false};
 
     std::atomic<float>* driveParam = nullptr;
