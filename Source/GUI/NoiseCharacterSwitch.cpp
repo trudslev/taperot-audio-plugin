@@ -19,7 +19,7 @@ void NoiseCharacterSwitch::timerCallback()
     const float target = (float) std::round(getValue()) / 2.0f;
     if (std::abs(target - displayedT) > 0.001f)
     {
-        displayedT += (target - displayedT) * 0.18f;
+        displayedT += (target - displayedT) * 0.35f;
         repaint();
     }
     else if (displayedT != target)

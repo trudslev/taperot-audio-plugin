@@ -17,7 +17,7 @@ void ToggleSwitch::timerCallback()
     const float target = getToggleState() ? 1.0f : 0.0f;
     if (std::abs(target - thumbPosition01) > 0.001f)
     {
-        thumbPosition01 += (target - thumbPosition01) * 0.18f;
+        thumbPosition01 += (target - thumbPosition01) * 0.35f;
         repaint();
     }
     else if (thumbPosition01 != target)
