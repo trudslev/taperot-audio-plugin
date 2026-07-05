@@ -15,11 +15,13 @@
 #include <array>
 #include <memory>
 
-class TapeRotAudioProcessor final : public juce::AudioProcessor
+class TapeRotAudioProcessor final : public juce::AudioProcessor,
+                                     private juce::AudioProcessorValueTreeState::Listener,
+                                     private juce::AsyncUpdater
 {
 public:
     TapeRotAudioProcessor();
-    ~TapeRotAudioProcessor() override = default;
+    ~TapeRotAudioProcessor() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -46,9 +48,6 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     FailureEngine& getFailureEngine() noexcept { return failureEngine; }
-    float getWowDisplay() const noexcept { return wowDisplay.load(std::memory_order_relaxed); }
-    float getFlutterDisplay() const noexcept { return flutterDisplay.load(std::memory_order_relaxed); }
-    float getFailureDisplay() const noexcept { return failureDisplay.load(std::memory_order_relaxed); }
     float getFailAuxDisplay() const noexcept { return failAuxDisplay.load(std::memory_order_relaxed); }
     float getStopSpeedDisplay() const noexcept { return tapeStop.getSpeedDisplay(); }
     float getGenDisplay() const noexcept { return genSmoothed.getCurrentValue(); }
@@ -64,6 +63,26 @@ public:
     }
 
 private:
+    // Selecting a MODEL snaps DRIVE/WOW/FLUTTER/NOISE to that machine's preset (see
+    // TapeModelData.h) - knobs stay adjustable afterward, every model switch just re-applies its
+    // preset unconditionally. Conversely, nudging any of those four knobs away from the current
+    // model's preset means the sound no longer matches a named machine, so MODEL snaps to NONE.
+    // Both directions are deferred via AsyncUpdater since AudioProcessorValueTreeState's
+    // parameterChanged callback isn't guaranteed to run on the message thread (it fires from
+    // whichever thread changed the parameter, including host automation on the audio thread), and
+    // setValueNotifyingHost is only safe to call from the message thread.
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+    void handleAsyncUpdate() override;
+    std::atomic<int> pendingModelPresetIndex{-1};
+    std::atomic<bool> knobsMayHaveDrifted{false};
+    // Suppresses the drift check while handleAsyncUpdate is itself applying a model's preset -
+    // otherwise the four setValueNotifyingHost calls that apply the preset would immediately be
+    // seen as "drift" and snap MODEL straight back to NONE.
+    std::atomic<bool> isApplyingModelPreset{false};
+    // Guards against either listener reacting to setStateInformation's apvts.replaceState(...)
+    // while it's still firing per-parameter callbacks for a freshly-restored session.
+    std::atomic<bool> isRestoringState{false};
+
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* wowParam = nullptr;
     std::atomic<float>* flutterParam = nullptr;
@@ -104,9 +123,6 @@ private:
     AuxEnvelope failEnvelope;
     OutputStage outputStage;
 
-    std::atomic<float> wowDisplay{0.0f};
-    std::atomic<float> flutterDisplay{0.0f};
-    std::atomic<float> failureDisplay{0.0f};
     std::atomic<float> failAuxDisplay{0.0f};
     double displaySampleRate = 44100.0;
 

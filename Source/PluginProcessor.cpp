@@ -33,6 +33,80 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
 
     for (int i = 0; i < maxGenerations; ++i)
         generationStages[(size_t) i] = std::make_unique<DegradationCore>(i);
+
+    apvts.addParameterListener(ParamIDs::model, this);
+    apvts.addParameterListener(ParamIDs::drive, this);
+    apvts.addParameterListener(ParamIDs::wow, this);
+    apvts.addParameterListener(ParamIDs::flutter, this);
+    apvts.addParameterListener(ParamIDs::noise, this);
+}
+
+TapeRotAudioProcessor::~TapeRotAudioProcessor()
+{
+    apvts.removeParameterListener(ParamIDs::model, this);
+    apvts.removeParameterListener(ParamIDs::drive, this);
+    apvts.removeParameterListener(ParamIDs::wow, this);
+    apvts.removeParameterListener(ParamIDs::flutter, this);
+    apvts.removeParameterListener(ParamIDs::noise, this);
+}
+
+void TapeRotAudioProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if (isRestoringState.load(std::memory_order_relaxed))
+        return;
+
+    if (parameterID == ParamIDs::model)
+    {
+        pendingModelPresetIndex.store((int) newValue, std::memory_order_relaxed);
+        triggerAsyncUpdate();
+    }
+    else if (!isApplyingModelPreset.load(std::memory_order_relaxed))
+    {
+        // One of DRIVE/WOW/FLUTTER/NOISE changed for a reason other than our own preset-apply
+        // below (a manual drag, or host automation) - check on the message thread whether it
+        // still matches the selected model's preset.
+        knobsMayHaveDrifted.store(true, std::memory_order_relaxed);
+        triggerAsyncUpdate();
+    }
+}
+
+void TapeRotAudioProcessor::handleAsyncUpdate()
+{
+    const int index = pendingModelPresetIndex.exchange(-1, std::memory_order_relaxed);
+    if (index >= 0 && (size_t) index < kNumTapeModels && (size_t) index != noneModelIndex)
+    {
+        const auto& preset = kTapeModels[(size_t) index];
+        auto applyPercent = [this](const char* paramID, float percentValue)
+        {
+            if (auto* param = apvts.getParameter(paramID))
+                param->setValueNotifyingHost(param->convertTo0to1(percentValue));
+        };
+        isApplyingModelPreset.store(true, std::memory_order_relaxed);
+        applyPercent(ParamIDs::drive, preset.presetDrivePercent);
+        applyPercent(ParamIDs::wow, preset.presetWowPercent);
+        applyPercent(ParamIDs::flutter, preset.presetFlutterPercent);
+        applyPercent(ParamIDs::noise, preset.presetNoisePercent);
+        isApplyingModelPreset.store(false, std::memory_order_relaxed);
+    }
+
+    if (knobsMayHaveDrifted.exchange(false, std::memory_order_relaxed))
+    {
+        const int currentModel = (int) modelParam->load(std::memory_order_relaxed);
+        if (currentModel >= 0 && (size_t) currentModel < kNumTapeModels && (size_t) currentModel != noneModelIndex)
+        {
+            const auto& preset = kTapeModels[(size_t) currentModel];
+            constexpr float epsilon = 0.05f;
+            const bool stillMatchesPreset =
+                std::abs(driveParam->load(std::memory_order_relaxed) - preset.presetDrivePercent) < epsilon
+                && std::abs(wowParam->load(std::memory_order_relaxed) - preset.presetWowPercent) < epsilon
+                && std::abs(flutterParam->load(std::memory_order_relaxed) - preset.presetFlutterPercent) < epsilon
+                && std::abs(noiseParam->load(std::memory_order_relaxed) - preset.presetNoisePercent) < epsilon;
+
+            if (!stillMatchesPreset)
+                if (auto* modelParameter = apvts.getParameter(ParamIDs::model))
+                    modelParameter->setValueNotifyingHost(modelParameter->convertTo0to1((float) noneModelIndex));
+        }
+    }
 }
 
 void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -106,7 +180,11 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     saturator.process(buffer, drive01);
 
-    genSmoothed.setTargetValue((float) juce::jlimit(1, maxGenerations, (int) std::round(genParam->load())));
+    // NONE bypasses the tape-model/GEN system entirely: there's no model character to compound
+    // across generations, so force a single pass regardless of the GEN control's position (still
+    // via genSmoothed, so entering/leaving NONE ramps rather than jumps).
+    const int requestedGen = (size_t) model == noneModelIndex ? 1 : (int) std::round(genParam->load());
+    genSmoothed.setTargetValue((float) juce::jlimit(1, maxGenerations, requestedGen));
     genSmoothed.skip(numSamples);
     const float genValue = genSmoothed.getCurrentValue();
 
@@ -156,9 +234,6 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         display.store(current + smoothingCoeff * (target - current), std::memory_order_relaxed);
     };
 
-    smoothDisplay(wowDisplay, wow01);
-    smoothDisplay(flutterDisplay, flutter01);
-    smoothDisplay(failureDisplay, failure01);
     smoothDisplay(failAuxDisplay, failAuxValue);
 
     float peak = 0.0f;
@@ -192,7 +267,15 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
         if (xml->hasTagName(apvts.state.getType()))
         {
             LegacyMigration::remapLegacyModelIndexIfNeeded(*xml);
+
+            // Suppress the model-preset-snap listener while restoring: replaceState fires
+            // parameterChanged for every parameter it touches, including model, and the saved
+            // session's own drive/wow/flutter/noise values (not necessarily the current preset,
+            // since the user can adjust them after selecting a model) must win, not get
+            // immediately overwritten by a preset re-application.
+            isRestoringState.store(true, std::memory_order_relaxed);
             apvts.replaceState(juce::ValueTree::fromXml(*xml));
+            isRestoringState.store(false, std::memory_order_relaxed);
         }
 }
 

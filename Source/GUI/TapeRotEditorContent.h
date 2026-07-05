@@ -13,7 +13,6 @@
 #include "FailLamp.h"
 #include "Scope.h"
 #include "GenDigitDisplay.h"
-#include "ModelReadout.h"
 #include "../PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -43,7 +42,8 @@ private:
     NoiseCharacterSwitch noiseCharacterSwitch;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> noiseCharacterAttachment;
 
-    ModelReadout modelReadout;
+    juce::ComboBox modelComboBox;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> modelComboBoxAttachment;
 
     std::array<std::unique_ptr<FailureDotToggle>, TapeRotTheme::Layout::failureDots.size()> failureDotToggles;
     std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>,

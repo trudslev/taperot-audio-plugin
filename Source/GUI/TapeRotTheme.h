@@ -168,11 +168,12 @@ namespace TapeRotTheme
             float x;
         };
 
-        inline constexpr std::array<KnobSpec, 8> knobs{{
+        // MODEL is deliberately not a knob (see modelDropdown* below) - it's a "pick a named
+        // preset" control, not a continuous sweep, so it's a dropdown instead.
+        inline constexpr std::array<KnobSpec, 7> knobs{{
             {"drive", "DRIVE", 82.0f},
             {"wow", "WOW", 190.0f},
             {"flutter", "FLUTTER", 298.0f},
-            {"model", "MODEL", 406.0f},
             {"noise", "NOISE", 514.0f},
             {"failure", "FAILURE", 634.0f},
             {"mix", "MIX", 760.0f},
@@ -190,13 +191,15 @@ namespace TapeRotTheme
         constexpr float humSwitchX = 518.0f;
         constexpr float spreadSwitchX = 610.0f;
 
-        // ModelReadout box, per the updated SVG (sits under the MODEL knob, replacing its
-        // generic knob-label text).
-        constexpr float modelReadoutX = 361.0f, modelReadoutY = 261.0f;
-        constexpr float modelReadoutW = 90.0f, modelReadoutH = 22.0f, modelReadoutRadius = 4.0f;
-        constexpr float modelReadoutLabelY = 297.0f;
-        constexpr float modelReadoutNominalFontPx = 10.0f;
-        constexpr float modelReadoutMinFontPx = 6.5f;
+        // MODEL dropdown, replacing the old rotary-knob-plus-readout treatment. The MACHINE
+        // section only has the gap between the TRANSPORT|MACHINE divider (352) and the NOISE
+        // knob's own tick radius (514 - knobTickOuterRadius = 470) to work with - 118px wide
+        // centred on the old knob position (406) doesn't fit in that 118px-wide gap with any
+        // margin, so this is narrower and centred within the gap instead, with a smaller dropdown
+        // font (see TapeRotLookAndFeel::getComboBoxFont) so "CASSETTE II" still fits legibly.
+        constexpr float modelDropdownCentreX = 411.0f;
+        constexpr float modelDropdownW = 100.0f, modelDropdownH = 24.0f;
+        constexpr float modelDropdownY = knobCentreY - modelDropdownH * 0.5f;
 
         constexpr float failureDotY = 365.0f, failureDotRadius = 4.0f, failureDotLabelY = 377.0f;
         constexpr float failureDotFirstX = 592.0f, failureDotSpacing = 28.0f;
