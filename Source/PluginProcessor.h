@@ -6,6 +6,7 @@
 #include "DSP/Hum.h"
 #include "DSP/FailureEngine.h"
 #include "DSP/StereoSpread.h"
+#include "DSP/ToneFilters.h"
 #include "DSP/OutputStage.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
@@ -63,6 +64,8 @@ private:
     std::atomic<float>* failureCrinklesParam = nullptr;
     std::atomic<float>* failureImbalanceParam = nullptr;
     std::atomic<float>* genParam = nullptr;
+    std::atomic<float>* lpParam = nullptr;
+    std::atomic<float>* hpParam = nullptr;
 
     static constexpr int maxGenerations = 8;
 
@@ -74,6 +77,7 @@ private:
     Hum hum;
     FailureEngine failureEngine;
     StereoSpread stereoSpread;
+    ToneFilters toneFilters;
     OutputStage outputStage;
 
     std::atomic<float> wowDisplay{0.0f};

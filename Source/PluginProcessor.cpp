@@ -23,6 +23,8 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     failureCrinklesParam = apvts.getRawParameterValue(ParamIDs::failureCrinkles);
     failureImbalanceParam = apvts.getRawParameterValue(ParamIDs::failureImbalance);
     genParam = apvts.getRawParameterValue(ParamIDs::gen);
+    lpParam = apvts.getRawParameterValue(ParamIDs::lp);
+    hpParam = apvts.getRawParameterValue(ParamIDs::hp);
 
     for (int i = 0; i < maxGenerations; ++i)
         generationStages[(size_t) i] = std::make_unique<DegradationCore>(i);
@@ -39,6 +41,7 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     hum.prepare(spec);
     failureEngine.prepare(spec);
     stereoSpread.prepare(spec);
+    toneFilters.prepare(spec);
     outputStage.prepare(spec);
 
     genSmoothed.reset(sampleRate, 0.04);
@@ -79,6 +82,8 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const bool snags = failureSnagsParam->load() > 0.5f;
     const bool crinkles = failureCrinklesParam->load() > 0.5f;
     const bool imbalance = failureImbalanceParam->load() > 0.5f;
+    const float lpHz = lpParam->load();
+    const float hpHz = hpParam->load();
 
     const int numSamples = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
@@ -117,6 +122,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     hum.process(buffer, humEnabled);
     failureEngine.process(buffer, failure01, dropouts, snags, crinkles, imbalance);
     stereoSpread.process(buffer, spread);
+    toneFilters.process(buffer, lpHz, hpHz);
     outputStage.process(buffer, dryBuffer, mix01, outputDb);
 
     constexpr float displayTimeConstantSeconds = 0.15f;

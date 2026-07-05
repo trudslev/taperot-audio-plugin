@@ -20,6 +20,8 @@ namespace ParamIDs
     constexpr auto failureImbalance = "failureImbalance";
     constexpr auto noiseCharacter = "noiseCharacter";
     constexpr auto gen = "gen";
+    constexpr auto lp = "lp";
+    constexpr auto hp = "hp";
 }
 
 namespace NoiseCharacterNames
@@ -98,6 +100,19 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{ParamIDs::gen, 1}, "Generation", 1, 8, 1));
+
+    auto hzAttrs = juce::AudioParameterFloatAttributes().withLabel("Hz");
+
+    // Skewed toward the lower end, as is conventional for frequency parameters, since that's
+    // where most of the perceptually-relevant tonal action happens. Defaults sit at the
+    // transparent extreme of each range (LP wide open, HP fully open) so the filters are "off".
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ParamIDs::lp, 1}, "LP",
+        juce::NormalisableRange<float>(1000.0f, 20000.0f, 0.0f, 0.3f), 20000.0f, hzAttrs));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ParamIDs::hp, 1}, "HP",
+        juce::NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f, hzAttrs));
 
     return {params.begin(), params.end()};
 }
