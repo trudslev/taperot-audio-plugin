@@ -10,6 +10,7 @@ target_sources(TapeRotTests PRIVATE
     NoiseSourceTests.cpp
     ToneFiltersTests.cpp
     AuxEffectsTests.cpp
+    ParametersStateTests.cpp
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
     ../Source/DSP/TapeModelEQ.cpp
@@ -26,6 +27,7 @@ target_compile_definitions(TapeRotTests PRIVATE
 target_link_libraries(TapeRotTests PRIVATE
     juce::juce_dsp
     juce::juce_audio_basics
+    juce::juce_audio_processors
     juce::juce_core
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)
