@@ -11,6 +11,7 @@ target_sources(TapeRotTests PRIVATE
     ToneFiltersTests.cpp
     AuxEffectsTests.cpp
     ParametersStateTests.cpp
+    GenerationCascadeTests.cpp
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
     ../Source/DSP/TapeModelEQ.cpp
