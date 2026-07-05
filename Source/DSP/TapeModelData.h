@@ -35,13 +35,18 @@ struct TapeModel
 
 // Ordered cleanest to nastiest so the MODEL knob sweeps hi-fi -> trash.
 inline constexpr std::array<TapeModel, 8> kTapeModels{{
-    // Placeholder curve pending measured reference data - deliberately subtle since a real B77
-    // at 19cm/s is close to transparent; its character should mostly emerge via GEN compounding.
+    // Approximates published Revox/Studer B77 specs at 7.5ips/19cm/s, cross-referenced across
+    // multiple listings: frequency response 50Hz-15kHz +/-1.5dB (tight band), extending to
+    // 30Hz-20kHz +2/-3dB (outer tolerance); S/N ~67dB(A) - the lowest noise floor of the eight
+    // models; wow & flutter ~0.08% - the lightest of the eight; THD ~0.5% - the lowest drive
+    // setting of the eight. No significant low-end head-bump (the real deck is close to flat
+    // down low, unlike cassette-era gear). Still pending replacement with a real swept
+    // measurement of an actual unit; this is a tolerance-band approximation, not a measured curve.
     {"REVOX B77", {{
-        {EQBandType::Peak, 50.0f, 1.0f, 1.0f},
-        {EQBandType::HighPass, 25.0f, 0.0f, 0.707f},
-        {EQBandType::HighShelf, 18000.0f, -1.5f, 0.707f}
-    }}, 3, 0.91f},
+        {EQBandType::HighPass, 28.0f, 0.0f, 0.707f},
+        {EQBandType::HighShelf, 13000.0f, -2.0f, 0.707f},
+        {}
+    }}, 2, 1.26f},
     {"VCR HIFI", {{
         {EQBandType::HighShelf, 12000.0f, -2.0f, 0.707f},
         {EQBandType::Peak, 5000.0f, 1.0f, 1.0f},

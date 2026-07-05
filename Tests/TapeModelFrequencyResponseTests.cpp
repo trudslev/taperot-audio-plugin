@@ -116,7 +116,7 @@ public:
             }
         }
 
-        beginTest("REVOX B77 is nearly flat in the midrange (deliberately subtle placeholder curve)");
+        beginTest("REVOX B77 is nearly flat in the midrange (measured-spec approximation, not a boosted/cut band)");
         {
             const float midGainDb = measureGainDb(0, 1000.0f, sampleRate) - kTapeModels[0].makeupGainDb;
             logMessage("REVOX B77 @ 1kHz: " + juce::String(midGainDb, 2) + " dB");
