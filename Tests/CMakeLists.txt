@@ -16,6 +16,7 @@ target_sources(TapeRotTests PRIVATE
     TapeModelCalibrationTests.cpp
     TapeModelFrequencyResponseTests.cpp
     ModelSwitchAutomationTests.cpp
+    FactoryPresetsTests.cpp
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
     ../Source/DSP/TapeModelEQ.cpp

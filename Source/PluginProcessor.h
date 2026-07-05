@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Parameters.h"
+#include "DSP/FactoryPresets.h"
 #include "DSP/Saturator.h"
 #include "DSP/DegradationCore.h"
 #include "DSP/Hum.h"
@@ -35,14 +36,22 @@ public:
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
-    int getNumPrograms() override { return 1; }
-    int getCurrentProgram() override { return 0; }
-    void setCurrentProgram(int) override {}
-    const juce::String getProgramName(int) override { return {}; }
+    int getNumPrograms() override;
+    int getCurrentProgram() override { return currentProgramIndex.load(std::memory_order_relaxed); }
+    void setCurrentProgram(int index) override;
+    const juce::String getProgramName(int index) override;
     void changeProgramName(int, const juce::String&) override {}
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
+
+    // Factory presets (indices [0, kNumFactoryPresets)) are the read-only, always-present entries
+    // in kFactoryPresets; user presets (indices [kNumFactoryPresets, getNumPrograms())) are files
+    // in getUserPresetDirectory(), sorted alphabetically by filename. "Save" is never in-place for
+    // a factory preset - the GUI's Save always calls saveUserPreset, which creates a new file.
+    bool isFactoryPreset(int index) const noexcept { return index >= 0 && index < (int) kNumFactoryPresets; }
+    void saveUserPreset(const juce::String& name);
+    void deleteUserPreset(int index);
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -71,9 +80,16 @@ private:
     // thread) does the real work.
     void handleAsyncUpdate() override;
     std::atomic<int> pendingProgramIndex{-1};
-    // Guards setStateInformation's apvts.replaceState(...) from being seen as anything other than
-    // a plain session restore by any future per-parameter listener.
-    std::atomic<bool> isRestoringState{false};
+
+    void applyProgramByIndex(int index);
+    void applyFactoryPreset(const FactoryPreset& preset);
+    void refreshUserPresetList();
+    static juce::File getUserPresetDirectory();
+
+    std::atomic<int> currentProgramIndex{(int) warmCassetteProgramIndex};
+    // Sorted alphabetically by filename (stable across relaunches, unlike mtime-sort). Index i in
+    // this array is program index kNumFactoryPresets + i.
+    juce::Array<juce::File> userPresetFiles;
 
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* wowParam = nullptr;
