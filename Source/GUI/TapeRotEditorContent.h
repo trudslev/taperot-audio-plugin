@@ -14,6 +14,7 @@
 #include "Scope.h"
 #include "GenDigitDisplay.h"
 #include "ModelReadout.h"
+#include "PresetStrip.h"
 #include "../PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -61,4 +62,5 @@ private:
     FailLamp failLamp;
     Scope scope;
     GenDigitDisplay genDigitDisplay;
+    PresetStrip presetStrip;
 };

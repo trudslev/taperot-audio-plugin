@@ -87,20 +87,40 @@ namespace TapeRotTheme
     constexpr float dotLabelTracking = 0.5f;
     constexpr float dymoTracking = 4.0f;
     constexpr float versionTracking = 2.0f;
+    constexpr float presetNameTracking = 1.2f;
+    constexpr float presetSaveLabelTracking = 1.5f;
 
     namespace Layout
     {
         constexpr float canvasWidth = 960.0f;
-        constexpr float canvasHeight = 400.0f;
+        constexpr float canvasHeight = 434.0f;
 
         constexpr float bezelOuterX = 2.0f, bezelOuterY = 2.0f;
-        constexpr float bezelOuterW = 956.0f, bezelOuterH = 396.0f, bezelOuterRadius = 14.0f;
+        constexpr float bezelOuterW = 956.0f, bezelOuterH = 430.0f, bezelOuterRadius = 14.0f;
         constexpr float panelX = 8.0f, panelY = 8.0f;
-        constexpr float panelW = 944.0f, panelH = 384.0f, panelRadius = 10.0f;
+        constexpr float panelW = 944.0f, panelH = 418.0f, panelRadius = 10.0f;
 
+        // Header grew by presetStripH (34px) to fit the new preset strip below the original
+        // DymoLabel/scope/counter/lamp content - everything else in this Layout that used to sit
+        // below the old header (dividers, knobs, switches, etc.) shifts down by that same 34px, a
+        // mechanical pass rather than a re-layout (see the plan's "keep the previous knob-panel
+        // layout, just shifted down uniformly" decision).
         constexpr float headerX = 8.0f, headerY = 8.0f;
-        constexpr float headerW = 944.0f, headerH = 108.0f;
-        constexpr float headerSeparatorY = 116.0f;
+        constexpr float headerW = 944.0f, headerH = 142.0f;
+        constexpr float headerSeparatorY = 150.0f;
+
+        // The original header/panel boundary (pre-preset-strip) is now an internal divider inside
+        // the taller header, separating the DymoLabel/scope/counter/lamp row from the preset strip.
+        constexpr float presetStripDividerY = 116.0f;
+
+        // Preset strip: prev/name-plate/next/save row, per design/taperot-interface.svg.
+        constexpr float presetArrowCentreY = 133.0f, presetArrowRadius = 11.0f;
+        constexpr float presetPrevCentreX = 335.0f, presetNextCentreX = 625.0f;
+        constexpr float presetNamePlateX = 360.0f, presetNamePlateY = 121.0f;
+        constexpr float presetNamePlateW = 240.0f, presetNamePlateH = 24.0f, presetNamePlateRadius = 4.0f;
+        constexpr float presetSaveX = 889.0f, presetSaveY = 122.0f;
+        constexpr float presetSaveW = 22.0f, presetSaveH = 22.0f, presetSaveRadius = 2.5f;
+        constexpr float presetSaveLabelY = 155.0f;
 
         constexpr float dymoX = 32.0f, dymoY = 40.0f, dymoW = 168.0f, dymoH = 34.0f;
         // A hand-applied Dymo label doesn't sit dead-square on the panel - keep this visibly but
@@ -143,14 +163,14 @@ namespace TapeRotTheme
         constexpr float lampX = 838.0f, lampY = 58.0f, lampRadius = 8.0f, lampGlowRadius = 20.0f;
         constexpr float lampSpecularX = 835.5f, lampSpecularY = 55.0f, lampSpecularRadius = 2.2f;
 
-        constexpr float sectionLabelY = 146.0f;
+        constexpr float sectionLabelY = 180.0f;
         constexpr float inputLabelX = 82.0f, transportLabelX = 244.0f, machineLabelX = 460.0f,
                         decayLabelX = 634.0f, outputLabelX = 814.0f;
 
-        constexpr float dividerTop = 132.0f, dividerBottom = 362.0f;
+        constexpr float dividerTop = 166.0f, dividerBottom = 396.0f;
         constexpr std::array<float, 4> dividerX{136.0f, 352.0f, 568.0f, 700.0f};
 
-        constexpr float knobCentreY = 212.0f, knobRadius = 33.0f;
+        constexpr float knobCentreY = 246.0f, knobRadius = 33.0f;
         constexpr float knobLabelOffsetY = 63.0f;
         constexpr float knobTickInnerRadius = knobRadius + 6.0f;
         constexpr float knobTickOuterRadius = knobRadius + 11.0f;
@@ -179,10 +199,10 @@ namespace TapeRotTheme
             {"output", "OUTPUT", 868.0f},
         }};
 
-        constexpr float switchY = 309.5f, switchH = 13.0f, switchW = 48.0f, switchRadius = 6.5f;
+        constexpr float switchY = 343.5f, switchH = 13.0f, switchW = 48.0f, switchRadius = 6.5f;
         constexpr float switchThumbRadius = 8.0f, switchThumbDotRadius = 2.4f;
-        constexpr float switchCentreY = 316.0f;
-        constexpr float switchLabelY = 338.0f, switchCaptionY = 350.0f;
+        constexpr float switchCentreY = 350.0f;
+        constexpr float switchLabelY = 372.0f, switchCaptionY = 384.0f;
 
         // MACHINE section switch row positions, per the updated design/taperot-interface.svg.
         constexpr float switchModeSwitchX = 370.0f;
@@ -192,13 +212,13 @@ namespace TapeRotTheme
 
         // ModelReadout box, per the updated SVG (sits under the MODEL knob, replacing its
         // generic knob-label text).
-        constexpr float modelReadoutX = 361.0f, modelReadoutY = 261.0f;
+        constexpr float modelReadoutX = 361.0f, modelReadoutY = 295.0f;
         constexpr float modelReadoutW = 90.0f, modelReadoutH = 22.0f, modelReadoutRadius = 4.0f;
-        constexpr float modelReadoutLabelY = 297.0f;
+        constexpr float modelReadoutLabelY = 331.0f;
         constexpr float modelReadoutNominalFontPx = 10.0f;
         constexpr float modelReadoutMinFontPx = 6.5f;
 
-        constexpr float failureDotY = 365.0f, failureDotRadius = 4.0f, failureDotLabelY = 377.0f;
+        constexpr float failureDotY = 399.0f, failureDotRadius = 4.0f, failureDotLabelY = 411.0f;
         constexpr float failureDotFirstX = 592.0f, failureDotSpacing = 28.0f;
 
         struct FailureDotSpec
@@ -216,11 +236,11 @@ namespace TapeRotTheme
 
         constexpr float screwRadius = 6.5f;
         inline constexpr std::array<std::pair<float, float>, 4> screwPositions{{
-            {24.0f, 24.0f}, {936.0f, 24.0f}, {24.0f, 376.0f}, {936.0f, 376.0f}
+            {24.0f, 24.0f}, {936.0f, 24.0f}, {24.0f, 410.0f}, {936.0f, 410.0f}
         }};
         constexpr int screwSeed = 1337;
 
-        constexpr float versionTextX = 480.0f, versionTextY = 390.0f;
+        constexpr float versionTextX = 480.0f, versionTextY = 424.0f;
 
         constexpr int speckleSeed = 4242;
         constexpr int speckleCount = 150;
@@ -229,16 +249,16 @@ namespace TapeRotTheme
         // INPUT/TRANSPORT/OUTPUT rather than the already-packed MACHINE/DECAY sub-rows (which
         // already hold the NOISE/HUM switches and the SPREAD switch + failure dots respectively),
         // so nothing needs to be resized or crowded to fit them.
-        constexpr float smallKnobCentreY = 335.0f, smallKnobRadius = 18.0f;
+        constexpr float smallKnobCentreY = 369.0f, smallKnobRadius = 18.0f;
         constexpr float smallKnobLabelOffsetY = 28.0f;
 
         constexpr float lpKnobX = 760.0f, rampKnobX = 814.0f, hpKnobX = 868.0f; // under OUTPUT
 
-        constexpr float genSelectorCentreX = 244.0f, genSelectorY = 327.0f; // under TRANSPORT
+        constexpr float genSelectorCentreX = 244.0f, genSelectorY = 361.0f; // under TRANSPORT
         constexpr float genSelectorSegmentW = 14.0f, genSelectorSegmentH = 22.0f, genSelectorGap = 4.0f;
         constexpr float genSelectorLabelOffsetY = 30.0f;
 
-        constexpr float auxButtonCentreY = 335.0f, auxButtonRadius = 16.0f; // under INPUT
+        constexpr float auxButtonCentreY = 369.0f, auxButtonRadius = 16.0f; // under INPUT
         constexpr float stopButtonX = 36.0f, filterButtonX = 72.0f, failButtonX = 108.0f;
         constexpr float auxButtonLabelOffsetY = 26.0f;
     }

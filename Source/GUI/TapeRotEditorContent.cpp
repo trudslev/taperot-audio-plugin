@@ -3,7 +3,7 @@
 using namespace TapeRotTheme;
 
 TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
-    : processorRef(p), failLamp(p), scope(p), genDigitDisplay(p), modelReadout(p)
+    : processorRef(p), modelReadout(p), failLamp(p), scope(p), genDigitDisplay(p), presetStrip(p)
 {
     setSize((int) Layout::canvasWidth, (int) Layout::canvasHeight);
     setLookAndFeel(&lookAndFeel);
@@ -118,6 +118,9 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
 
     genDigitDisplay.setBounds(getLocalBounds());
     addAndMakeVisible(genDigitDisplay);
+
+    presetStrip.setBounds(getLocalBounds());
+    addAndMakeVisible(presetStrip);
 }
 
 TapeRotEditorContent::~TapeRotEditorContent()

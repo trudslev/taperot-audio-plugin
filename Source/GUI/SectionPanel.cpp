@@ -18,7 +18,7 @@ void SectionPanel::generateSpeckleImage()
     for (int i = 0; i < Layout::speckleCount; ++i)
     {
         const float x = 20.0f + random.nextFloat() * (Layout::canvasWidth - 40.0f);
-        const float y = 122.0f + random.nextFloat() * (Layout::canvasHeight - 122.0f - 20.0f);
+        const float y = 156.0f + random.nextFloat() * (Layout::canvasHeight - 156.0f - 20.0f);
         const float r = 0.4f + random.nextFloat() * 0.5f;
 
         g.setColour(Colour::mutedLabel.withAlpha(0.08f));
@@ -66,6 +66,15 @@ void SectionPanel::paintHeader(juce::Graphics& g)
     g.fillRoundedRectangle(header, Layout::panelRadius);
     // Square off the header's bottom corners so it butts flush against the body.
     g.fillRect(juce::Rectangle<float>(Layout::headerX, Layout::headerSeparatorY - 10.0f, Layout::headerW, 10.0f));
+
+    // Internal divider between the original DymoLabel/scope/counter/lamp content and the preset
+    // strip below it - a subtler version of the header/panel line drawn below.
+    g.setColour(juce::Colours::black.withAlpha(0.35f));
+    g.drawLine(24.0f, Layout::presetStripDividerY, Layout::headerX + Layout::headerW - 16.0f,
+               Layout::presetStripDividerY, 1.0f);
+    g.setColour(juce::Colours::white.withAlpha(0.05f));
+    g.drawLine(24.0f, Layout::presetStripDividerY + 1.0f, Layout::headerX + Layout::headerW - 16.0f,
+               Layout::presetStripDividerY + 1.0f, 1.0f);
 
     g.setColour(juce::Colour(0xFF0E0C09));
     g.drawLine(Layout::headerX, Layout::headerSeparatorY, Layout::headerX + Layout::headerW,
