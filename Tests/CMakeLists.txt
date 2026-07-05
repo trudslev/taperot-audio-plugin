@@ -11,7 +11,8 @@ target_sources(TapeRotTests PRIVATE
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
     ../Source/DSP/TapeModelEQ.cpp
-    ../Source/DSP/NoiseSource.cpp)
+    ../Source/DSP/NoiseSource.cpp
+    ../Source/DSP/DegradationCore.cpp)
 
 target_compile_definitions(TapeRotTests PRIVATE
     JUCE_WEB_BROWSER=0

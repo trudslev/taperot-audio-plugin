@@ -15,8 +15,8 @@ void WowFlutter::prepare(const juce::dsp::ProcessSpec& spec)
     for (int ch = 0; ch < numChannels; ++ch)
     {
         auto& c = channels[(size_t) ch];
-        c.random = juce::Random((juce::int64) (0x9E3779B97F4A7C15ULL * (juce::uint64) (ch + 1)));
-        c.flutterRateHz = 7.0 + c.random.nextDouble() * 5.0;
+        c.random = juce::Random((juce::int64) (0x9E3779B97F4A7C15ULL * (juce::uint64) (ch + 1) + instanceSeedOffset));
+        c.flutterRateHz = (7.0 + c.random.nextDouble() * 5.0) * (double) wowFlutterRateMultiplier;
     }
 
     reset();
@@ -44,7 +44,7 @@ void WowFlutter::process(juce::AudioBuffer<float>& buffer, float wowDepth01, flo
     const float wowDepthSamples = wowDepth01 * maxWowMs * 0.001f * (float) sampleRate;
     const float flutterDepthSamples = flutterDepth01 * maxFlutterMs * 0.001f * (float) sampleRate;
 
-    const double wowPhaseInc = juce::MathConstants<double>::twoPi * wowRateHz / sampleRate;
+    const double wowPhaseInc = juce::MathConstants<double>::twoPi * (wowRateHz * (double) wowFlutterRateMultiplier) / sampleRate;
     const float wowRandomLpfCoeff = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * wowRandomLpfHz / (float) sampleRate);
     const float flutterLpfCoeff = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * flutterNoiseLpfHz / (float) sampleRate);
     const float flutterHpfCoeff = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * flutterNoiseHpfHz / (float) sampleRate);

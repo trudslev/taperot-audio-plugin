@@ -39,6 +39,7 @@ target_sources(TapeRot PRIVATE
     Source/DSP/WowFlutter.cpp
     Source/DSP/TapeModelEQ.cpp
     Source/DSP/NoiseSource.cpp
+    Source/DSP/DegradationCore.cpp
     Source/DSP/Hum.cpp
     Source/DSP/FailureEngine.cpp
     Source/DSP/StereoSpread.cpp

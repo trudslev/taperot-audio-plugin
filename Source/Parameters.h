@@ -19,6 +19,7 @@ namespace ParamIDs
     constexpr auto failureCrinkles = "failureCrinkles";
     constexpr auto failureImbalance = "failureImbalance";
     constexpr auto noiseCharacter = "noiseCharacter";
+    constexpr auto gen = "gen";
 }
 
 namespace NoiseCharacterNames
@@ -94,6 +95,9 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         juce::ParameterID{ParamIDs::noiseCharacter, 1}, "Noise Character",
         juce::StringArray{NoiseCharacterNames::tape, NoiseCharacterNames::vcr, NoiseCharacterNames::dust},
         0));
+
+    params.push_back(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{ParamIDs::gen, 1}, "Generation", 1, 8, 1));
 
     return {params.begin(), params.end()};
 }

@@ -22,6 +22,10 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     failureSnagsParam = apvts.getRawParameterValue(ParamIDs::failureSnags);
     failureCrinklesParam = apvts.getRawParameterValue(ParamIDs::failureCrinkles);
     failureImbalanceParam = apvts.getRawParameterValue(ParamIDs::failureImbalance);
+    genParam = apvts.getRawParameterValue(ParamIDs::gen);
+
+    for (int i = 0; i < maxGenerations; ++i)
+        generationStages[(size_t) i] = std::make_unique<DegradationCore>(i);
 }
 
 void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -30,13 +34,16 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
                                  (juce::uint32) getTotalNumOutputChannels()};
 
     saturator.prepare(spec);
-    wowFlutter.prepare(spec);
-    tapeModelEQ.prepare(spec);
-    noiseSource.prepare(spec);
+    for (auto& stage : generationStages)
+        stage->prepare(spec);
     hum.prepare(spec);
     failureEngine.prepare(spec);
     stereoSpread.prepare(spec);
     outputStage.prepare(spec);
+
+    genSmoothed.reset(sampleRate, 0.04);
+    genSmoothed.setCurrentAndTargetValue(genParam->load());
+    genFloorSnapshot.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, true);
 
     displaySampleRate = sampleRate;
 
@@ -80,9 +87,33 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         dryBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
 
     saturator.process(buffer, drive01);
-    wowFlutter.process(buffer, wow01, flutter01);
-    tapeModelEQ.process(buffer, model);
-    noiseSource.process(buffer, noise01, noiseCharacter);
+
+    genSmoothed.setTargetValue((float) juce::jlimit(1, maxGenerations, (int) std::round(genParam->load())));
+    genSmoothed.skip(numSamples);
+    const float genValue = genSmoothed.getCurrentValue();
+
+    const int floorGen = juce::jlimit(1, maxGenerations, (int) std::floor(genValue));
+    const int ceilGen = juce::jlimit(1, maxGenerations, (int) std::ceil(genValue));
+    const float genFraction = genValue - (float) floorGen;
+    const bool genTransitioning = floorGen != ceilGen;
+
+    for (int stage = 0; stage < ceilGen; ++stage)
+    {
+        generationStages[(size_t) stage]->process(buffer, wow01, flutter01, model, noise01, noiseCharacter);
+
+        if (genTransitioning && stage == floorGen - 1)
+            genFloorSnapshot.makeCopyOf(buffer, true);
+    }
+
+    if (genTransitioning)
+        for (int ch = 0; ch < numChannels; ++ch)
+        {
+            auto* wet = buffer.getWritePointer(ch);
+            const auto* floorTap = genFloorSnapshot.getReadPointer(ch);
+            for (int i = 0; i < numSamples; ++i)
+                wet[i] = floorTap[i] * (1.0f - genFraction) + wet[i] * genFraction;
+        }
+
     hum.process(buffer, humEnabled);
     failureEngine.process(buffer, failure01, dropouts, snags, crinkles, imbalance);
     stereoSpread.process(buffer, spread);

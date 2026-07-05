@@ -2,14 +2,14 @@
 
 #include "Parameters.h"
 #include "DSP/Saturator.h"
-#include "DSP/WowFlutter.h"
-#include "DSP/TapeModelEQ.h"
-#include "DSP/NoiseSource.h"
+#include "DSP/DegradationCore.h"
 #include "DSP/Hum.h"
 #include "DSP/FailureEngine.h"
 #include "DSP/StereoSpread.h"
 #include "DSP/OutputStage.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <array>
+#include <memory>
 
 class TapeRotAudioProcessor final : public juce::AudioProcessor
 {
@@ -62,11 +62,15 @@ private:
     std::atomic<float>* failureSnagsParam = nullptr;
     std::atomic<float>* failureCrinklesParam = nullptr;
     std::atomic<float>* failureImbalanceParam = nullptr;
+    std::atomic<float>* genParam = nullptr;
+
+    static constexpr int maxGenerations = 8;
 
     Saturator saturator;
-    WowFlutter wowFlutter;
-    TapeModelEQ tapeModelEQ;
-    NoiseSource noiseSource;
+    std::array<std::unique_ptr<DegradationCore>, maxGenerations> generationStages;
+    juce::SmoothedValue<float> genSmoothed{1.0f};
+    juce::AudioBuffer<float> genFloorSnapshot;
+
     Hum hum;
     FailureEngine failureEngine;
     StereoSpread stereoSpread;

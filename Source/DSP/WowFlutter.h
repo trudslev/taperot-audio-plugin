@@ -5,6 +5,12 @@
 class WowFlutter
 {
 public:
+    // seedOffset decorrelates multiple instances' random modulation (e.g. per GEN cascade stage);
+    // rateMultiplier slightly detunes wow/flutter rates so cascaded instances don't phase-lock.
+    // Defaults reproduce the exact original single-instance behavior.
+    explicit WowFlutter(juce::uint64 seedOffset = 0, float rateMultiplier = 1.0f) noexcept
+        : instanceSeedOffset(seedOffset), wowFlutterRateMultiplier(rateMultiplier) {}
+
     void prepare(const juce::dsp::ProcessSpec& spec);
     void reset();
     void process(juce::AudioBuffer<float>& buffer, float wowDepth01, float flutterDepth01);
@@ -40,4 +46,7 @@ private:
     double sampleRate = 44100.0;
     float maxDelaySamples = 0.0f;
     float centerDelaySamples = 0.0f;
+
+    juce::uint64 instanceSeedOffset;
+    float wowFlutterRateMultiplier;
 };
