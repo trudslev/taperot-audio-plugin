@@ -204,12 +204,6 @@ namespace TapeRotTheme
         constexpr float switchCentreY = 350.0f;
         constexpr float switchLabelY = 372.0f, switchCaptionY = 384.0f;
 
-        // MACHINE section switch row positions, per the updated design/taperot-interface.svg.
-        constexpr float switchModeSwitchX = 370.0f;
-        constexpr float noiseSwitchX = 449.0f;
-        constexpr float humSwitchX = 518.0f;
-        constexpr float spreadSwitchX = 610.0f;
-
         // ModelReadout box, per the updated SVG (sits under the MODEL knob, replacing its
         // generic knob-label text).
         constexpr float modelReadoutX = 361.0f, modelReadoutY = 295.0f;
@@ -217,6 +211,20 @@ namespace TapeRotTheme
         constexpr float modelReadoutLabelY = 331.0f;
         constexpr float modelReadoutNominalFontPx = 10.0f;
         constexpr float modelReadoutMinFontPx = 6.5f;
+
+        // MACHINE section switch row: SWITCH's left edge lines up with the ModelReadout box's own
+        // left edge above it; HUM's right edge mirrors that against the NOISE knob's outer tick
+        // radius on the other side (the NOISE knob has no boxed readout of its own to align to,
+        // so its tick ring stands in as the equivalent landmark); NOISE sits centred between them.
+        // (matches, within a pixel, the same 361-vs-406-knob-centre offset the ModelReadout box
+        // already has relative to the MODEL knob - i.e. this isn't a new convention, just the
+        // existing one mirrored onto the other knob.)
+        constexpr float noiseKnobX = 514.0f; // must match the "noise" entry in the knobs array below
+        constexpr float switchModeSwitchX = modelReadoutX;
+        constexpr float humSwitchRightEdge = noiseKnobX + knobTickOuterRadius;
+        constexpr float humSwitchX = humSwitchRightEdge - switchW;
+        constexpr float noiseSwitchX = (switchModeSwitchX + humSwitchRightEdge) * 0.5f - switchW * 0.5f;
+        constexpr float spreadSwitchX = 610.0f;
 
         constexpr float failureDotY = 399.0f, failureDotRadius = 4.0f, failureDotLabelY = 411.0f;
         constexpr float failureDotFirstX = 592.0f, failureDotSpacing = 28.0f;
