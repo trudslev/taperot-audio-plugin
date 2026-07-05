@@ -13,6 +13,11 @@ FetchContent_Declare(JUCE
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
+juce_add_binary_data(TapeRotBinaryData
+    SOURCES
+        design/impact-label/Impact_label.ttf
+        design/impact-label/Impact_label_reversed.ttf)
+
 juce_add_plugin(TapeRot
     PRODUCT_NAME "TapeRot"
     COMPANY_NAME "TapeRot"
@@ -59,7 +64,6 @@ target_sources(TapeRot PRIVATE
     Source/GUI/FailLamp.cpp
     Source/GUI/Scope.cpp
     Source/GUI/GenDigitDisplay.cpp
-    Source/GUI/ModelReadout.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC
@@ -71,6 +75,7 @@ target_link_libraries(TapeRot
     PRIVATE
         juce::juce_audio_utils
         juce::juce_dsp
+        TapeRotBinaryData
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags

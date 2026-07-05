@@ -36,5 +36,6 @@ target_link_libraries(TapeRotTests PRIVATE
     juce::juce_audio_processors
     juce::juce_gui_basics
     juce::juce_core
+    TapeRotBinaryData
     juce::juce_recommended_config_flags
     juce::juce_recommended_warning_flags)

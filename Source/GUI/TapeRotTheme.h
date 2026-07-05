@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_graphics/juce_graphics.h>
+#include <BinaryData.h>
 #include <array>
 
 // All layout numbers are in the SVG's reference space (960x400). Components draw
@@ -48,8 +49,6 @@ namespace TapeRotTheme
         // Brighter, slightly warm white for the Dymo emboss face - stressed/stretched label
         // plastic reads brighter than the general cream used elsewhere in the panel.
         inline const juce::Colour dymoEmbossFace{0xFFFFFDF6};
-        inline const juce::Colour dymoEmbossHighlight{0xFFFFFFFF};
-        inline const juce::Colour dymoEmbossShadow{0xFF050300};
     }
 
     inline juce::String sansFontName() { return "Helvetica Neue"; }
@@ -62,7 +61,19 @@ namespace TapeRotTheme
     inline juce::Font switchCaptionFont() { return juce::FontOptions(sansFontName(), 7.0f, juce::Font::plain); }
     inline juce::Font modelReadoutFont(float sizePx) { return juce::FontOptions(sansFontName(), sizePx, juce::Font::bold); }
     inline juce::Font dotLabelFont() { return juce::FontOptions(sansFontName(), 6.5f, juce::Font::plain); }
-    inline juce::Font dymoFont() { return juce::FontOptions(sansFontName(), 17.0f, juce::Font::bold); }
+    // Impact Label (design/impact-label/, by Michael Tension - commercial use permitted,
+    // donationware), embedded as binary data rather than depending on it being installed as a
+    // system font. Deliberately the "_reversed" variant: the regular one's glyphs are a pre-baked
+    // solid tile with the letter cut out as a negative-space hole (a complete look on its own),
+    // while "_reversed" is plain open letterforms, which is what drawEmbossedGlyph needs to work
+    // with - the font's own rough strokes already read as embossed without any further bevel.
+    inline juce::Font dymoFont()
+    {
+        static const juce::Typeface::Ptr typeface =
+            juce::Typeface::createSystemTypefaceFor(BinaryData::Impact_label_reversed_ttf,
+                                                     (size_t) BinaryData::Impact_label_reversed_ttfSize);
+        return juce::Font(typeface).withHeight(29.4f);
+    }
     inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
     inline juce::Font versionFont() { return juce::FontOptions(sansFontName(), 8.0f, juce::Font::plain); }
 
@@ -74,7 +85,7 @@ namespace TapeRotTheme
     constexpr float switchCaptionTracking = 0.3f;
     constexpr float modelReadoutTracking = 1.5f;
     constexpr float dotLabelTracking = 0.5f;
-    constexpr float dymoTracking = 6.0f;
+    constexpr float dymoTracking = 4.0f;
     constexpr float versionTracking = 2.0f;
 
     namespace Layout
@@ -92,22 +103,34 @@ namespace TapeRotTheme
         constexpr float headerSeparatorY = 116.0f;
 
         constexpr float dymoX = 32.0f, dymoY = 40.0f, dymoW = 168.0f, dymoH = 34.0f;
-        constexpr float dymoRotationDegrees = -1.6f;
+        // A hand-applied Dymo label doesn't sit dead-square on the panel - keep this visibly but
+        // subtly off from 0deg (roughly -1.5 to -3deg reads as "manually stuck on" without looking
+        // broken).
+        constexpr float dymoRotationDegrees = -2.8f;
 
-        // Punched-relief emboss: a single light source (upper-left, in screen space where +y is
-        // down) casts a hard highlight on the letter's upper-left-facing edge and a hard shadow on
-        // its lower-right-facing edge. Angle is measured the usual atan2 way (0 deg = +x/right,
-        // 90 deg = +y/down), so 225 deg = up and to the left.
-        constexpr float dymoLightDirectionDegrees = 225.0f;
-        constexpr float dymoBevelOffsetPx = 0.9f;
-        // Multiplies the highlight/shadow alpha below; a per-character punch-pressure factor
-        // further scales this at draw time so lighter punches read as a weaker bevel.
-        constexpr float dymoBevelContrastStrength = 1.0f;
+        // Physical-label imperfections: the tape sits ON TOP of the panel (contact shadow, biased
+        // toward the lower-right like a single overhead light), its cut ends aren't a clean
+        // parallel rectangle (hand-cut/simple cutter), and it has a whisper of bow/unevenness
+        // rather than dead-flat edges. An earlier, more conservative pass at these values read as
+        // "no different" at actual on-screen size, so these are pushed noticeably further than
+        // feels necessary in an isolated close-up render - keep that in mind before nudging them
+        // back down.
+        constexpr float dymoContactShadowAlpha = 0.55f;
+        constexpr float dymoContactShadowBlurPx = 6.0f;
+        constexpr float dymoContactShadowOffsetX = 3.0f;
+        constexpr float dymoContactShadowOffsetY = 5.0f;
+        constexpr float dymoLeftCutAnglePx = -3.5f;
+        constexpr float dymoRightCutAnglePx = 5.0f;
+        constexpr float dymoTapeBowPx = 0.8f;
+        constexpr float dymoEdgeImperfectionPx = 1.0f;
+
         // Per-character hand-punched variance: small random position/rotation jitter, deterministic
         // per character index so it doesn't flicker between repaints.
         constexpr float dymoJitterPositionPx = 0.5f;
         constexpr float dymoJitterRotationDegrees = 2.2f;
-        constexpr float dymoPressureMin = 0.55f;
+        // Ink-bounds centring (see drawEmbossedTrackedText) still read slightly high in practice -
+        // this nudges the whole line down a touch to sit visually centred on the strip.
+        constexpr float dymoTextVerticalNudgePx = 2.0f;
 
         constexpr float scopeX = 224.0f, scopeXEnd = 640.0f, scopeCentreY = 62.0f;
 
