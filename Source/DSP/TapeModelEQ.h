@@ -40,6 +40,12 @@ private:
 
     int activeModelIndex = 0;
     int pendingModelIndex = -1;
+    // If MODEL changes again while a crossfade is already in flight, the new target is queued
+    // here rather than immediately reconfiguring the in-progress pending chain: swapping its
+    // coefficients mid-fade (with stale filter history from whatever it was fading from) and
+    // snapping the blend position back to 0 both produce an audible jump. The queued target is
+    // picked up once the current crossfade settles.
+    int queuedModelIndex = -1;
     bool aIsActive = true;
 
     ChainSet chainA, chainB;

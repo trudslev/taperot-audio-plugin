@@ -57,6 +57,11 @@ inline constexpr std::array<TapeModel, 8> kTapeModels{{
         {EQBandType::LowPass, 8000.0f, 0.0f, 0.707f},
         {EQBandType::Peak, 1500.0f, 2.5f, 1.2f}
     }}, 3, 2.99f},
+    // Revised from the prior "Cassette Type I" (LowShelf 60Hz +2dB/Q0.7, HighShelf 14kHz -4dB/Q0.7,
+    // no makeup gain): the low end moved from a broad shelf to a narrower Peak bump (less mud below
+    // 60Hz) and the treble rolloff was eased from -4dB to -2.5dB (brighter, less muffled) per this
+    // model set's brief. The legacy state migration maps old "Cassette Type I" sessions onto this
+    // model by name/position, but the curve itself is intentionally different, not a null-op.
     {"CASSETTE I", {{
         {EQBandType::HighShelf, 14000.0f, -2.5f, 0.707f},
         {EQBandType::Peak, 60.0f, 1.5f, 1.0f},

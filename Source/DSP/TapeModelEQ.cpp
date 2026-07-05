@@ -109,6 +109,8 @@ void TapeModelEQ::reset()
         for (auto& f : perChannel)
             f.reset();
 
+    queuedModelIndex = -1;
+
     clunkDipActive = false;
     clunkDipSamplesRemaining = 0;
     pendingClunkModelIndex = -1;
@@ -129,12 +131,24 @@ void TapeModelEQ::process(juce::AudioBuffer<float>& buffer, int modelIndex, bool
 
 void TapeModelEQ::processFade(juce::AudioBuffer<float>& buffer, int modelIndex)
 {
-    if (modelIndex != activeModelIndex && modelIndex != pendingModelIndex)
+    if (pendingModelIndex == -1)
     {
-        pendingModelIndex = modelIndex;
-        configureChain(getPendingChain(), pendingModelIndex);
-        crossfade.setCurrentAndTargetValue(0.0f);
-        crossfade.setTargetValue(1.0f);
+        // No crossfade in flight - safe to start one immediately.
+        if (modelIndex != activeModelIndex)
+        {
+            pendingModelIndex = modelIndex;
+            configureChain(getPendingChain(), pendingModelIndex);
+            for (auto& perChannel : getPendingChain().filters)
+                for (auto& f : perChannel)
+                    f.reset();
+            crossfade.setCurrentAndTargetValue(0.0f);
+            crossfade.setTargetValue(1.0f);
+        }
+    }
+    else if (modelIndex != pendingModelIndex)
+    {
+        // Already mid-fade: queue the new target rather than disturbing the in-progress one.
+        queuedModelIndex = modelIndex;
     }
 
     if (pendingModelIndex == -1)
@@ -172,6 +186,18 @@ void TapeModelEQ::processFade(juce::AudioBuffer<float>& buffer, int modelIndex)
         activeModelIndex = pendingModelIndex;
         pendingModelIndex = -1;
         aIsActive = !aIsActive;
+
+        if (queuedModelIndex != -1 && queuedModelIndex != activeModelIndex)
+        {
+            pendingModelIndex = queuedModelIndex;
+            configureChain(getPendingChain(), pendingModelIndex);
+            for (auto& perChannel : getPendingChain().filters)
+                for (auto& f : perChannel)
+                    f.reset();
+            crossfade.setCurrentAndTargetValue(0.0f);
+            crossfade.setTargetValue(1.0f);
+        }
+        queuedModelIndex = -1;
     }
 }
 

@@ -41,6 +41,10 @@ If Logic Pro doesn't pick up a freshly built AU: Audio Units Manager → "Reset 
 
 See [BUILDING.md](BUILDING.md) for requirements (Xcode full install, CMake 3.24+, pluginval).
 
+## Prompts log
+
+`prompts/PROMPTS.md` holds numbered work-package prompts. Once a prompt has been fully implemented, mark it `SHIPPED` with the date it shipped (e.g. `PROMPT #1 - SHIPPED 2026-07-05`) instead of `TODO`.
+
 ## Architecture
 
 ### Signal chain (fixed order, all in `PluginProcessor::processBlock`)
