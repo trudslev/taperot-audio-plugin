@@ -64,6 +64,7 @@ target_sources(TapeRot PRIVATE
     Source/GUI/FailLamp.cpp
     Source/GUI/Scope.cpp
     Source/GUI/GenDigitDisplay.cpp
+    Source/GUI/ModelReadout.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC

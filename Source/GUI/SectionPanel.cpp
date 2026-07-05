@@ -105,18 +105,16 @@ void SectionPanel::paintKnobLabels(juce::Graphics& g)
     const auto font = knobLabelFont();
     for (const auto& knob : Layout::knobs)
     {
+        // MODEL gets the ModelReadout component instead of a generic label - see the SVG (its
+        // knob has no trailing label text, unlike every other knob).
+        if (juce::String(knob.paramID) == "model")
+            continue;
+
         drawTrackedText(g, knob.label, font, knobLabelTracking,
                          juce::Rectangle<float>(knob.x - 60.0f, Layout::knobCentreY + Layout::knobLabelOffsetY - 8.0f,
                                                  120.0f, 16.0f),
                          juce::Justification::centred, Colour::ink);
     }
-
-    // MODEL isn't in the generic knobs array (it's a dropdown, not a knob - see
-    // Layout::modelDropdown*), so its label is drawn here instead.
-    drawTrackedText(g, "MODEL", font, knobLabelTracking,
-                     juce::Rectangle<float>(Layout::modelDropdownCentreX - 60.0f,
-                                             Layout::knobCentreY + Layout::knobLabelOffsetY - 8.0f, 120.0f, 16.0f),
-                     juce::Justification::centred, Colour::ink);
 }
 
 void SectionPanel::paintSwitchLabels(juce::Graphics& g)

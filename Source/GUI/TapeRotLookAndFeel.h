@@ -12,10 +12,6 @@ public:
                           float sliderPosProportional, float rotaryStartAngle, float rotaryEndAngle,
                           juce::Slider&) override;
 
-    // Smaller than the LookAndFeel_V2 default so the longest model name ("CASSETTE II") fits the
-    // MODEL dropdown's width, which is itself constrained by the MACHINE section's layout.
-    juce::Font getComboBoxFont(juce::ComboBox&) override;
-
     static std::unique_ptr<juce::Slider> createKnobSlider(const juce::String& label);
 
     // Public (not static-private) so a unit test can assert tickCount == model table size without

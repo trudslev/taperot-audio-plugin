@@ -8,19 +8,7 @@ TapeRotLookAndFeel::TapeRotLookAndFeel()
     setColour(juce::Slider::rotarySliderOutlineColourId, TapeRotTheme::Colour::rim);
     setColour(juce::ComboBox::backgroundColourId, TapeRotTheme::Colour::dark);
     setColour(juce::ComboBox::textColourId, TapeRotTheme::Colour::cream);
-    setColour(juce::ComboBox::outlineColourId, TapeRotTheme::Colour::rim);
-    setColour(juce::ComboBox::arrowColourId, TapeRotTheme::Colour::amber);
-    setColour(juce::ComboBox::buttonColourId, TapeRotTheme::Colour::dark);
-    setColour(juce::PopupMenu::backgroundColourId, TapeRotTheme::Colour::dark);
-    setColour(juce::PopupMenu::textColourId, TapeRotTheme::Colour::cream);
-    setColour(juce::PopupMenu::highlightedBackgroundColourId, TapeRotTheme::Colour::amber);
-    setColour(juce::PopupMenu::highlightedTextColourId, TapeRotTheme::Colour::dark);
     setColour(juce::Label::textColourId, TapeRotTheme::Colour::ink);
-}
-
-juce::Font TapeRotLookAndFeel::getComboBoxFont(juce::ComboBox&)
-{
-    return juce::FontOptions(TapeRotTheme::sansFontName(), 11.0f, juce::Font::bold);
 }
 
 int TapeRotLookAndFeel::getTickCountForSlider(const juce::Slider& slider) noexcept

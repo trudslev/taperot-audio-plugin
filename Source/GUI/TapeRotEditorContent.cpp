@@ -3,7 +3,7 @@
 using namespace TapeRotTheme;
 
 TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
-    : processorRef(p), failLamp(p), scope(p), genDigitDisplay(p)
+    : processorRef(p), failLamp(p), scope(p), genDigitDisplay(p), modelReadout(p)
 {
     setSize((int) Layout::canvasWidth, (int) Layout::canvasHeight);
     setLookAndFeel(&lookAndFeel);
@@ -54,14 +54,9 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
         processorRef.apvts, ParamIDs::switchMode, switchModeSwitch);
     addAndMakeVisible(switchModeSwitch);
 
-    modelComboBox.setBounds((int) (Layout::modelDropdownCentreX - Layout::modelDropdownW * 0.5f),
-                             (int) Layout::modelDropdownY, (int) Layout::modelDropdownW, (int) Layout::modelDropdownH);
-    modelComboBox.setJustificationType(juce::Justification::centred);
-    for (size_t i = 0; i < kNumTapeModels; ++i)
-        modelComboBox.addItem(kTapeModels[i].displayName, (int) i + 1);
-    modelComboBoxAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-        processorRef.apvts, ParamIDs::model, modelComboBox);
-    addAndMakeVisible(modelComboBox);
+    modelReadout.setBounds((int) Layout::modelReadoutX, (int) Layout::modelReadoutY,
+                            (int) Layout::modelReadoutW, (int) (Layout::modelReadoutLabelY + 6.0f - Layout::modelReadoutY));
+    addAndMakeVisible(modelReadout);
 
     for (size_t i = 0; i < Layout::failureDots.size(); ++i)
     {
