@@ -50,10 +50,22 @@ See [BUILDING.md](BUILDING.md) for requirements (Xcode full install, CMake 3.24+
 ### Signal chain (fixed order, all in `PluginProcessor::processBlock`)
 
 ```
-Saturator -> WowFlutter -> TapeModelEQ -> NoiseGenerator -> FailureEngine -> StereoSpread -> OutputStage
+Saturator -> [GEN-cascade of 1-8 DegradationCore stages] -> Hum -> FailureEngine -> StereoSpread
+    -> ToneFilters (LP/HP) -> TapeStop (STOP aux) -> FilterSweep (FILTER aux) -> OutputStage
 ```
 
-Each DSP stage (`Source/DSP/`) is a self-contained class with `prepare(juce::dsp::ProcessSpec)` and a `process(buffer, ...)` method taking plain floats/bools read from the APVTS each block — no DSP stage reads the APVTS directly. **Only Saturator, WowFlutter, and TapeModelEQ have real DSP implemented**; NoiseGenerator, FailureEngine, StereoSpread, and OutputStage are currently passthrough stubs with their parameters already wired end-to-end (APVTS -> processor -> stage call), so adding real DSP to them means editing the stage class only, not the wiring.
+Each `DegradationCore` stage is itself `WowFlutter -> TapeModelEQ -> NoiseSource`, reusing the same
+model-EQ table (`TapeModelData.h`) per generation. `GEN` selects how many stages run (1-8); the
+processor cross-fades between the floor/ceil stage count as GEN is automated (`genSmoothed`,
+`genFloorSnapshot`) so raising/lowering it mid-playback doesn't click. `TapeModelEQ` itself handles
+the `SWITCH` parameter's two model-switch behaviors (FADE: parallel-chain crossfade; CLUNK: hard
+coefficient swap timed under a mute dip, plus a thump) - every active GEN stage reacts to the same
+shared `model`/`switchMode` values each block, so they switch in sync with no cross-stage
+coordination needed. `FailureEngine`'s effective intensity is `max(failure01, failAuxValue)`, where
+`failAuxValue` comes from an `AuxEnvelope` driven by the `FAIL` aux trigger and shared `RAMP` time;
+`TapeStop`/`FilterSweep` are driven by the `STOP`/`FILTER` aux triggers the same way.
+
+Each DSP stage (`Source/DSP/`) is a self-contained class with `prepare(juce::dsp::ProcessSpec)` and a `process(buffer, ...)` method taking plain floats/bools read from the APVTS each block — no DSP stage reads the APVTS directly. All stages have real DSP implemented; the one intentional placeholder is the REVOX B77 tape model's EQ curve (see `TapeModelData.h` — deliberately near-transparent pending measured reference data).
 
 Latency is reported via `saturator.getLatencySamples()` — if a future stage introduces its own latency, `prepareToPlay` needs to sum across stages.
 
@@ -61,7 +73,7 @@ Latency is reported via `saturator.getLatencySamples()` — if a future stage in
 
 `Source/Parameters.h` is the single source of truth for parameter IDs (`ParamIDs::*`) and the APVTS layout (`createTapeRotParameterLayout()`). `PluginProcessor` caches raw atomic pointers to each parameter in its constructor via `apvts.getRawParameterValue(...)` and reads them fresh every block in `processBlock` — don't call `getRawParameterValue` per-block, and don't add a parameter without adding both the layout entry and the cached pointer.
 
-Three atomics (`wowDisplay`, `flutterDisplay`, `failureDisplay`) are exponentially smoothed per-block in `processBlock` and exposed via `getWowDisplay()`/`getFlutterDisplay()`/`getFailureDisplay()` for the editor to poll (e.g. for meter/scope drawing) without touching the audio thread's actual parameter values.
+`failAuxDisplay` is exponentially smoothed per-block in `processBlock` from the FAIL aux envelope's output and exposed via `getFailAuxDisplay()` for the FAIL lamp to poll without touching the audio thread's actual parameter values. `getGenDisplay()`/`getStopSpeedDisplay()` similarly expose live internal state (the smoothed GEN value, the tape-stop ramp speed) for the Scope. These are the only three GUI-facing "derived" display getters — a wow/flutter/failure-amount trio was scaffolded the same way at one point but removed since nothing ever read them and they'd have just mirrored their own knob's static value, not measured anything from the actual audio.
 
 ### GUI (`Source/GUI/`)
 
@@ -73,6 +85,10 @@ Scaling to the actual window size is handled once, centrally: `PluginEditor::res
 
 `design/taperot-interface.svg` is the reference visual mock the theme/layout constants were derived from — check it when adjusting layout numbers or colours. `design/icon/` holds the app icon source (SVG) and exported PNGs at each required size; the plugin/app icon is wired via `ICON_BIG`/`ICON_SMALL` in `CMakeLists.txt` (`juce_add_plugin`), which JUCE turns into a generated `.icns` at build time — don't hand-maintain an `.icns` file.
 
+`DymoLabel` draws the "TAPEROT" nameplate using `design/impact-label/Impact_label_reversed.ttf` (donationware, commercial use confirmed with the author - check license terms before swapping in any other third-party font the same way), embedded as binary data rather than depended on as an installed system font — see Build system below. Its glyphs are placed via `GlyphArrangement` at an explicit baseline computed from actual ink bounds (not `drawText`'s ascent/descent-based centring, which doesn't line up for this hand-drawn display font); the plate itself has intentionally-imperfect "hand-applied label" geometry (rotation, asymmetric hand-cut edges, slight bow, contact shadow) via named `dymo*` constants in `TapeRotTheme.h`.
+
 ### Build system
 
 `CMakeLists.txt` fetches JUCE via `FetchContent` (pinned to `8.0.14`) and defines one `juce_add_plugin(TapeRot ...)` target producing AU + VST3 + Standalone from the same source list. `PLUGIN_MANUFACTURER_CODE` (`Trot`), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID`, and `COMPANY_NAME` are placeholders per BUILDING.md — treat them as effectively permanent once anything is shipped or automated against them, so confirm before changing. `Tests/` is a separate `juce_add_console_app` target that compiles the DSP `.cpp` files directly (not linked against the plugin target) plus its own Catch2-style test files — new DSP `.cpp` files need to be added to both `target_sources(TapeRot ...)` in the root `CMakeLists.txt` and `target_sources(TapeRotTests ...)` in `Tests/CMakeLists.txt` if you want them covered by tests.
+
+`juce_add_binary_data(TapeRotBinaryData SOURCES design/impact-label/...)` embeds the Dymo-label font files as C++ byte arrays (`BinaryData::Impact_label_reversed_ttf`/`..._ttfSize`) rather than loading them from disk at runtime; it's linked into both the `TapeRot` plugin target and `TapeRotTests` (anything that includes `TapeRotTheme.h`, which calls `Typeface::createSystemTypefaceFor` on it, needs the link). New embedded assets go in this same `juce_add_binary_data` call, not as raw `target_sources`.

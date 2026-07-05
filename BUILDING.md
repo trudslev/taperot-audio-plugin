@@ -47,4 +47,4 @@ Covers: exact-null at `drive = 0`, bounded/finite output at full drive, fixed-de
 
 - `PLUGIN_MANUFACTURER_CODE` (`Trot`), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID` (`com.taperot.taperot`), and `COMPANY_NAME` in `CMakeLists.txt` are placeholders — finalize these before any real release, since they're effectively permanent once shipped or automated against.
 - JUCE's free/personal tier splash screen is enabled (no paid license configured).
-- Only blocks 1–3 of the signal chain (drive/saturation, wow & flutter, tape model EQ) have real DSP in this pass. Noise, the failure engine, stereo spread, and mix/output/bypass are wired in as passthrough stubs with their parameters already present in the APVTS layout.
+- All signal-chain stages have real DSP implemented (drive/saturation, wow & flutter, the 8-model GEN-cascading tape EQ with FADE/CLUNK switching, noise/hum, the failure engine, LP/HP tone shaping, STOP/FILTER/FAIL performance triggers, stereo spread, mix/output). The one intentional placeholder is the REVOX B77 model's EQ curve, deliberately near-transparent pending measured reference data.
