@@ -35,7 +35,7 @@ public:
             {
                 sat.process(buffer, 0.6f);
                 wow.process(buffer, 0.5f, 0.5f);
-                eq.process(buffer, 2);
+                eq.process(buffer, 2, false);
             }
             const double end = juce::Time::getMillisecondCounterHiRes();
 
@@ -64,18 +64,49 @@ public:
                 const double start = juce::Time::getMillisecondCounterHiRes();
                 for (int i = 0; i < numIterations; ++i)
                     for (int stage = 0; stage < genCount; ++stage)
-                        stages[(size_t) stage]->process(buffer, 0.5f, 0.5f, 2, 0.4f, NoiseSource::tape);
+                        stages[(size_t) stage]->process(buffer, 0.5f, 0.5f, 2, false, 0.4f, NoiseSource::tape);
                 const double end = juce::Time::getMillisecondCounterHiRes();
 
                 const double avgMsPerBlock = (end - start) / (double) numIterations;
                 const double cpuPercent = 100.0 * avgMsPerBlock / realTimeBudgetMs;
 
-                logMessage("GEN=" + juce::String(genCount) + " average block time: "
+                logMessage("GEN=" + juce::String(genCount) + " (FADE) average block time: "
                            + juce::String(avgMsPerBlock, 4) + " ms, CPU load: "
                            + juce::String(cpuPercent, 2) + "%");
 
                 expect(avgMsPerBlock < realTimeBudgetMs,
                        "GEN=" + juce::String(genCount) + " cascade should stay below the real-time budget");
+            }
+        }
+
+        beginTest("GEN cascade CPU cost in CLUNK mode (per-sample band loop, not the batched FADE path)");
+        {
+            std::array<std::unique_ptr<DegradationCore>, 8> stages;
+            for (int i = 0; i < 8; ++i)
+            {
+                stages[(size_t) i] = std::make_unique<DegradationCore>(i);
+                stages[(size_t) i]->prepare(spec);
+            }
+
+            auto buffer = generatePinkNoise(numChannels, blockSize, 8811);
+
+            for (int genCount : { 1, 8 })
+            {
+                const double start = juce::Time::getMillisecondCounterHiRes();
+                for (int i = 0; i < numIterations; ++i)
+                    for (int stage = 0; stage < genCount; ++stage)
+                        stages[(size_t) stage]->process(buffer, 0.5f, 0.5f, 2, true, 0.4f, NoiseSource::tape);
+                const double end = juce::Time::getMillisecondCounterHiRes();
+
+                const double avgMsPerBlock = (end - start) / (double) numIterations;
+                const double cpuPercent = 100.0 * avgMsPerBlock / realTimeBudgetMs;
+
+                logMessage("GEN=" + juce::String(genCount) + " (CLUNK) average block time: "
+                           + juce::String(avgMsPerBlock, 4) + " ms, CPU load: "
+                           + juce::String(cpuPercent, 2) + "%");
+
+                expect(avgMsPerBlock < realTimeBudgetMs,
+                       "GEN=" + juce::String(genCount) + " CLUNK cascade should stay below the real-time budget");
             }
         }
     }

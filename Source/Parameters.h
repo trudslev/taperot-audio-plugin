@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DSP/TapeModelData.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 namespace ParamIDs
@@ -26,6 +27,7 @@ namespace ParamIDs
     constexpr auto filterAux = "filterAux";
     constexpr auto failAux = "failAux";
     constexpr auto ramp = "ramp";
+    constexpr auto switchMode = "switchMode";
 }
 
 namespace NoiseCharacterNames
@@ -54,12 +56,17 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         juce::ParameterID{ParamIDs::flutter, 1}, "Flutter",
         juce::NormalisableRange<float>(0.0f, 100.0f), 25.0f, percentAttrs));
 
+    // versionHint bumped 1 -> 2: the model table was completely redefined (different machines,
+    // different order), so an old session's stored index would silently select the wrong machine
+    // if it reattached to this parameter. Bumping the hint means old automation/state for "model"
+    // simply doesn't apply to the new parameter, and it starts at its own default instead - the
+    // only sensible outcome once a choice list's *meaning* changes, not just gains an entry.
+    juce::StringArray modelNames;
+    for (const auto& model : kTapeModels)
+        modelNames.add(model.displayName);
+    constexpr int defaultModelIndex = 4; // CASSETTE I
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{ParamIDs::model, 1}, "Model",
-        juce::StringArray{"VCR HiFi", "Camcorder", "Dictaphone", "Toy",
-                           "Cassette Type I", "Cassette Type II",
-                           "Reel-to-Reel", "Answering Machine"},
-        0));
+        juce::ParameterID{ParamIDs::model, 2}, "Model", modelNames, defaultModelIndex));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::noise, 1}, "Noise",
@@ -134,6 +141,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::ramp, 1}, "Ramp",
         juce::NormalisableRange<float>(0.05f, 4.0f, 0.0f, 0.4f), 0.3f, secondsAttrs));
+
+    // false = FADE (default), true = CLUNK.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ParamIDs::switchMode, 1}, "Switch", false));
 
     return {params.begin(), params.end()};
 }

@@ -37,7 +37,7 @@ public:
                 if (block == 10)
                     model = 3;
 
-                eq.process(chunk, model);
+                eq.process(chunk, model, false);
 
                 for (int ch = 0; ch < numChannels; ++ch)
                 {

@@ -20,7 +20,7 @@ public:
 
     void prepare(const juce::dsp::ProcessSpec& spec);
     void reset();
-    void process(juce::AudioBuffer<float>& buffer, float wow01, float flutter01, int model,
+    void process(juce::AudioBuffer<float>& buffer, float wow01, float flutter01, int model, bool clunkMode,
                  float noiseAmount01, int noiseCharacter);
 
 private:

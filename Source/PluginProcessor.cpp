@@ -29,6 +29,7 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     filterAuxParam = apvts.getRawParameterValue(ParamIDs::filterAux);
     failAuxParam = apvts.getRawParameterValue(ParamIDs::failAux);
     rampParam = apvts.getRawParameterValue(ParamIDs::ramp);
+    switchModeParam = apvts.getRawParameterValue(ParamIDs::switchMode);
 
     for (int i = 0; i < maxGenerations; ++i)
         generationStages[(size_t) i] = std::make_unique<DegradationCore>(i);
@@ -95,6 +96,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const bool filterAuxEnabled = filterAuxParam->load() > 0.5f;
     const bool failAuxEnabled = failAuxParam->load() > 0.5f;
     const float rampSeconds = rampParam->load();
+    const bool clunkMode = switchModeParam->load() > 0.5f;
 
     const int numSamples = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
@@ -115,7 +117,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     for (int stage = 0; stage < ceilGen; ++stage)
     {
-        generationStages[(size_t) stage]->process(buffer, wow01, flutter01, model, noise01, noiseCharacter);
+        generationStages[(size_t) stage]->process(buffer, wow01, flutter01, model, clunkMode, noise01, noiseCharacter);
 
         if (genTransitioning && stage == floorGen - 1)
             genFloorSnapshot.makeCopyOf(buffer, true);

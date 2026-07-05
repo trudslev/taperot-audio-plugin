@@ -86,6 +86,7 @@ private:
     std::atomic<float>* filterAuxParam = nullptr;
     std::atomic<float>* failAuxParam = nullptr;
     std::atomic<float>* rampParam = nullptr;
+    std::atomic<float>* switchModeParam = nullptr;
 
     static constexpr int maxGenerations = 8;
 

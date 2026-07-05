@@ -30,11 +30,11 @@ void DegradationCore::reset()
     noiseSource.reset();
 }
 
-void DegradationCore::process(juce::AudioBuffer<float>& buffer, float wow01, float flutter01, int model,
+void DegradationCore::process(juce::AudioBuffer<float>& buffer, float wow01, float flutter01, int model, bool clunkMode,
                                float noiseAmount01, int noiseCharacter)
 {
     wowFlutter.process(buffer, wow01, flutter01);
-    tapeModelEQ.process(buffer, model);
+    tapeModelEQ.process(buffer, model, clunkMode);
 
     if (applySaturation)
     {

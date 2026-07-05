@@ -72,10 +72,10 @@ public:
 
             for (int block = 0; block < 5; ++block)
             {
-                stage0->process(actual, 0.5f, 0.3f, 2, 0.4f, NoiseSource::tape);
+                stage0->process(actual, 0.5f, 0.3f, 2, false, 0.4f, NoiseSource::tape);
 
                 wow.process(expected, 0.5f, 0.3f);
-                eq.process(expected, 2);
+                eq.process(expected, 2, false);
                 noise.process(expected, 0.4f, NoiseSource::tape);
             }
 
@@ -86,7 +86,7 @@ public:
 
         beginTest("GEN=6 shows measurably reduced high-frequency bandwidth versus GEN=1");
         {
-            constexpr int model = 0; // VCR HiFi: includes a 12kHz high-shelf cut, compounds each pass
+            constexpr int model = 2; // VCR LP: rolloff from 8kHz, compounds each pass
             constexpr float testToneHz = 15000.0f;
 
             std::array<std::unique_ptr<DegradationCore>, 8> stages;
@@ -98,9 +98,9 @@ public:
 
             for (int block = 0; block < 20; ++block)
             {
-                stages[0]->process(gen1, 0.0f, 0.0f, model, 0.0f, NoiseSource::tape);
+                stages[0]->process(gen1, 0.0f, 0.0f, model, false, 0.0f, NoiseSource::tape);
                 for (int s = 0; s < 6; ++s)
-                    stages[(size_t) s]->process(gen6, 0.0f, 0.0f, model, 0.0f, NoiseSource::tape);
+                    stages[(size_t) s]->process(gen6, 0.0f, 0.0f, model, false, 0.0f, NoiseSource::tape);
             }
 
             const float rms1 = rmsOf(gen1);
@@ -126,9 +126,9 @@ public:
                 gen1.clear();
                 gen6.clear();
 
-                stages[0]->process(gen1, 0.0f, 0.0f, 0, 0.5f, NoiseSource::tape);
+                stages[0]->process(gen1, 0.0f, 0.0f, 0, false, 0.5f, NoiseSource::tape);
                 for (int s = 0; s < 6; ++s)
-                    stages[(size_t) s]->process(gen6, 0.0f, 0.0f, 0, 0.5f, NoiseSource::tape);
+                    stages[(size_t) s]->process(gen6, 0.0f, 0.0f, 0, false, 0.5f, NoiseSource::tape);
 
                 if (block >= 5) // past the gain-smoothing settle-in
                 {

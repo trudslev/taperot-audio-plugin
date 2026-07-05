@@ -23,52 +23,58 @@ constexpr int kMaxBandsPerModel = 3;
 
 struct TapeModel
 {
-    const char* name;
+    const char* displayName;
     std::array<EQBand, kMaxBandsPerModel> bands;
     int numBands;
+    // Per-model output trim so all eight loudness-match at matched settings (calibrated by
+    // rendering pink noise through each and measuring RMS/LUFS - see Tests/TapeModelEQTests.cpp).
+    float makeupGainDb;
 };
 
+// Ordered cleanest to nastiest so the MODEL knob sweeps hi-fi -> trash.
 inline constexpr std::array<TapeModel, 8> kTapeModels{{
-    {"VCR HiFi", {{
-        {EQBandType::LowShelf, 80.0f, 1.0f, 0.7f},
-        {EQBandType::HighShelf, 12000.0f, -3.0f, 0.7f},
+    // Placeholder curve pending measured reference data - deliberately subtle since a real B77
+    // at 19cm/s is close to transparent; its character should mostly emerge via GEN compounding.
+    {"REVOX B77", {{
+        {EQBandType::Peak, 50.0f, 1.0f, 1.0f},
+        {EQBandType::HighPass, 25.0f, 0.0f, 0.707f},
+        {EQBandType::HighShelf, 18000.0f, -1.5f, 0.707f}
+    }}, 3, 0.0f},
+    {"VCR HIFI", {{
+        {EQBandType::HighShelf, 12000.0f, -2.0f, 0.707f},
+        {EQBandType::Peak, 5000.0f, 1.0f, 1.0f},
         {}
-    }}, 2},
-    {"Camcorder", {{
-        {EQBandType::HighPass, 200.0f, 0.0f, 0.7f},
-        {EQBandType::Peak, 1200.0f, 3.0f, 1.0f},
-        {EQBandType::LowPass, 8000.0f, 0.0f, 0.7f}
-    }}, 3},
-    {"Dictaphone", {{
-        {EQBandType::HighPass, 400.0f, 0.0f, 0.9f},
-        {EQBandType::LowPass, 3500.0f, 0.0f, 0.9f},
-        {EQBandType::Peak, 1000.0f, 4.0f, 1.5f}
-    }}, 3},
-    {"Toy", {{
-        {EQBandType::HighPass, 200.0f, 0.0f, 0.8f},
-        {EQBandType::Peak, 2500.0f, 8.0f, 4.0f},
-        {EQBandType::LowPass, 2600.0f, 0.0f, 1.5f}
-    }}, 3},
-    {"Cassette Type I", {{
-        {EQBandType::LowShelf, 60.0f, 2.0f, 0.7f},
-        {EQBandType::HighShelf, 14000.0f, -4.0f, 0.7f},
+    }}, 2, 0.0f},
+    {"VCR LP", {{
+        {EQBandType::HighShelf, 8000.0f, -4.0f, 0.707f},
+        {EQBandType::Peak, 1000.0f, -2.0f, 1.0f},
         {}
-    }}, 2},
-    {"Cassette Type II", {{
-        {EQBandType::LowShelf, 80.0f, 1.0f, 0.7f},
-        {EQBandType::HighShelf, 16000.0f, -1.5f, 0.7f},
+    }}, 2, 0.0f},
+    {"CAMCORDER", {{
+        {EQBandType::HighPass, 200.0f, 0.0f, 0.707f},
+        {EQBandType::LowPass, 8000.0f, 0.0f, 0.707f},
+        {EQBandType::Peak, 1500.0f, 2.5f, 1.2f}
+    }}, 3, 0.0f},
+    {"CASSETTE I", {{
+        {EQBandType::HighShelf, 14000.0f, -2.5f, 0.707f},
+        {EQBandType::Peak, 60.0f, 1.5f, 1.0f},
         {}
-    }}, 2},
-    {"Reel-to-Reel", {{
-        {EQBandType::LowShelf, 60.0f, 0.5f, 0.7f},
-        {EQBandType::HighShelf, 18000.0f, -1.0f, 0.7f},
+    }}, 2, 0.0f},
+    {"CASSETTE II", {{
+        {EQBandType::HighShelf, 16000.0f, -1.0f, 0.707f},
+        {EQBandType::LowShelf, 80.0f, -1.0f, 0.707f},
         {}
-    }}, 2},
-    {"Answering Machine", {{
-        {EQBandType::HighPass, 400.0f, 0.0f, 1.0f},
-        {EQBandType::Peak, 1500.0f, 5.0f, 2.0f},
-        {EQBandType::LowPass, 3000.0f, 0.0f, 1.0f}
-    }}, 3},
+    }}, 2, 0.0f},
+    {"DICTAPHONE", {{
+        {EQBandType::HighPass, 400.0f, 0.0f, 0.8f},
+        {EQBandType::LowPass, 3500.0f, 0.0f, 0.8f},
+        {EQBandType::Peak, 3000.0f, 4.0f, 2.0f}
+    }}, 3, 0.0f},
+    {"TOY", {{
+        {EQBandType::LowPass, 2500.0f, 0.0f, 1.2f},
+        {EQBandType::HighPass, 300.0f, 0.0f, 0.8f},
+        {}
+    }}, 2, 0.0f},
 }};
 
 constexpr size_t kNumTapeModels = kTapeModels.size();
