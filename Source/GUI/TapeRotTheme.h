@@ -54,7 +54,8 @@ namespace TapeRotTheme
     inline juce::Font knobLabelFont() { return juce::FontOptions(sansFontName(), 11.0f, juce::Font::bold); }
     inline juce::Font microLabelFont() { return juce::FontOptions(sansFontName(), 8.5f, juce::Font::plain); }
     inline juce::Font switchLabelFont() { return juce::FontOptions(sansFontName(), 9.0f, juce::Font::bold); }
-    inline juce::Font switchCaptionFont() { return juce::FontOptions(sansFontName(), 7.5f, juce::Font::plain); }
+    inline juce::Font switchCaptionFont() { return juce::FontOptions(sansFontName(), 7.0f, juce::Font::plain); }
+    inline juce::Font modelReadoutFont(float sizePx) { return juce::FontOptions(sansFontName(), sizePx, juce::Font::bold); }
     inline juce::Font dotLabelFont() { return juce::FontOptions(sansFontName(), 6.5f, juce::Font::plain); }
     inline juce::Font dymoFont() { return juce::FontOptions(sansFontName(), 17.0f, juce::Font::bold); }
     inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
@@ -65,7 +66,8 @@ namespace TapeRotTheme
     constexpr float knobLabelTracking = 2.5f;
     constexpr float microLabelTracking = 2.5f;
     constexpr float switchLabelTracking = 2.0f;
-    constexpr float switchCaptionTracking = 1.0f;
+    constexpr float switchCaptionTracking = 0.3f;
+    constexpr float modelReadoutTracking = 1.5f;
     constexpr float dotLabelTracking = 0.5f;
     constexpr float dymoTracking = 6.0f;
     constexpr float versionTracking = 2.0f;
@@ -139,9 +141,19 @@ namespace TapeRotTheme
         constexpr float switchCentreY = 316.0f;
         constexpr float switchLabelY = 338.0f, switchCaptionY = 350.0f;
 
-        constexpr float noiseSwitchX = 396.0f;
-        constexpr float humSwitchX = 486.0f;
+        // MACHINE section switch row positions, per the updated design/taperot-interface.svg.
+        constexpr float switchModeSwitchX = 370.0f;
+        constexpr float noiseSwitchX = 449.0f;
+        constexpr float humSwitchX = 518.0f;
         constexpr float spreadSwitchX = 610.0f;
+
+        // ModelReadout box, per the updated SVG (sits under the MODEL knob, replacing its
+        // generic knob-label text).
+        constexpr float modelReadoutX = 361.0f, modelReadoutY = 261.0f;
+        constexpr float modelReadoutW = 90.0f, modelReadoutH = 22.0f, modelReadoutRadius = 4.0f;
+        constexpr float modelReadoutLabelY = 297.0f;
+        constexpr float modelReadoutNominalFontPx = 10.0f;
+        constexpr float modelReadoutMinFontPx = 6.5f;
 
         constexpr float failureDotY = 365.0f, failureDotRadius = 4.0f, failureDotLabelY = 377.0f;
         constexpr float failureDotFirstX = 592.0f, failureDotSpacing = 28.0f;

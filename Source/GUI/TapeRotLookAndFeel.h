@@ -13,4 +13,8 @@ public:
                           juce::Slider&) override;
 
     static std::unique_ptr<juce::Slider> createKnobSlider(const juce::String& label);
+
+    // Public (not static-private) so a unit test can assert tickCount == model table size without
+    // needing a live Slider/Component.
+    static int getTickCountForSlider(const juce::Slider& slider) noexcept;
 };

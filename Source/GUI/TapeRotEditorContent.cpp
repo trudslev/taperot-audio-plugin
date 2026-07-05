@@ -3,7 +3,7 @@
 using namespace TapeRotTheme;
 
 TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
-    : processorRef(p), failLamp(p), scope(p), genDigitDisplay(p)
+    : processorRef(p), failLamp(p), scope(p), genDigitDisplay(p), modelReadout(p)
 {
     setSize((int) Layout::canvasWidth, (int) Layout::canvasHeight);
     setLookAndFeel(&lookAndFeel);
@@ -47,6 +47,16 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
     noiseCharacterAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         processorRef.apvts, ParamIDs::noiseCharacter, noiseCharacterSwitch);
     addAndMakeVisible(noiseCharacterSwitch);
+
+    switchModeSwitch.setBounds((int) Layout::switchModeSwitchX, (int) (Layout::switchCentreY - Layout::switchThumbRadius),
+                                (int) Layout::switchW, (int) (Layout::switchThumbRadius * 2.0f));
+    switchModeAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        processorRef.apvts, ParamIDs::switchMode, switchModeSwitch);
+    addAndMakeVisible(switchModeSwitch);
+
+    modelReadout.setBounds((int) Layout::modelReadoutX, (int) Layout::modelReadoutY,
+                            (int) Layout::modelReadoutW, (int) (Layout::modelReadoutLabelY + 6.0f - Layout::modelReadoutY));
+    addAndMakeVisible(modelReadout);
 
     for (size_t i = 0; i < Layout::failureDots.size(); ++i)
     {

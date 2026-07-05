@@ -182,6 +182,7 @@ void TapeRotAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
+    xml->setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
     copyXmlToBinary(*xml, destData);
 }
 
@@ -189,7 +190,10 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
 {
     if (std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes)); xml != nullptr)
         if (xml->hasTagName(apvts.state.getType()))
+        {
+            LegacyMigration::remapLegacyModelIndexIfNeeded(*xml);
             apvts.replaceState(juce::ValueTree::fromXml(*xml));
+        }
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

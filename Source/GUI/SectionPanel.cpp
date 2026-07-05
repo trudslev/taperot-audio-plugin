@@ -105,6 +105,11 @@ void SectionPanel::paintKnobLabels(juce::Graphics& g)
     const auto font = knobLabelFont();
     for (const auto& knob : Layout::knobs)
     {
+        // MODEL gets the ModelReadout component instead of a generic label - see the SVG (its
+        // knob has no trailing label text, unlike every other knob).
+        if (juce::String(knob.paramID) == "model")
+            continue;
+
         drawTrackedText(g, knob.label, font, knobLabelTracking,
                          juce::Rectangle<float>(knob.x - 60.0f, Layout::knobCentreY + Layout::knobLabelOffsetY - 8.0f,
                                                  120.0f, 16.0f),
@@ -126,10 +131,12 @@ void SectionPanel::paintSwitchLabels(juce::Graphics& g)
     };
 
     // juce::String's const char* constructor treats bytes as Latin-1, not UTF-8, so the
-    // middle-dot separator must be decoded explicitly via fromUTF8 to avoid mojibake.
-    drawSwitchText(Layout::noiseSwitchX, "NOISE", juce::String::fromUTF8("TAPE \xC2\xB7 VCR \xC2\xB7 DUST"));
-    drawSwitchText(Layout::humSwitchX, "HUM", juce::String::fromUTF8("OFF \xC2\xB7 ON"));
-    drawSwitchText(Layout::spreadSwitchX, "SPREAD", juce::String::fromUTF8("LINKED \xC2\xB7 STEREO"));
+    // middle-dot separator must be decoded explicitly via fromUTF8 to avoid mojibake. Dots have
+    // no surrounding spaces, per the updated SVG's tighter caption typography.
+    drawSwitchText(Layout::switchModeSwitchX, "SWITCH", juce::String::fromUTF8("FADE\xC2\xB7" "CLUNK"));
+    drawSwitchText(Layout::noiseSwitchX, "NOISE", juce::String::fromUTF8("TAPE\xC2\xB7" "VCR\xC2\xB7" "DUST"));
+    drawSwitchText(Layout::humSwitchX, "HUM", juce::String::fromUTF8("OFF\xC2\xB7ON"));
+    drawSwitchText(Layout::spreadSwitchX, "SPREAD", juce::String::fromUTF8("LINKED\xC2\xB7STEREO"));
 }
 
 void SectionPanel::paintFailureDotLabels(juce::Graphics& g)

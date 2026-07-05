@@ -37,6 +37,56 @@ namespace NoiseCharacterNames
     constexpr auto dust = "DUST";
 }
 
+namespace LegacyMigration
+{
+    // Bumped whenever a stored parameter's *meaning* (not just its ID) changes incompatibly -
+    // currently just the model table redefinition. Written into getStateInformation's XML root;
+    // setStateInformation checks it and remaps legacy values before restoring. Note this is
+    // separate from a parameter's ParameterID versionHint: that only affects the VST3/AU host's
+    // own numeric automation-lane ID (so old automation doesn't silently reattach to a
+    // parameter whose choices changed), but does NOT affect APVTS's own getStateInformation/
+    // setStateInformation XML, which is keyed by the plain ID string regardless of versionHint -
+    // that path needs this explicit marker instead.
+    constexpr auto stateSchemaVersionAttribute = "taperotStateSchemaVersion";
+    constexpr int currentStateSchemaVersion = 2;
+
+    // Old table order was: VCR HiFi, Camcorder, Dictaphone, Toy, Cassette Type I, Cassette Type
+    // II, Reel-to-Reel, Answering Machine (indices 0-7). Maps each to its closest match in the
+    // new table so a pre-migration session's MODEL knob lands somewhere sensible rather than on
+    // an arbitrary, unrelated machine.
+    inline constexpr std::array<int, 8> legacyModelIndexRemap{
+        1, // VCR HiFi          -> VCR HIFI (1)
+        3, // Camcorder         -> CAMCORDER (3)
+        6, // Dictaphone        -> DICTAPHONE (6)
+        7, // Toy               -> TOY (7)
+        4, // Cassette Type I   -> CASSETTE I (4)
+        5, // Cassette Type II  -> CASSETTE II (5)
+        0, // Reel-to-Reel      -> REVOX B77 (0) - both reel-to-reel machines
+        6, // Answering Machine -> DICTAPHONE (6) - similar narrow telephone-band character
+    };
+
+    // Free function (rather than a TapeRotAudioProcessor method) so it's unit-testable with a
+    // synthetic XmlElement, without needing the real plugin target's JucePlugin_* macros.
+    inline void remapLegacyModelIndexIfNeeded(juce::XmlElement& xml)
+    {
+        const int schemaVersion = xml.getIntAttribute(stateSchemaVersionAttribute, 1);
+        if (schemaVersion >= currentStateSchemaVersion)
+            return;
+
+        for (int i = 0; i < xml.getNumChildElements(); ++i)
+        {
+            auto* child = xml.getChildElement(i);
+            if (child != nullptr && child->getStringAttribute("id") == ParamIDs::model)
+            {
+                const int oldIndex = juce::jlimit(0, (int) legacyModelIndexRemap.size() - 1,
+                                                   (int) child->getDoubleAttribute("value"));
+                child->setAttribute("value", (double) legacyModelIndexRemap[(size_t) oldIndex]);
+                break;
+            }
+        }
+    }
+}
+
 inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
@@ -56,11 +106,8 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         juce::ParameterID{ParamIDs::flutter, 1}, "Flutter",
         juce::NormalisableRange<float>(0.0f, 100.0f), 25.0f, percentAttrs));
 
-    // versionHint bumped 1 -> 2: the model table was completely redefined (different machines,
-    // different order), so an old session's stored index would silently select the wrong machine
-    // if it reattached to this parameter. Bumping the hint means old automation/state for "model"
-    // simply doesn't apply to the new parameter, and it starts at its own default instead - the
-    // only sensible outcome once a choice list's *meaning* changes, not just gains an entry.
+    // versionHint bumped 1 -> 2 (protects VST3/AU host automation-lane reattachment only - see
+    // LegacyMigration above for the separate fix needed for APVTS's own state XML).
     juce::StringArray modelNames;
     for (const auto& model : kTapeModels)
         modelNames.add(model.displayName);

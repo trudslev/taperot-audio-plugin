@@ -13,6 +13,7 @@
 #include "FailLamp.h"
 #include "Scope.h"
 #include "GenDigitDisplay.h"
+#include "ModelReadout.h"
 #include "../PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -34,11 +35,15 @@ private:
 
     ToggleSwitch humSwitch{"Hum"};
     ToggleSwitch spreadSwitch{"Spread"};
+    ToggleSwitch switchModeSwitch{"Switch"};
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> humAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> spreadAttachment;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> switchModeAttachment;
 
     NoiseCharacterSwitch noiseCharacterSwitch;
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> noiseCharacterAttachment;
+
+    ModelReadout modelReadout;
 
     std::array<std::unique_ptr<FailureDotToggle>, TapeRotTheme::Layout::failureDots.size()> failureDotToggles;
     std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>,

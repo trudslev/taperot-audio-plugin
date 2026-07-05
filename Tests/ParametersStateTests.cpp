@@ -124,6 +124,36 @@ public:
             expect(*apvtsNew.getRawParameterValue(ParamIDs::failAux) < 0.5f);
             expectWithinAbsoluteError((float) *apvtsNew.getRawParameterValue(ParamIDs::ramp), 0.3f, 0.01f);
         }
+
+        beginTest("Legacy model index remap: pre-schema-marker session index is remapped to its new-table match");
+        {
+            for (int oldIndex = 0; oldIndex < (int) LegacyMigration::legacyModelIndexRemap.size(); ++oldIndex)
+            {
+                juce::XmlElement xml("PARAMETERS");
+                // No stateSchemaVersionAttribute set - mirrors a session saved before it existed.
+                auto* param = xml.createNewChildElement("PARAM");
+                param->setAttribute("id", ParamIDs::model);
+                param->setAttribute("value", (double) oldIndex);
+
+                LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
+
+                const int remapped = (int) xml.getChildElement(0)->getDoubleAttribute("value");
+                expectEquals(remapped, LegacyMigration::legacyModelIndexRemap[(size_t) oldIndex]);
+            }
+        }
+
+        beginTest("Legacy model index remap: current-schema session is left untouched");
+        {
+            juce::XmlElement xml("PARAMETERS");
+            xml.setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
+            auto* param = xml.createNewChildElement("PARAM");
+            param->setAttribute("id", ParamIDs::model);
+            param->setAttribute("value", 7.0); // TOY in the current table - must NOT be remapped
+
+            LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
+
+            expectEquals((int) xml.getChildElement(0)->getDoubleAttribute("value"), 7);
+        }
     }
 };
 

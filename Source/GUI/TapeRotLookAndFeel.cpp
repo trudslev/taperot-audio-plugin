@@ -11,9 +11,25 @@ TapeRotLookAndFeel::TapeRotLookAndFeel()
     setColour(juce::Label::textColourId, TapeRotTheme::Colour::ink);
 }
 
+int TapeRotLookAndFeel::getTickCountForSlider(const juce::Slider& slider) noexcept
+{
+    // A choice-bound slider's interval is 1 (propagated from AudioParameterChoice's
+    // NormalisableRange by SliderParameterAttachment); continuous knobs have interval 0.
+    // Deriving the count this way means adding a model to the data table produces the right
+    // tick count/detent spacing automatically, with no GUI code change.
+    if (slider.getInterval() >= 1.0)
+    {
+        const auto range = slider.getRange();
+        const int steppedCount = (int) std::round(range.getLength() / slider.getInterval()) + 1;
+        if (steppedCount >= 2)
+            return steppedCount;
+    }
+    return TapeRotTheme::Layout::knobNumTicks;
+}
+
 void TapeRotLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height,
                                           float sliderPosProportional, float, float,
-                                          juce::Slider&)
+                                          juce::Slider& slider)
 {
     using namespace TapeRotTheme;
 
@@ -21,10 +37,11 @@ void TapeRotLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int w
     const auto centre = bounds.getCentre();
     const float radius = Layout::knobRadius;
 
-    for (int i = 0; i < Layout::knobNumTicks; ++i)
+    const int tickCount = getTickCountForSlider(slider);
+    for (int i = 0; i < tickCount; ++i)
     {
         const float angle = Layout::knobArcStartDegrees
-            + (float) i / (float) (Layout::knobNumTicks - 1)
+            + (float) i / (float) (tickCount - 1)
               * (Layout::knobArcEndDegrees - Layout::knobArcStartDegrees);
         const auto inner = pointOnCircle(centre, Layout::knobTickInnerRadius, angle);
         const auto outer = pointOnCircle(centre, Layout::knobTickOuterRadius, angle);
