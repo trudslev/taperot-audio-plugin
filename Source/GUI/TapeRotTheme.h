@@ -45,6 +45,11 @@ namespace TapeRotTheme
         inline const juce::Colour resetStubFill{0xFFC9C2B2};
         inline const juce::Colour resetStubStroke{0xFF6E675A};
         inline const juce::Colour cream{0xFFF5F2EA};
+        // Brighter, slightly warm white for the Dymo emboss face - stressed/stretched label
+        // plastic reads brighter than the general cream used elsewhere in the panel.
+        inline const juce::Colour dymoEmbossFace{0xFFFFFDF6};
+        inline const juce::Colour dymoEmbossHighlight{0xFFFFFFFF};
+        inline const juce::Colour dymoEmbossShadow{0xFF050300};
     }
 
     inline juce::String sansFontName() { return "Helvetica Neue"; }
@@ -88,6 +93,21 @@ namespace TapeRotTheme
 
         constexpr float dymoX = 32.0f, dymoY = 40.0f, dymoW = 168.0f, dymoH = 34.0f;
         constexpr float dymoRotationDegrees = -1.6f;
+
+        // Punched-relief emboss: a single light source (upper-left, in screen space where +y is
+        // down) casts a hard highlight on the letter's upper-left-facing edge and a hard shadow on
+        // its lower-right-facing edge. Angle is measured the usual atan2 way (0 deg = +x/right,
+        // 90 deg = +y/down), so 225 deg = up and to the left.
+        constexpr float dymoLightDirectionDegrees = 225.0f;
+        constexpr float dymoBevelOffsetPx = 0.9f;
+        // Multiplies the highlight/shadow alpha below; a per-character punch-pressure factor
+        // further scales this at draw time so lighter punches read as a weaker bevel.
+        constexpr float dymoBevelContrastStrength = 1.0f;
+        // Per-character hand-punched variance: small random position/rotation jitter, deterministic
+        // per character index so it doesn't flicker between repaints.
+        constexpr float dymoJitterPositionPx = 0.5f;
+        constexpr float dymoJitterRotationDegrees = 2.2f;
+        constexpr float dymoPressureMin = 0.55f;
 
         constexpr float scopeX = 224.0f, scopeXEnd = 640.0f, scopeCentreY = 62.0f;
 
