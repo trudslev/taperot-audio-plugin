@@ -22,6 +22,10 @@ namespace ParamIDs
     constexpr auto gen = "gen";
     constexpr auto lp = "lp";
     constexpr auto hp = "hp";
+    constexpr auto stop = "stop";
+    constexpr auto filterAux = "filterAux";
+    constexpr auto failAux = "failAux";
+    constexpr auto ramp = "ramp";
 }
 
 namespace NoiseCharacterNames
@@ -113,6 +117,23 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::hp, 1}, "HP",
         juce::NormalisableRange<float>(20.0f, 2000.0f, 0.0f, 0.3f), 20.0f, hzAttrs));
+
+    // Momentary performance triggers: exposed as ordinary automatable bools, which is already
+    // enough for any host's own MIDI-learn to map a note/CC to them without extra plugin-side
+    // MIDI handling.
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ParamIDs::stop, 1}, "Stop", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ParamIDs::filterAux, 1}, "Filter", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID{ParamIDs::failAux, 1}, "Fail", false));
+
+    auto secondsAttrs = juce::AudioParameterFloatAttributes().withLabel("s");
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ParamIDs::ramp, 1}, "Ramp",
+        juce::NormalisableRange<float>(0.05f, 4.0f, 0.0f, 0.4f), 0.3f, secondsAttrs));
 
     return {params.begin(), params.end()};
 }

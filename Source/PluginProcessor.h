@@ -7,6 +7,9 @@
 #include "DSP/FailureEngine.h"
 #include "DSP/StereoSpread.h"
 #include "DSP/ToneFilters.h"
+#include "DSP/TapeStop.h"
+#include "DSP/FilterSweep.h"
+#include "DSP/AuxEnvelope.h"
 #include "DSP/OutputStage.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <array>
@@ -66,6 +69,10 @@ private:
     std::atomic<float>* genParam = nullptr;
     std::atomic<float>* lpParam = nullptr;
     std::atomic<float>* hpParam = nullptr;
+    std::atomic<float>* stopParam = nullptr;
+    std::atomic<float>* filterAuxParam = nullptr;
+    std::atomic<float>* failAuxParam = nullptr;
+    std::atomic<float>* rampParam = nullptr;
 
     static constexpr int maxGenerations = 8;
 
@@ -78,6 +85,9 @@ private:
     FailureEngine failureEngine;
     StereoSpread stereoSpread;
     ToneFilters toneFilters;
+    TapeStop tapeStop;
+    FilterSweep filterSweep;
+    AuxEnvelope failEnvelope;
     OutputStage outputStage;
 
     std::atomic<float> wowDisplay{0.0f};

@@ -25,6 +25,10 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     genParam = apvts.getRawParameterValue(ParamIDs::gen);
     lpParam = apvts.getRawParameterValue(ParamIDs::lp);
     hpParam = apvts.getRawParameterValue(ParamIDs::hp);
+    stopParam = apvts.getRawParameterValue(ParamIDs::stop);
+    filterAuxParam = apvts.getRawParameterValue(ParamIDs::filterAux);
+    failAuxParam = apvts.getRawParameterValue(ParamIDs::failAux);
+    rampParam = apvts.getRawParameterValue(ParamIDs::ramp);
 
     for (int i = 0; i < maxGenerations; ++i)
         generationStages[(size_t) i] = std::make_unique<DegradationCore>(i);
@@ -42,6 +46,9 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     failureEngine.prepare(spec);
     stereoSpread.prepare(spec);
     toneFilters.prepare(spec);
+    tapeStop.prepare(spec);
+    filterSweep.prepare(spec);
+    failEnvelope.setSampleRate(sampleRate);
     outputStage.prepare(spec);
 
     genSmoothed.reset(sampleRate, 0.04);
@@ -84,6 +91,10 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const bool imbalance = failureImbalanceParam->load() > 0.5f;
     const float lpHz = lpParam->load();
     const float hpHz = hpParam->load();
+    const bool stopEnabled = stopParam->load() > 0.5f;
+    const bool filterAuxEnabled = filterAuxParam->load() > 0.5f;
+    const bool failAuxEnabled = failAuxParam->load() > 0.5f;
+    const float rampSeconds = rampParam->load();
 
     const int numSamples = buffer.getNumSamples();
     const int numChannels = buffer.getNumChannels();
@@ -120,9 +131,17 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         }
 
     hum.process(buffer, humEnabled);
-    failureEngine.process(buffer, failure01, dropouts, snags, crinkles, imbalance);
+
+    failEnvelope.setEngaged(failAuxEnabled);
+    failEnvelope.setRampSeconds(rampSeconds);
+    const float failAuxValue = failEnvelope.advanceBlock(numSamples);
+    const float effectiveFailure01 = juce::jmax(failure01, failAuxValue);
+    failureEngine.process(buffer, effectiveFailure01, dropouts, snags, crinkles, imbalance);
+
     stereoSpread.process(buffer, spread);
     toneFilters.process(buffer, lpHz, hpHz);
+    tapeStop.process(buffer, stopEnabled, rampSeconds);
+    filterSweep.process(buffer, filterAuxEnabled, rampSeconds);
     outputStage.process(buffer, dryBuffer, mix01, outputDb);
 
     constexpr float displayTimeConstantSeconds = 0.15f;

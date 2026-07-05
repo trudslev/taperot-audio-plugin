@@ -44,6 +44,8 @@ target_sources(TapeRot PRIVATE
     Source/DSP/FailureEngine.cpp
     Source/DSP/StereoSpread.cpp
     Source/DSP/ToneFilters.cpp
+    Source/DSP/TapeStop.cpp
+    Source/DSP/FilterSweep.cpp
     Source/DSP/OutputStage.cpp
     Source/GUI/TapeRotLookAndFeel.cpp
     Source/GUI/DymoLabel.cpp
