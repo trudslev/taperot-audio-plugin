@@ -13,6 +13,7 @@ target_sources(TapeRotTests PRIVATE
     ParametersStateTests.cpp
     GenerationCascadeTests.cpp
     TapeRotLookAndFeelTests.cpp
+    TapeModelCalibrationTests.cpp
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
     ../Source/DSP/TapeModelEQ.cpp
