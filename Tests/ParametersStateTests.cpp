@@ -83,6 +83,25 @@ public:
             expectWithinAbsoluteError((float) *apvtsB.getRawParameterValue(ParamIDs::ramp), 1.5f, 0.01f);
         }
 
+        beginTest("DRIVE's skew doesn't affect the physical value round-tripped through session state");
+        {
+            // DRIVE is skewed (0.3) for knob feel - session/preset XML stores the physical
+            // (denormalised) value, not the skew-dependent normalized position, so the same
+            // physical number must come back regardless of skew.
+            DummyProcessor procA;
+            juce::AudioProcessorValueTreeState apvtsA(procA, nullptr, "PARAMETERS", createTapeRotParameterLayout());
+            *dynamic_cast<juce::AudioParameterFloat*>(apvtsA.getParameter(ParamIDs::drive)) = 37.5f;
+
+            auto state = apvtsA.copyState();
+            std::unique_ptr<juce::XmlElement> xml(state.createXml());
+
+            DummyProcessor procB;
+            juce::AudioProcessorValueTreeState apvtsB(procB, nullptr, "PARAMETERS", createTapeRotParameterLayout());
+            apvtsB.replaceState(juce::ValueTree::fromXml(*xml));
+
+            expectWithinAbsoluteError((float) *apvtsB.getRawParameterValue(ParamIDs::drive), 37.5f, 0.01f);
+        }
+
         beginTest("Missing new parameters in an old saved session fall back to defaults without crashing");
         {
             DummyProcessor procOld;

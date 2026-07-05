@@ -94,9 +94,26 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     auto percentAttrs = juce::AudioParameterFloatAttributes().withLabel("%");
     auto dbAttrs = juce::AudioParameterFloatAttributes().withLabel("dB");
 
+    // Skewed (matching LP/HP/RAMP's existing 0.3-0.4 convention below): Saturator's drive-gain
+    // curve is 1 + driveNorm*11 feeding tanh(x*driveGain)/tanh(driveGain), which is already at
+    // ~99% of its saturated ceiling by driveGain~4-5 - i.e. by roughly DRIVE=30-35% of the old
+    // linear range, everything above that is audibly indistinguishable "fully clipped." A skew
+    // front-loads knob resolution into that useful low range instead.
+    //
+    // Skew safety: session-state and preset-file values are the physical (denormalised) number
+    // (see AudioProcessorValueTreeState's own XML persistence, and processBlock reading
+    // driveParam->load() directly) - so "drive=55" means the same physical 55% and the same sound
+    // before and after this change, in any saved session or preset file. The one thing this does
+    // change is any *already-recorded host automation lane* on DRIVE: hosts store/play back
+    // automation as normalized [0,1] breakpoints, which convertFrom0to1 maps through whichever
+    // skew is active - so an old automation curve will produce a different physical DRIVE value
+    // (and therefore a different sound) at the same breakpoint after this change. That's an
+    // unavoidable consequence of changing any parameter's skew, not a bug; it doesn't affect the
+    // parameter's default value (stored/interpreted as a physical number either way) or any
+    // session/preset file.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::drive, 1}, "Drive",
-        juce::NormalisableRange<float>(0.0f, 100.0f), 20.0f, percentAttrs));
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.3f), 20.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::wow, 1}, "Wow",
