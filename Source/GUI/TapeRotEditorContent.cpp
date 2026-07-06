@@ -50,11 +50,11 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
             slider->setTooltip(tooltip);
 
             // MODEL's label is the ModelReadout component instead of static text (see
-            // SectionPanel::paintKnobLabels) - it gets this same tooltip directly, not a hover
-            // proxy, since it's already a real Component covering that space.
-            if (juce::String(spec.paramID) == ParamIDs::model)
-                modelReadout.setTooltip(tooltip);
-            else
+            // SectionPanel::paintKnobLabels) - it's a hover proxy like the rest below rather than
+            // a tooltip set directly on ModelReadout, since ModelReadout deliberately opts out of
+            // mouse interception entirely (setInterceptsMouseClicks(false, false), a pure-display
+            // component like Scope/FailLamp) - added once its bounds are set, further down.
+            if (juce::String(spec.paramID) != ParamIDs::model)
                 // Narrower than SectionPanel's own 120px-wide justification box for this label
                 // (fine for centering text, but would overlap a neighbour's hover area at these
                 // knobs' ~108px spacing) - 90 clears the tightest gap with margin either side.
@@ -122,6 +122,8 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
     modelReadout.setBounds((int) Layout::modelReadoutX, (int) Layout::modelReadoutY,
                             (int) Layout::modelReadoutW, (int) (Layout::modelReadoutLabelY + 6.0f - Layout::modelReadoutY));
     addAndMakeVisible(modelReadout);
+    if (const auto* modelTooltip = genericKnobTooltip(ParamIDs::model))
+        addLabelTooltip(modelReadout.getBounds().toFloat(), modelTooltip);
 
     for (size_t i = 0; i < Layout::failureDots.size(); ++i)
     {
@@ -134,13 +136,17 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
 
         const char* dotTooltip = nullptr;
         if (juce::String(spec.paramID) == ParamIDs::failureDropouts)
-            dotTooltip = "Dropouts: brief random drops in signal level.";
+            dotTooltip = "Dropouts: brief random drops in signal level. Enables this glitch type - "
+                         "raise FAILURE or hold FAIL to actually trigger it.";
         else if (juce::String(spec.paramID) == ParamIDs::failureSnags)
-            dotTooltip = "Snags: brief pitch-flutter stutters.";
+            dotTooltip = "Snags: brief pitch-flutter stutters. Enables this glitch type - raise "
+                         "FAILURE or hold FAIL to actually trigger it.";
         else if (juce::String(spec.paramID) == ParamIDs::failureCrinkles)
-            dotTooltip = "Crinkles: bursts of crackling, high-passed noise.";
+            dotTooltip = "Crinkles: bursts of crackling, high-passed noise. Enables this glitch "
+                         "type - raise FAILURE or hold FAIL to actually trigger it.";
         else if (juce::String(spec.paramID) == ParamIDs::failureImbalance)
-            dotTooltip = "Wobble: brief per-channel level imbalance blips.";
+            dotTooltip = "Wobble: brief per-channel level imbalance blips. Enables this glitch "
+                         "type - raise FAILURE or hold FAIL to actually trigger it.";
 
         if (dotTooltip != nullptr)
         {
@@ -203,7 +209,10 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
                    "Momentary filter sweep: a resonant low-pass closes in while held, then reopens on release.",
                    filterAttachment);
     setupAuxButton(failButton, Layout::failButtonX, ParamIDs::failAux,
-                   "Momentary failure burst: pushes FAILURE to maximum while held.", failAttachment);
+                   "Momentary failure burst: pushes FAILURE to maximum while held - only produces "
+                   "glitches for the types enabled under DECAY's DRP/SNG/CRK/WBL dots, and each is "
+                   "a random chance per second, so a longer hold is more likely to audibly trigger one.",
+                   failAttachment);
 
     // Scope/FailLamp/GenDigitDisplay draw with absolute canvas coordinates (like SectionPanel and
     // DymoLabel), so they're sized to the full canvas rather than a sub-region - a JUCE

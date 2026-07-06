@@ -89,12 +89,19 @@ namespace TapeRotTheme
     // as the real on-screen paint, so it's a faithful cross-platform measurement.
     inline float measureRenderedInkHeight(const juce::Font& font, const juce::String& text)
     {
-        const int canvasW = 2000, canvasH = 400;
+        // Sized relative to the requested font height, not a fixed constant: if a backend's
+        // interpretation of this typeface's metrics disagrees badly enough with the height we
+        // asked for (the exact cross-platform problem this function exists to catch), a fixed-size
+        // canvas can end up clipping the glyphs, under-measuring the ink height and leaving the
+        // caller's correction under-corrected - a generous, height-proportional margin means
+        // clipping can't happen regardless of how differently a platform renders this font.
+        const int canvasW = juce::jmax(400, (int) (font.getHeight() * 40.0f));
+        const int canvasH = juce::jmax(200, (int) (font.getHeight() * 20.0f));
         juce::Image img(juce::Image::ARGB, canvasW, canvasH, true);
         juce::Graphics g(img);
         g.setColour(juce::Colours::white);
         g.setFont(font);
-        g.drawText(text, 0, 0, canvasW, canvasH, juce::Justification::centredLeft, false);
+        g.drawText(text, 0, 0, canvasW, canvasH, juce::Justification::centred, false);
 
         int minY = canvasH, maxY = -1;
         for (int y = 0; y < canvasH; ++y)
