@@ -1,9 +1,10 @@
 name: Edge Build
 
 # Builds TapeRot from develop on every push, runs the DSP test suite, packages a macOS installer
-# (.pkg, AU+VST3+Standalone) and a Windows zip (VST3+Standalone - no AU, that's Apple-only), and
-# publishes both to the rolling "edge" pre-release. Neither is signed (no Apple Developer ID or
-# Windows code-signing cert wired in) - recipients need to bypass Gatekeeper/SmartScreen once.
+# (.pkg, AU+VST3+Standalone) and a Windows installer (Inno Setup .exe, VST3+Standalone - no AU,
+# that's Apple-only), and publishes both to the rolling "edge" pre-release. Neither is signed (no
+# Apple Developer ID or Windows code-signing cert wired in) - recipients need to bypass
+# Gatekeeper/SmartScreen once.
 # The two build jobs upload their packages as workflow artifacts; a final job downloads both and
 # publishes them together in one release-action call, so neither platform's asset ever gets wiped
 # out by the other's "replace previous assets" step.
@@ -110,7 +111,7 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "zip_name=TapeRot-${VERSION}-edge-${SHORT_SHA}-windows.zip" >> "$GITHUB_OUTPUT"
+          echo "installer_name=TapeRot-${VERSION}-edge-${SHORT_SHA}-windows" >> "$GITHUB_OUTPUT"
 
       - name: Stage build output
         shell: bash
@@ -123,16 +124,21 @@ jobs:
           cp build/TapeRot_artefacts/Release/Standalone/TapeRot.exe "$STAGE/Standalone/"
           echo "STAGE=$STAGE" >> "$GITHUB_ENV"
 
-      - name: Zip build output
+      - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
-          Compress-Archive -Path "$env:STAGE\*" -DestinationPath "${{ steps.version.outputs.zip_name }}"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=${{ steps.version.outputs.version }}" `
+            "/DMyOutputBaseFilename=${{ steps.version.outputs.installer_name }}" `
+            "/DMyStageDir=$env:STAGE" `
+            /O. `
+            installer\windows\TapeRot.iss
 
-      - name: Upload Windows build artifact
+      - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-zip
-          path: ${{ steps.version.outputs.zip_name }}
+          name: windows-installer
+          path: ${{ steps.version.outputs.installer_name }}.exe
           retention-days: 7
 
   publish-edge:
@@ -162,11 +168,11 @@ jobs:
 
             - **macOS**: right-click the `.pkg` and choose Open, or run
               `xattr -dr com.apple.quarantine ~/Downloads/TapeRot-*-macos.pkg`
-            - **Windows**: SmartScreen will show "Windows protected your PC" - click
-              "More info" then "Run anyway", or right-click the downloaded zip -> Properties ->
-              Unblock before extracting.
+            - **Windows**: SmartScreen will show "Windows protected your PC" on the installer -
+              click "More info" then "Run anyway". The installer needs admin rights (it places the
+              VST3 in the shared Common Files location) and installs both the VST3 and Standalone.
           prerelease: true
           allowUpdates: true
           removeArtifacts: true
-          artifacts: "dist/*.pkg,dist/*.zip"
+          artifacts: "dist/*.pkg,dist/*.exe"
           token: ${{ secrets.GITHUB_TOKEN }}
