@@ -51,16 +51,37 @@ namespace TapeRotTheme
         inline const juce::Colour dymoEmbossFace{0xFFFFFDF6};
     }
 
-    inline juce::String sansFontName() { return "Helvetica Neue"; }
     inline juce::String monoFontName() { return juce::Font::getDefaultMonospacedFontName(); }
 
-    inline juce::Font sectionLabelFont() { return juce::FontOptions(sansFontName(), 10.0f, juce::Font::bold); }
-    inline juce::Font knobLabelFont() { return juce::FontOptions(sansFontName(), 11.0f, juce::Font::bold); }
-    inline juce::Font microLabelFont() { return juce::FontOptions(sansFontName(), 8.5f, juce::Font::plain); }
-    inline juce::Font switchLabelFont() { return juce::FontOptions(sansFontName(), 9.0f, juce::Font::bold); }
-    inline juce::Font switchCaptionFont() { return juce::FontOptions(sansFontName(), 7.0f, juce::Font::plain); }
-    inline juce::Font modelReadoutFont(float sizePx) { return juce::FontOptions(sansFontName(), sizePx, juce::Font::bold); }
-    inline juce::Font dotLabelFont() { return juce::FontOptions(sansFontName(), 6.5f, juce::Font::plain); }
+    // Inter (design/inter/, SIL Open Font License 1.1 - explicitly permits embedding/bundling in
+    // software, see design/inter/LICENSE.txt), embedded as binary data rather than depending on a
+    // system font: "Helvetica Neue" doesn't exist on Windows, and the tracking/kerning constants
+    // below are tuned against a specific typeface's metrics, so this needs to be the same file on
+    // every platform rather than whatever each OS happens to substitute. Two static weights
+    // (Regular/Bold) rather than one + synthetic bold, matching how every UI label here is either
+    // plain or bold, never anything in between.
+    inline juce::Typeface::Ptr sansRegularTypeface()
+    {
+        static const juce::Typeface::Ptr typeface =
+            juce::Typeface::createSystemTypefaceFor(BinaryData::InterRegular_ttf,
+                                                      (size_t) BinaryData::InterRegular_ttfSize);
+        return typeface;
+    }
+    inline juce::Typeface::Ptr sansBoldTypeface()
+    {
+        static const juce::Typeface::Ptr typeface =
+            juce::Typeface::createSystemTypefaceFor(BinaryData::InterBold_ttf,
+                                                      (size_t) BinaryData::InterBold_ttfSize);
+        return typeface;
+    }
+
+    inline juce::Font sectionLabelFont() { return juce::Font(sansBoldTypeface()).withHeight(10.0f); }
+    inline juce::Font knobLabelFont() { return juce::Font(sansBoldTypeface()).withHeight(11.0f); }
+    inline juce::Font microLabelFont() { return juce::Font(sansRegularTypeface()).withHeight(8.5f); }
+    inline juce::Font switchLabelFont() { return juce::Font(sansBoldTypeface()).withHeight(9.0f); }
+    inline juce::Font switchCaptionFont() { return juce::Font(sansRegularTypeface()).withHeight(7.0f); }
+    inline juce::Font modelReadoutFont(float sizePx) { return juce::Font(sansBoldTypeface()).withHeight(sizePx); }
+    inline juce::Font dotLabelFont() { return juce::Font(sansRegularTypeface()).withHeight(6.5f); }
     // Impact Label (design/impact-label/, by Michael Tension - commercial use permitted,
     // donationware), embedded as binary data rather than depending on it being installed as a
     // system font. Deliberately the "_reversed" variant: the regular one's glyphs are a pre-baked
@@ -75,7 +96,7 @@ namespace TapeRotTheme
         return juce::Font(typeface).withHeight(29.4f);
     }
     inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
-    inline juce::Font versionFont() { return juce::FontOptions(sansFontName(), 8.0f, juce::Font::plain); }
+    inline juce::Font versionFont() { return juce::Font(sansRegularTypeface()).withHeight(8.0f); }
 
     // Section-header letter spacing (px), applied via juce::AttributedString/Font tracking helpers.
     constexpr float sectionLabelTracking = 3.5f;

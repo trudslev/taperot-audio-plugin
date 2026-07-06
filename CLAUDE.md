@@ -4,15 +4,25 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-Configure once (JUCE 8.0.14 is fetched automatically via CMake `FetchContent`, no local checkout needed):
+TapeRot builds on macOS (AU + VST3 + Standalone) and Windows (VST3 + Standalone — AU is
+Apple-only; `CMakeLists.txt` conditionalizes `FORMATS`/`*_COPY_DIR` on `APPLE`). JUCE 8.0.14 is
+fetched automatically via CMake `FetchContent` on either platform, no local checkout needed.
+
+Configure once — macOS:
 
 ```sh
 cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES=arm64
 ```
 
+Configure once — Windows:
+
+```bat
+cmake -B build -G "Visual Studio 17 2022" -A x64
+```
+
 Re-run the configure step whenever `CMakeLists.txt` changes (new sources, new `juce_add_plugin` args, etc.) — a plain rebuild won't pick those up.
 
-Build (produces AU, VST3, and Standalone; auto-installs AU/VST3 to `~/Library/Audio/Plug-Ins/...`):
+Build (macOS auto-installs AU/VST3 to `~/Library/Audio/Plug-Ins/...`; Windows installs VST3 to JUCE's own default, `%COMMONPROGRAMFILES%\VST3\`):
 
 ```sh
 cmake --build build --config Release
@@ -21,12 +31,13 @@ cmake --build build --config Release
 Run the DSP unit tests (Catch2-style, built as a console app target `TapeRotTests`):
 
 ```sh
-./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests
+./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests          # macOS
+build\Tests\TapeRotTests_artefacts\Release\TapeRotTests.exe        # Windows
 ```
 
 To run a single test, pass its name/tag as an argument to that binary (Catch2 CLI conventions — e.g. `./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests "[saturator]"`).
 
-Validate plugin formats after building:
+Validate plugin formats after building — macOS (AU + VST3):
 
 ```sh
 auval -a | grep -i tapero                    # confirm AU registration + 4-char codes
@@ -37,9 +48,15 @@ auval -v aufx Rota Trot                      # full AU validation
     --validate ~/Library/Audio/Plug-Ins/VST3/TapeRot.vst3
 ```
 
-If Logic Pro doesn't pick up a freshly built AU: Audio Units Manager → "Reset & Rescan Selection", or restart Logic. If a rebuilt app/plugin icon doesn't refresh, LaunchServices/Dock/Finder are caching by bundle path — `touch` the bundle, re-run `lsregister -f <bundle>`, then `killall Dock Finder`.
+Validate on Windows (VST3 only, no AU/`auval` equivalent):
 
-See [BUILDING.md](BUILDING.md) for requirements (Xcode full install, CMake 3.24+, pluginval).
+```bat
+pluginval.exe --strictness-level 8 --validate "%COMMONPROGRAMFILES%\VST3\TapeRot.vst3"
+```
+
+If Logic Pro doesn't pick up a freshly built AU: Audio Units Manager → "Reset & Rescan Selection", or restart Logic. If a rebuilt app/plugin icon doesn't refresh, LaunchServices/Dock/Finder are caching by bundle path — `touch` the bundle, re-run `lsregister -f <bundle>`, then `killall Dock Finder`. (macOS-only tips — on Windows, a host's own plugin rescan action, e.g. Reaper's "re-scan VST paths", covers the equivalent case.)
+
+See [BUILDING.md](BUILDING.md) for full per-platform requirements (Xcode/Visual Studio, CMake 3.24+, pluginval).
 
 ## Prompts log
 
@@ -77,7 +94,9 @@ Latency is reported via `saturator.getLatencySamples()` — if a future stage in
 
 ### GUI (`Source/GUI/`)
 
-The entire interface is custom-painted (no JUCE Components with default look beyond sliders) against a **fixed reference canvas of 960x400** defined in `TapeRotTheme.h` (`Layout::canvasWidth/canvasHeight`). All layout constants (positions, radii, font sizes, tracking/letter-spacing) live in `TapeRotTheme.h` alongside the full colour palette — components should pull from `TapeRotTheme::Layout`/`TapeRotTheme::Colour` rather than hardcoding numbers.
+The entire interface is custom-painted (no JUCE Components with default look beyond sliders) against a **fixed reference canvas of 960x434** defined in `TapeRotTheme.h` (`Layout::canvasWidth/canvasHeight`). All layout constants (positions, radii, font sizes, tracking/letter-spacing) live in `TapeRotTheme.h` alongside the full colour palette — components should pull from `TapeRotTheme::Layout`/`TapeRotTheme::Colour` rather than hardcoding numbers.
+
+All UI text (everything except the Dymo nameplate, see below) uses Inter (`design/inter/`, SIL Open Font License 1.1 — see `design/inter/LICENSE.txt`), embedded as binary data via `sansRegularTypeface()`/`sansBoldTypeface()` in `TapeRotTheme.h` rather than a named system font — this used to be "Helvetica Neue" (macOS-only, and the tracking/kerning constants here are tuned against a specific typeface's metrics, so it needs to be the same file on every platform).
 
 Scaling to the actual window size is handled once, centrally: `PluginEditor::resized()` computes a single uniform scale factor (`window width / referenceWidth`) and applies it as a transform on the whole `TapeRotEditorContent`, with the constrainer locking the aspect ratio. Individual GUI components (`SectionPanel`, `DymoLabel`, knob slider look-and-feel in `TapeRotLookAndFeel`) always draw in the untransformed 960x400 reference space and never need to know about the current window size.
 
@@ -89,6 +108,10 @@ Scaling to the actual window size is handled once, centrally: `PluginEditor::res
 
 ### Build system
 
-`CMakeLists.txt` fetches JUCE via `FetchContent` (pinned to `8.0.14`) and defines one `juce_add_plugin(TapeRot ...)` target producing AU + VST3 + Standalone from the same source list. `PLUGIN_MANUFACTURER_CODE` (`Trot`), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID`, and `COMPANY_NAME` are placeholders per BUILDING.md — treat them as effectively permanent once anything is shipped or automated against them, so confirm before changing. `Tests/` is a separate `juce_add_console_app` target that compiles the DSP `.cpp` files directly (not linked against the plugin target) plus its own Catch2-style test files — new DSP `.cpp` files need to be added to both `target_sources(TapeRot ...)` in the root `CMakeLists.txt` and `target_sources(TapeRotTests ...)` in `Tests/CMakeLists.txt` if you want them covered by tests.
+`CMakeLists.txt` fetches JUCE via `FetchContent` (pinned to `8.0.14`) and defines one `juce_add_plugin(TapeRot ...)` target. `FORMATS` and `VST3_COPY_DIR`/`AU_COPY_DIR` are set from an `if(APPLE)`/`else()` block (`TAPEROT_FORMATS`/`TAPEROT_EXTRA_ARGS`) — AU only builds on Apple, and the Windows branch leaves the copy dirs unset so JUCE applies its own correct Windows default rather than a macOS path built on `$ENV{HOME}`. `CMAKE_OSX_DEPLOYMENT_TARGET`/`CMAKE_OSX_ARCHITECTURES` are likewise only set `if(APPLE)`. `PLUGIN_MANUFACTURER_CODE` (`Trot`), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID`, and `COMPANY_NAME` are placeholders per BUILDING.md — treat them as effectively permanent once anything is shipped or automated against them, so confirm before changing. `Tests/` is a separate `juce_add_console_app` target that compiles the DSP `.cpp` files directly (not linked against the plugin target) plus its own Catch2-style test files — new DSP `.cpp` files need to be added to both `target_sources(TapeRot ...)` in the root `CMakeLists.txt` and `target_sources(TapeRotTests ...)` in `Tests/CMakeLists.txt` if you want them covered by tests.
 
-`juce_add_binary_data(TapeRotBinaryData SOURCES design/impact-label/...)` embeds the Dymo-label font files as C++ byte arrays (`BinaryData::Impact_label_reversed_ttf`/`..._ttfSize`) rather than loading them from disk at runtime; it's linked into both the `TapeRot` plugin target and `TapeRotTests` (anything that includes `TapeRotTheme.h`, which calls `Typeface::createSystemTypefaceFor` on it, needs the link). New embedded assets go in this same `juce_add_binary_data` call, not as raw `target_sources`.
+`juce_add_binary_data(TapeRotBinaryData SOURCES design/impact-label/... design/inter/...)` embeds the Dymo-label and Inter font files as C++ byte arrays (`BinaryData::Impact_label_reversed_ttf`/`..._ttfSize`, `BinaryData::InterRegular_ttf`/`InterBold_ttf` — note JUCE's binary-data name-mangling strips hyphens rather than converting them to underscores, so `Inter-Regular.ttf` becomes `InterRegular_ttf`, not `Inter_Regular_ttf`) rather than loading them from disk at runtime; it's linked into both the `TapeRot` plugin target and `TapeRotTests` (anything that includes `TapeRotTheme.h`, which calls `Typeface::createSystemTypefaceFor` on both, needs the link). New embedded assets go in this same `juce_add_binary_data` call, not as raw `target_sources`.
+
+### Windows-specific notes
+
+No exotic macOS APIs exist anywhere in `Source/DSP/` (confirmed by audit — no Objective-C++, no CoreAudio/CoreMIDI/AudioToolbox/Accelerate, no SIMD intrinsics), so the DSP side ports unmodified. The only platform branches anywhere in the codebase are `Source/PluginProcessor.cpp`'s `getUserPresetDirectory()` (`#if JUCE_WINDOWS` → `%APPDATA%\<Manufacturer>\<Plugin>\Presets`, else macOS's `~/Library/Audio/Presets/...`) and the `CMakeLists.txt` items above — everything else was already cross-platform-correct (icon generation, `createLegalFileName`, JUCE's own MSVC-aware recommended-flags targets) or has no Windows equivalent by nature (AU). `.github/workflows/edge-build.yml` builds and publishes both a macOS installer (`.pkg`, ad-hoc signed) and a Windows build (`.zip`, unsigned) to the same rolling `edge` GitHub pre-release on every push to `develop`.

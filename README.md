@@ -1,6 +1,6 @@
 # TapeRot
 
-A tape-degradation audio effect plugin (AU/VST3/Standalone) for macOS, built with JUCE 8.
+A tape-degradation audio effect plugin (AU/VST3/Standalone on macOS; VST3/Standalone on Windows), built with JUCE 8.
 
 TapeRot emulates the character of aging magnetic tape and the machines that play it: drive/saturation,
 wow & flutter, 8 selectable tape-machine EQ models (with a generation-stacking cascade and a choice of
@@ -32,8 +32,8 @@ STOP/FILTER/FAIL performance effects, and mix/output staging.
 
 ## Building
 
-See [BUILDING.md](BUILDING.md) for build requirements, commands, validation (auval/pluginval),
-and running the DSP test suite.
+See [BUILDING.md](BUILDING.md) for per-platform build requirements, commands, validation
+(auval/pluginval on macOS, pluginval on Windows), and running the DSP test suite.
 
 ## Project layout
 

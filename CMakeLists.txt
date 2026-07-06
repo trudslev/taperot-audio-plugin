@@ -3,8 +3,11 @@ project(TapeRot VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
-set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
+
+if(APPLE)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
+    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
+endif()
 
 include(FetchContent)
 FetchContent_Declare(JUCE
@@ -16,7 +19,22 @@ FetchContent_MakeAvailable(JUCE)
 juce_add_binary_data(TapeRotBinaryData
     SOURCES
         design/impact-label/Impact_label.ttf
-        design/impact-label/Impact_label_reversed.ttf)
+        design/impact-label/Impact_label_reversed.ttf
+        design/inter/Inter-Regular.ttf
+        design/inter/Inter-Bold.ttf)
+
+# AU is Apple-only; Windows only ever builds VST3 + Standalone. VST3_COPY_DIR/AU_COPY_DIR are only
+# set on Apple - leaving them unset on Windows lets JUCE apply its own correct default
+# (%COMMONPROGRAMFILES%/VST3) rather than a macOS path built on a non-guaranteed $ENV{HOME}.
+if(APPLE)
+    set(TAPEROT_FORMATS AU VST3 Standalone)
+    set(TAPEROT_EXTRA_ARGS
+        VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
+        AU_COPY_DIR   "$ENV{HOME}/Library/Audio/Plug-Ins/Components")
+else()
+    set(TAPEROT_FORMATS VST3 Standalone)
+    set(TAPEROT_EXTRA_ARGS "")
+endif()
 
 juce_add_plugin(TapeRot
     PRODUCT_NAME "TapeRot"
@@ -26,7 +44,7 @@ juce_add_plugin(TapeRot
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-256.png"
     PLUGIN_MANUFACTURER_CODE Trot
     PLUGIN_CODE Rota
-    FORMATS AU VST3 Standalone
+    FORMATS ${TAPEROT_FORMATS}
     VST3_CATEGORIES Fx
     AU_MAIN_TYPE kAudioUnitType_Effect
     IS_SYNTH FALSE
@@ -34,8 +52,7 @@ juce_add_plugin(TapeRot
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
     COPY_PLUGIN_AFTER_BUILD TRUE
-    VST3_COPY_DIR "$ENV{HOME}/Library/Audio/Plug-Ins/VST3"
-    AU_COPY_DIR   "$ENV{HOME}/Library/Audio/Plug-Ins/Components")
+    ${TAPEROT_EXTRA_ARGS})
 
 target_sources(TapeRot PRIVATE
     Source/PluginProcessor.cpp

@@ -1,9 +1,12 @@
 name: Edge Build
 
 # Builds TapeRot from develop on every push, runs the DSP test suite, packages a macOS installer
-# (.pkg) that drops the AU/VST3/Standalone into their standard install locations, and publishes it
-# as the rolling "edge" pre-release. Ad-hoc signed only (no Apple Developer account wired in) -
-# recipients need to right-click > Open (or clear the quarantine flag) the first time they run it.
+# (.pkg, AU+VST3+Standalone) and a Windows zip (VST3+Standalone - no AU, that's Apple-only), and
+# publishes both to the rolling "edge" pre-release. Neither is signed (no Apple Developer ID or
+# Windows code-signing cert wired in) - recipients need to bypass Gatekeeper/SmartScreen once.
+# The two build jobs upload their packages as workflow artifacts; a final job downloads both and
+# publishes them together in one release-action call, so neither platform's asset ever gets wiped
+# out by the other's "replace previous assets" step.
 
 on:
   push:
@@ -13,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-macos:
     runs-on: macos-14
 
     steps:
@@ -42,7 +45,7 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
-          echo "pkg_name=TapeRot-${VERSION}-edge-${SHORT_SHA}.pkg" >> "$GITHUB_OUTPUT"
+          echo "pkg_name=TapeRot-${VERSION}-edge-${SHORT_SHA}-macos.pkg" >> "$GITHUB_OUTPUT"
 
       - name: Stage installer payload
         run: |
@@ -69,21 +72,95 @@ jobs:
             --install-location / \
             "${{ steps.version.outputs.pkg_name }}"
 
+      - name: Upload macOS installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: ${{ steps.version.outputs.pkg_name }}
+          retention-days: 7
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build (VST3/Standalone + tests)
+        run: cmake --build build --config Release
+
+      - name: Run DSP test suite
+        run: ./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests.exe
+
+      - name: Determine version/build identifiers
+        id: version
+        run: |
+          VERSION=$(grep -oE 'VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1 | awk '{print $2}')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "zip_name=TapeRot-${VERSION}-edge-${SHORT_SHA}-windows.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Stage build output
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/stage"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/VST3" "$STAGE/Standalone"
+          cp -R build/TapeRot_artefacts/Release/VST3/TapeRot.vst3 "$STAGE/VST3/"
+          cp build/TapeRot_artefacts/Release/Standalone/TapeRot.exe "$STAGE/Standalone/"
+          echo "STAGE=$STAGE" >> "$GITHUB_ENV"
+
+      - name: Zip build output
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "$env:STAGE\*" -DestinationPath "${{ steps.version.outputs.zip_name }}"
+
+      - name: Upload Windows build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: ${{ steps.version.outputs.zip_name }}
+          retention-days: 7
+
+  publish-edge:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine short SHA
+        id: sha
+        run: echo "short_sha=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Publish rolling edge pre-release
         uses: ncipollo/release-action@v1
         with:
           tag: edge
-          name: "Edge build (${{ steps.version.outputs.short_sha }})"
+          name: "Edge build (${{ steps.sha.outputs.short_sha }})"
           body: |
-            Automatic bleeding-edge build from `develop` @ ${{ steps.version.outputs.short_sha }}.
-            Not signed with an Apple Developer ID or notarized - macOS will flag it as unverified
-            on first run. Either right-click the installer and choose Open, or run:
+            Automatic bleeding-edge build from `develop` @ ${{ steps.sha.outputs.short_sha }}.
+            Neither package is signed (no Apple Developer ID or Windows code-signing cert wired
+            in yet), so both OSes will flag them as unverified on first run:
 
-            ```
-            xattr -dr com.apple.quarantine ~/Downloads/${{ steps.version.outputs.pkg_name }}
-            ```
+            - **macOS**: right-click the `.pkg` and choose Open, or run
+              `xattr -dr com.apple.quarantine ~/Downloads/TapeRot-*-macos.pkg`
+            - **Windows**: SmartScreen will show "Windows protected your PC" - click
+              "More info" then "Run anyway", or right-click the downloaded zip -> Properties ->
+              Unblock before extracting.
           prerelease: true
           allowUpdates: true
           removeArtifacts: true
-          artifacts: "${{ steps.version.outputs.pkg_name }}"
+          artifacts: "dist/*.pkg,dist/*.zip"
           token: ${{ secrets.GITHUB_TOKEN }}
