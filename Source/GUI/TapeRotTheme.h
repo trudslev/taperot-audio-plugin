@@ -82,6 +82,36 @@ namespace TapeRotTheme
     inline juce::Font switchCaptionFont() { return juce::Font(sansRegularTypeface()).withHeight(7.0f); }
     inline juce::Font modelReadoutFont(float sizePx) { return juce::Font(sansBoldTypeface()).withHeight(sizePx); }
     inline juce::Font dotLabelFont() { return juce::Font(sansRegularTypeface()).withHeight(6.5f); }
+    // Rasterizes text and measures its true rendered ink height in pixels, by scanning an offscreen
+    // image for non-transparent pixels. Unlike Font/GlyphArrangement metrics (ascent, descent,
+    // getBoundingBox) - which reflect each platform's own interpretation of the typeface's declared
+    // metrics tables, not what actually gets painted - this goes through the same rasterization path
+    // as the real on-screen paint, so it's a faithful cross-platform measurement.
+    inline float measureRenderedInkHeight(const juce::Font& font, const juce::String& text)
+    {
+        const int canvasW = 2000, canvasH = 400;
+        juce::Image img(juce::Image::ARGB, canvasW, canvasH, true);
+        juce::Graphics g(img);
+        g.setColour(juce::Colours::white);
+        g.setFont(font);
+        g.drawText(text, 0, 0, canvasW, canvasH, juce::Justification::centredLeft, false);
+
+        int minY = canvasH, maxY = -1;
+        for (int y = 0; y < canvasH; ++y)
+        {
+            for (int x = 0; x < canvasW; ++x)
+            {
+                if (img.getPixelAt(x, y).getAlpha() > 10)
+                {
+                    minY = juce::jmin(minY, y);
+                    maxY = juce::jmax(maxY, y);
+                    break;
+                }
+            }
+        }
+        return maxY >= minY ? (float) (maxY - minY + 1) : 0.0f;
+    }
+
     // Impact Label (design/impact-label/, by Michael Tension - commercial use permitted,
     // donationware), embedded as binary data rather than depending on it being installed as a
     // system font. Deliberately the "_reversed" variant: the regular one's glyphs are a pre-baked
@@ -93,7 +123,24 @@ namespace TapeRotTheme
         static const juce::Typeface::Ptr typeface =
             juce::Typeface::createSystemTypefaceFor(BinaryData::Impact_label_reversed_ttf,
                                                      (size_t) BinaryData::Impact_label_reversed_ttfSize);
-        return juce::Font(typeface).withHeight(29.4f);
+
+        // withHeight()'s nominal "height" is ascent+descent as each OS's font backend (CoreText on
+        // macOS, DirectWrite/FreeType on Windows) derives them from the typeface's own metrics
+        // tables - for this hand-drawn display font those disagree badly enough between backends
+        // that the same withHeight() value renders visibly smaller on Windows than on macOS. So
+        // rather than trust a hardcoded height, measure the actual rendered ink on whatever
+        // platform/backend is running right now and solve for the height that reproduces the
+        // macOS-tuned look (18px ink height at 29.4pt, confirmed via measureRenderedInkHeight on
+        // macOS) on it.
+        constexpr float nominalHeight = 29.4f;
+        constexpr float targetInkHeightPx = 18.0f;
+        static const float correctedHeight = []
+        {
+            const float measured = measureRenderedInkHeight(juce::Font(typeface).withHeight(nominalHeight), "TAPEROT");
+            return measured > 0.0f ? nominalHeight * (targetInkHeightPx / measured) : nominalHeight;
+        }();
+
+        return juce::Font(typeface).withHeight(correctedHeight);
     }
     inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
     inline juce::Font versionFont() { return juce::Font(sansRegularTypeface()).withHeight(8.0f); }
