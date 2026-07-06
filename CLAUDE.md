@@ -17,7 +17,7 @@ cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES=arm64
 Configure once — Windows:
 
 ```bat
-cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake -B build -A x64
 ```
 
 Re-run the configure step whenever `CMakeLists.txt` changes (new sources, new `juce_add_plugin` args, etc.) — a plain rebuild won't pick those up.
@@ -98,7 +98,7 @@ The entire interface is custom-painted (no JUCE Components with default look bey
 
 All UI text (everything except the Dymo nameplate, see below) uses Inter (`design/inter/`, SIL Open Font License 1.1 — see `design/inter/LICENSE.txt`), embedded as binary data via `sansRegularTypeface()`/`sansBoldTypeface()` in `TapeRotTheme.h` rather than a named system font — this used to be "Helvetica Neue" (macOS-only, and the tracking/kerning constants here are tuned against a specific typeface's metrics, so it needs to be the same file on every platform).
 
-Scaling to the actual window size is handled once, centrally: `PluginEditor::resized()` computes a single uniform scale factor (`window width / referenceWidth`) and applies it as a transform on the whole `TapeRotEditorContent`, with the constrainer locking the aspect ratio. Individual GUI components (`SectionPanel`, `DymoLabel`, knob slider look-and-feel in `TapeRotLookAndFeel`) always draw in the untransformed 960x400 reference space and never need to know about the current window size.
+Scaling to the actual window size is handled once, centrally: `PluginEditor::resized()` computes a single uniform scale factor (`window width / referenceWidth`) and applies it as a transform on the whole `TapeRotEditorContent`, with the constrainer locking the aspect ratio. Individual GUI components (`SectionPanel`, `DymoLabel`, knob slider look-and-feel in `TapeRotLookAndFeel`) always draw in the untransformed 960x434 reference space and never need to know about the current window size.
 
 `SectionPanel` does all the static/background painting (bezel, panel, header, section labels/dividers, knob labels, switch labels, failure-dot labels, counter housing, screws, version text) in one Component, driven entirely by `TapeRotTheme::Layout` constants — it has no interactive elements. `TapeRotLookAndFeel::createKnobSlider` builds the actual interactive `juce::Slider` knobs, which `TapeRotEditorContent` positions from `Layout::knobs` and binds to APVTS parameters via `SliderAttachment`.
 

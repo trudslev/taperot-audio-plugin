@@ -49,14 +49,14 @@ If Logic Pro doesn't pick up a freshly built AU: Preferences → Audio Units Man
 
 ### Requirements
 
-- Visual Studio 2022 with the "Desktop development with C++" workload.
+- Visual Studio 2022 or later with the "Desktop development with C++" workload.
 - CMake 3.24+ (bundled with Visual Studio, or install separately).
 - [pluginval](https://github.com/Tracktion/pluginval) for VST3 validation (Windows build available from the same releases page) — no `auval` equivalent, since AU doesn't exist on Windows.
 
 ### Build
 
 ```bat
-cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake -B build -A x64
 cmake --build build --config Release
 ```
 

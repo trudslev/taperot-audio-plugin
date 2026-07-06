@@ -88,8 +88,13 @@ jobs:
       # Configure/build/test run in the runner's native shell (pwsh) rather than bash - CMake's
       # Visual Studio generator locates VS via vswhere.exe internally, which is unreliable when
       # invoked from Git Bash on these runners (a known gotcha, not specific to this project).
+      #
+      # No explicit -G: hardcoding e.g. "Visual Studio 17 2022" breaks the moment GitHub rolls
+      # windows-latest onto a new VS version (which is exactly what just happened - this runner
+      # now ships VS2026, not VS2022). Omitting -G lets CMake auto-detect whichever VS is actually
+      # installed and pick the matching generator itself; -A x64 still applies to that default.
       - name: Configure
-        run: cmake -B build -G "Visual Studio 17 2022" -A x64
+        run: cmake -B build -A x64
 
       - name: Build (VST3/Standalone + tests)
         run: cmake --build build --config Release
