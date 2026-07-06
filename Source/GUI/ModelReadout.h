@@ -6,7 +6,7 @@
 // Dark readout window under the MODEL knob showing the active model's display name (replaces the
 // knob's usual generic label - see SectionPanel::paintKnobLabels, which skips "model"). Polls the
 // MODEL parameter so it updates on host automation too, and briefly flashes brighter on change.
-class ModelReadout final : public juce::Component, private juce::Timer
+class ModelReadout final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer
 {
 public:
     explicit ModelReadout(TapeRotAudioProcessor& processor);

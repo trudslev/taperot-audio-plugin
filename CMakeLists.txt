@@ -84,6 +84,7 @@ target_sources(TapeRot PRIVATE
     Source/GUI/ModelReadout.cpp
     Source/GUI/PresetArrowButton.cpp
     Source/GUI/PresetSaveButton.cpp
+    Source/GUI/PresetDeleteButton.cpp
     Source/GUI/PresetStrip.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 

@@ -40,7 +40,7 @@ namespace NoiseCharacterNames
 namespace LegacyMigration
 {
     // Bumped whenever a stored parameter's *meaning* (not just its ID) changes incompatibly -
-    // currently just the model table redefinition. Written into getStateInformation's XML root;
+    // so far, two model table redefinitions. Written into getStateInformation's XML root;
     // setStateInformation checks it and remaps legacy values before restoring. Note this is
     // separate from a parameter's ParameterID versionHint: that only affects the VST3/AU host's
     // own numeric automation-lane ID (so old automation doesn't silently reattach to a
@@ -48,21 +48,28 @@ namespace LegacyMigration
     // setStateInformation XML, which is keyed by the plain ID string regardless of versionHint -
     // that path needs this explicit marker instead.
     constexpr auto stateSchemaVersionAttribute = "taperotStateSchemaVersion";
-    constexpr int currentStateSchemaVersion = 2;
+    constexpr int currentStateSchemaVersion = 3;
 
-    // Old table order was: VCR HiFi, Camcorder, Dictaphone, Toy, Cassette Type I, Cassette Type
-    // II, Reel-to-Reel, Answering Machine (indices 0-7). Maps each to its closest match in the
-    // new table so a pre-migration session's MODEL knob lands somewhere sensible rather than on
-    // an arbitrary, unrelated machine.
-    inline constexpr std::array<int, 8> legacyModelIndexRemap{
-        1, // VCR HiFi          -> VCR HIFI (1)
-        3, // Camcorder         -> CAMCORDER (3)
-        6, // Dictaphone        -> DICTAPHONE (6)
-        7, // Toy               -> TOY (7)
-        4, // Cassette Type I   -> CASSETTE I (4)
-        5, // Cassette Type II  -> CASSETTE II (5)
-        0, // Reel-to-Reel      -> REVOX B77 (0) - both reel-to-reel machines
-        6, // Answering Machine -> DICTAPHONE (6) - similar narrow telephone-band character
+    // v1 -> v2: old table order was VCR HiFi, Camcorder, Dictaphone, Toy, Cassette Type I,
+    // Cassette Type II, Reel-to-Reel, Answering Machine (indices 0-7). Maps each to its closest
+    // match in the v2 table so a pre-migration session's MODEL knob lands somewhere sensible
+    // rather than on an arbitrary, unrelated machine. Output values are v2-table indices - see
+    // legacyModelIndexRemapV2ToV3 below for the second hop applied on top for schema < 3 sessions.
+    inline constexpr std::array<int, 8> legacyModelIndexRemapV1ToV2{
+        1, // VCR HiFi          -> VCR HIFI (1 in v2)
+        3, // Camcorder         -> CAMCORDER (3 in v2)
+        6, // Dictaphone        -> DICTAPHONE (6 in v2)
+        7, // Toy               -> TOY (7 in v2)
+        4, // Cassette Type I   -> CASSETTE I (4 in v2)
+        5, // Cassette Type II  -> CASSETTE II (5 in v2)
+        0, // Reel-to-Reel      -> REVOX B77 (0 in v2) - both reel-to-reel machines
+        6, // Answering Machine -> DICTAPHONE (6 in v2) - similar narrow telephone-band character
+    };
+
+    // v2 -> v3: NONE moved from last (8) to first (0) so it reads as "least processing" rather
+    // than a trailing afterthought; every real model simply shifts up by one index to make room.
+    inline constexpr std::array<int, 9> legacyModelIndexRemapV2ToV3{
+        1, 2, 3, 4, 5, 6, 7, 8, 0
     };
 
     // Free function (rather than a TapeRotAudioProcessor method) so it's unit-testable with a
@@ -78,9 +85,16 @@ namespace LegacyMigration
             auto* child = xml.getChildElement(i);
             if (child != nullptr && child->getStringAttribute("id") == ParamIDs::model)
             {
-                const int oldIndex = juce::jlimit(0, (int) legacyModelIndexRemap.size() - 1,
-                                                   (int) child->getDoubleAttribute("value"));
-                child->setAttribute("value", (double) legacyModelIndexRemap[(size_t) oldIndex]);
+                int index = (int) child->getDoubleAttribute("value");
+
+                if (schemaVersion < 2)
+                    index = legacyModelIndexRemapV1ToV2[(size_t) juce::jlimit(
+                        0, (int) legacyModelIndexRemapV1ToV2.size() - 1, index)];
+                if (schemaVersion < 3)
+                    index = legacyModelIndexRemapV2ToV3[(size_t) juce::jlimit(
+                        0, (int) legacyModelIndexRemapV2ToV3.size() - 1, index)];
+
+                child->setAttribute("value", (double) index);
                 break;
             }
         }
@@ -123,14 +137,14 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         juce::ParameterID{ParamIDs::flutter, 1}, "Flutter",
         juce::NormalisableRange<float>(0.0f, 100.0f), 25.0f, percentAttrs));
 
-    // versionHint bumped 1 -> 2 (protects VST3/AU host automation-lane reattachment only - see
-    // LegacyMigration above for the separate fix needed for APVTS's own state XML).
+    // versionHint bumped 1 -> 2 -> 3 (protects VST3/AU host automation-lane reattachment only -
+    // see LegacyMigration above for the separate fix needed for APVTS's own state XML).
     juce::StringArray modelNames;
     for (const auto& model : kTapeModels)
         modelNames.add(model.displayName);
-    constexpr int defaultModelIndex = 4; // CASSETTE I
+    constexpr int defaultModelIndex = 5; // CASSETTE I (shifted from 4 now that NONE is index 0)
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{ParamIDs::model, 2}, "Model", modelNames, defaultModelIndex));
+        juce::ParameterID{ParamIDs::model, 3}, "Model", modelNames, defaultModelIndex));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::noise, 1}, "Noise",

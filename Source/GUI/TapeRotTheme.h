@@ -132,12 +132,28 @@ namespace TapeRotTheme
         // platform/backend is running right now and solve for the height that reproduces the
         // macOS-tuned look (18px ink height at 29.4pt, confirmed via measureRenderedInkHeight on
         // macOS) on it.
+        //
+        // A single measure-and-rescale pass isn't quite enough: the ink-height-to-requested-height
+        // ratio isn't constant across sizes (confirmed on macOS itself - rounding/hinting/pixel-
+        // snapping shift it a few percent between e.g. 30pt and 200pt), and a Windows backend can
+        // exhibit a different, and differently-sized, version of that same nonlinearity - a report
+        // of "smaller than before, but still too large" after the first version of this fix is
+        // exactly what an under-correcting single pass looks like. So this iterates a few times,
+        // re-measuring at each new guess, which converges to the actual target regardless of how
+        // that ratio moves with size on whatever backend is running.
         constexpr float nominalHeight = 29.4f;
         constexpr float targetInkHeightPx = 18.0f;
         static const float correctedHeight = []
         {
-            const float measured = measureRenderedInkHeight(juce::Font(typeface).withHeight(nominalHeight), "TAPEROT");
-            return measured > 0.0f ? nominalHeight * (targetInkHeightPx / measured) : nominalHeight;
+            float heightGuess = nominalHeight;
+            for (int iteration = 0; iteration < 6; ++iteration)
+            {
+                const float measured = measureRenderedInkHeight(juce::Font(typeface).withHeight(heightGuess), "TAPEROT");
+                if (measured <= 0.0f)
+                    break;
+                heightGuess *= targetInkHeightPx / measured;
+            }
+            return heightGuess;
         }();
 
         return juce::Font(typeface).withHeight(correctedHeight);
@@ -156,7 +172,6 @@ namespace TapeRotTheme
     constexpr float dymoTracking = 4.0f;
     constexpr float versionTracking = 2.0f;
     constexpr float presetNameTracking = 1.2f;
-    constexpr float presetSaveLabelTracking = 1.5f;
 
     namespace Layout
     {
@@ -181,14 +196,21 @@ namespace TapeRotTheme
         // the taller header, separating the DymoLabel/scope/counter/lamp row from the preset strip.
         constexpr float presetStripDividerY = 116.0f;
 
-        // Preset strip: prev/name-plate/next/save row, per design/taperot-interface.svg.
+        // Preset strip: prev/name-plate/next/save/delete row, all clustered together (rather than
+        // save/delete stranded far to the right) so the whole preset control group reads as one
+        // unit, per design/taperot-interface.svg.
         constexpr float presetArrowCentreY = 133.0f, presetArrowRadius = 11.0f;
         constexpr float presetPrevCentreX = 335.0f, presetNextCentreX = 625.0f;
         constexpr float presetNamePlateX = 360.0f, presetNamePlateY = 121.0f;
         constexpr float presetNamePlateW = 240.0f, presetNamePlateH = 24.0f, presetNamePlateRadius = 4.0f;
-        constexpr float presetSaveX = 889.0f, presetSaveY = 122.0f;
+        constexpr float presetSaveX = presetNextCentreX + presetArrowRadius + 16.0f, presetSaveY = 122.0f;
         constexpr float presetSaveW = 22.0f, presetSaveH = 22.0f, presetSaveRadius = 2.5f;
-        constexpr float presetSaveLabelY = 155.0f;
+
+        // Delete sits right after save - the right-click context menu on the name plate has always
+        // been the "real" way to delete a user preset, but that's not visually discoverable, so
+        // this gives it an equally-visible sibling to SAVE rather than replacing the menu.
+        constexpr float presetDeleteX = presetSaveX + presetSaveW + 10.0f, presetDeleteY = presetSaveY;
+        constexpr float presetDeleteW = presetSaveW, presetDeleteH = presetSaveH, presetDeleteRadius = presetSaveRadius;
 
         constexpr float dymoX = 32.0f, dymoY = 40.0f, dymoW = 168.0f, dymoH = 34.0f;
         // A hand-applied Dymo label doesn't sit dead-square on the panel - keep this visibly but
@@ -326,17 +348,20 @@ namespace TapeRotTheme
         // already hold the NOISE/HUM switches and the SPREAD switch + failure dots respectively),
         // so nothing needs to be resized or crowded to fit them.
         constexpr float smallKnobCentreY = 369.0f, smallKnobRadius = 18.0f;
-        constexpr float smallKnobLabelOffsetY = 28.0f;
 
         constexpr float lpKnobX = 760.0f, rampKnobX = 814.0f, hpKnobX = 868.0f; // under OUTPUT
 
         constexpr float genSelectorCentreX = 244.0f, genSelectorY = 361.0f; // under TRANSPORT
         constexpr float genSelectorSegmentW = 14.0f, genSelectorSegmentH = 22.0f, genSelectorGap = 4.0f;
-        constexpr float genSelectorLabelOffsetY = 30.0f;
 
         constexpr float auxButtonCentreY = 369.0f, auxButtonRadius = 16.0f; // under INPUT
         constexpr float stopButtonX = 36.0f, filterButtonX = 72.0f, failButtonX = 108.0f;
-        constexpr float auxButtonLabelOffsetY = 26.0f;
+
+        // Shared label row for GEN/LP/RAMP/HP/STP/FLT/FAI (paintNewControlLabels) - must clear the
+        // bottom edge of the tallest control it sits under (small knobs, radius 18 centred at
+        // y=369, bottom edge 387) while staying above the bottom-left/right screws (centred at
+        // y=410, radius 6.5, top edge ~403.5).
+        constexpr float stripLabelY = 395.0f;
     }
 
     // Angle (degrees, clockwise from 12 o'clock) for a normalised 0..1 value across the knob arc.

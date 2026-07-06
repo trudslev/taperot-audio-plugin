@@ -8,6 +8,7 @@ PresetStrip::PresetStrip(TapeRotAudioProcessor& processor) : processorRef(proces
     const float half = Layout::presetArrowRadius + 3.0f;
     prevButton.setBounds((int) (Layout::presetPrevCentreX - half), (int) (Layout::presetArrowCentreY - half),
                           (int) (half * 2.0f), (int) (half * 2.0f));
+    prevButton.setTooltip("Previous preset.");
     prevButton.onClick = [this]
     {
         const int total = processorRef.getNumPrograms();
@@ -18,6 +19,7 @@ PresetStrip::PresetStrip(TapeRotAudioProcessor& processor) : processorRef(proces
 
     nextButton.setBounds((int) (Layout::presetNextCentreX - half), (int) (Layout::presetArrowCentreY - half),
                           (int) (half * 2.0f), (int) (half * 2.0f));
+    nextButton.setTooltip("Next preset.");
     nextButton.onClick = [this]
     {
         const int total = processorRef.getNumPrograms();
@@ -28,11 +30,19 @@ PresetStrip::PresetStrip(TapeRotAudioProcessor& processor) : processorRef(proces
 
     saveButton.setBounds((int) Layout::presetSaveX, (int) Layout::presetSaveY,
                           (int) Layout::presetSaveW, (int) Layout::presetSaveH);
+    saveButton.setTooltip("Save the current settings as a new user preset.");
     saveButton.onClick = [this] { showSaveAsPrompt(); };
     addAndMakeVisible(saveButton);
 
+    deleteButton.setBounds((int) Layout::presetDeleteX, (int) Layout::presetDeleteY,
+                            (int) Layout::presetDeleteW, (int) Layout::presetDeleteH);
+    deleteButton.setTooltip("Delete the current user preset (disabled for factory presets).");
+    deleteButton.onClick = [this] { showDeleteConfirmation(); };
+    addAndMakeVisible(deleteButton);
+
     displayedProgramIndex = processorRef.getCurrentProgram();
     displayedProgramName = processorRef.getProgramName(displayedProgramIndex);
+    updateDeleteButtonEnablement();
 
     startTimerHz(10);
 }
@@ -46,9 +56,15 @@ bool PresetStrip::hitTest(int x, int y)
 {
     using namespace TapeRotTheme;
 
+    const juce::Point<int> point(x, y);
+
     return juce::Rectangle<float>(Layout::presetNamePlateX, Layout::presetNamePlateY,
                                    Layout::presetNamePlateW, Layout::presetNamePlateH)
-        .contains((float) x, (float) y);
+               .contains(point.toFloat())
+        || prevButton.getBounds().contains(point)
+        || nextButton.getBounds().contains(point)
+        || saveButton.getBounds().contains(point)
+        || deleteButton.getBounds().contains(point);
 }
 
 void PresetStrip::timerCallback()
@@ -58,31 +74,57 @@ void PresetStrip::timerCallback()
     {
         displayedProgramIndex = index;
         displayedProgramName = processorRef.getProgramName(index);
+        updateDeleteButtonEnablement();
         repaint();
     }
+}
+
+void PresetStrip::updateDeleteButtonEnablement()
+{
+    deleteButton.setEnabled(!processorRef.isFactoryPreset(displayedProgramIndex));
 }
 
 void PresetStrip::mouseDown(const juce::MouseEvent& e)
 {
     using namespace TapeRotTheme;
 
-    // Right-click on the name plate for "Delete Preset" - the approved design brief only asked
-    // for prev/next/save (no delete button), but the preset system still needs some way to remove
-    // a user preset; a context menu adds that without any new visible chrome. Only offered for
-    // user presets - factory presets are never deletable.
-    if (!e.mods.isPopupMenu())
-        return;
-
     const juce::Rectangle<float> plate(Layout::presetNamePlateX, Layout::presetNamePlateY,
                                         Layout::presetNamePlateW, Layout::presetNamePlateH);
     if (!plate.contains(e.position))
         return;
 
-    if (processorRef.isFactoryPreset(displayedProgramIndex))
+    // Right-click on the name plate is a second, equally-valid way to delete a preset alongside
+    // the visible DELETE button - kept rather than replaced, since a hidden gesture and a visible
+    // control aren't mutually exclusive and some users will reach for either. Only offered for
+    // user presets - factory presets are never deletable.
+    if (e.mods.isPopupMenu())
+    {
+        if (processorRef.isFactoryPreset(displayedProgramIndex))
+            return;
+
+        juce::PopupMenu menu;
+        menu.addItem("Delete \"" + displayedProgramName + "\"", [this] { showDeleteConfirmation(); });
+        menu.showMenuAsync(juce::PopupMenu::Options());
         return;
+    }
+
+    showPresetListMenu();
+}
+
+void PresetStrip::showPresetListMenu()
+{
+    const int total = processorRef.getNumPrograms();
 
     juce::PopupMenu menu;
-    menu.addItem("Delete \"" + displayedProgramName + "\"", [this] { showDeleteConfirmation(); });
+    for (int i = 0; i < total; ++i)
+    {
+        if (i == 0 || (processorRef.isFactoryPreset(i) != processorRef.isFactoryPreset(i - 1)))
+            menu.addSectionHeader(processorRef.isFactoryPreset(i) ? "Factory" : "User");
+
+        menu.addItem(processorRef.getProgramName(i), true, i == displayedProgramIndex,
+                     [this, i] { processorRef.setCurrentProgram(i); });
+    }
+
     menu.showMenuAsync(juce::PopupMenu::Options());
 }
 
@@ -138,9 +180,4 @@ void PresetStrip::paint(juce::Graphics& g)
 
     drawTrackedText(g, displayedProgramName.toUpperCase(), modelReadoutFont(11.5f), presetNameTracking,
                      plate, juce::Justification::centred, Colour::amberBright);
-
-    drawTrackedText(g, "SAVE", dotLabelFont(), presetSaveLabelTracking,
-                     juce::Rectangle<float>(Layout::presetSaveX - 20.0f, Layout::presetSaveLabelY - 8.0f,
-                                             Layout::presetSaveW + 40.0f, 12.0f),
-                     juce::Justification::centred, Colour::mutedLabel);
 }

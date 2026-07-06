@@ -131,6 +131,14 @@ private:
     AuxEnvelope failEnvelope;
     OutputStage outputStage;
 
+    // NoiseSource/Hum are unconditional generators (real tape self-noise, not signal-dependent),
+    // so they hiss even with the host transport stopped feeding silent buffers. Smoothly fades the
+    // whole output to silence while the host reports not-playing, and back in on play, rather than
+    // a hard mute - avoids a click at the transport boundary. Only engages when a host actually
+    // reports transport state (getPlayHead()/getPosition() both present) - Standalone has no
+    // transport concept, so it's never gated there.
+    juce::SmoothedValue<float> transportGateSmoothed{1.0f};
+
     std::atomic<float> failAuxDisplay{0.0f};
     double displaySampleRate = 44100.0;
 

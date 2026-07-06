@@ -2,6 +2,7 @@
 
 #include "PresetArrowButton.h"
 #include "PresetSaveButton.h"
+#include "PresetDeleteButton.h"
 #include "../PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -22,20 +23,25 @@ public:
     // overlays, sits on top of real controls and needs actual mouse input of its own (the name
     // plate's right-click menu) - without narrowing hitTest to just the plate, its full-canvas
     // bounds would swallow every click meant for the knobs/switches underneath it everywhere else
-    // on the panel. Child buttons (prev/next/save) are unaffected either way - they're hit-tested
-    // independently of their parent's override.
+    // on the panel. Child buttons (prev/next/save/delete) are NOT hit-tested independently of this:
+    // JUCE's Component::getComponentAt checks a component's own hitTest before it ever recurses
+    // into children, so any child positioned outside the region this returns true for is
+    // unreachable by the mouse - hence also including their bounds below.
     bool hitTest(int x, int y) override;
 
 private:
     void timerCallback() override;
     void showSaveAsPrompt();
     void showDeleteConfirmation();
+    void showPresetListMenu();
+    void updateDeleteButtonEnablement();
 
     TapeRotAudioProcessor& processorRef;
 
     PresetArrowButton prevButton{false};
     PresetArrowButton nextButton{true};
     PresetSaveButton saveButton;
+    PresetDeleteButton deleteButton;
 
     std::unique_ptr<juce::AlertWindow> saveDialog;
 

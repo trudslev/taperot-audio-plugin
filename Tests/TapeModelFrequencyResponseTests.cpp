@@ -118,7 +118,8 @@ public:
 
         beginTest("REVOX B77 is nearly flat in the midrange (measured-spec approximation, not a boosted/cut band)");
         {
-            const float midGainDb = measureGainDb(0, 1000.0f, sampleRate) - kTapeModels[0].makeupGainDb;
+            constexpr int revoxB77Index = 1; // NONE is index 0
+            const float midGainDb = measureGainDb(revoxB77Index, 1000.0f, sampleRate) - kTapeModels[revoxB77Index].makeupGainDb;
             logMessage("REVOX B77 @ 1kHz: " + juce::String(midGainDb, 2) + " dB");
             expect(std::abs(midGainDb) < 0.5f, "REVOX B77 should be within 0.5dB of flat in the midrange");
         }

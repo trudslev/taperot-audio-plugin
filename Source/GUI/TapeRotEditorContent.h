@@ -15,6 +15,7 @@
 #include "GenDigitDisplay.h"
 #include "ModelReadout.h"
 #include "PresetStrip.h"
+#include "TooltipHoverArea.h"
 #include "../PluginProcessor.h"
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -63,4 +64,14 @@ private:
     Scope scope;
     GenDigitDisplay genDigitDisplay;
     PresetStrip presetStrip;
+
+    // SectionPanel paints every control's label as static text and never intercepts mouse input,
+    // so hovering a label alone (rather than the control itself) wouldn't show a tooltip without
+    // these - one invisible hover-only area per label, positioned to match SectionPanel's painted
+    // rect exactly, each carrying the same tooltip text as its associated control.
+    std::vector<std::unique_ptr<TooltipHoverArea>> labelTooltipAreas;
+
+    // Single shared popup for every control's setTooltip() text below - scoped to this component
+    // (rather than nullptr/whole-desktop) so it only ever considers TapeRot's own controls.
+    juce::TooltipWindow tooltipWindow{this};
 };

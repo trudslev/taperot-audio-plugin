@@ -144,9 +144,9 @@ public:
             expectWithinAbsoluteError((float) *apvtsNew.getRawParameterValue(ParamIDs::ramp), 0.3f, 0.01f);
         }
 
-        beginTest("Legacy model index remap: pre-schema-marker session index is remapped to its new-table match");
+        beginTest("Legacy model index remap: pre-schema-marker (v1) session gets both the v1->v2 and v2->v3 hops");
         {
-            for (int oldIndex = 0; oldIndex < (int) LegacyMigration::legacyModelIndexRemap.size(); ++oldIndex)
+            for (int oldIndex = 0; oldIndex < (int) LegacyMigration::legacyModelIndexRemapV1ToV2.size(); ++oldIndex)
             {
                 juce::XmlElement xml("PARAMETERS");
                 // No stateSchemaVersionAttribute set - mirrors a session saved before it existed.
@@ -157,7 +157,26 @@ public:
                 LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
 
                 const int remapped = (int) xml.getChildElement(0)->getDoubleAttribute("value");
-                expectEquals(remapped, LegacyMigration::legacyModelIndexRemap[(size_t) oldIndex]);
+                const int expectedV2 = LegacyMigration::legacyModelIndexRemapV1ToV2[(size_t) oldIndex];
+                const int expectedV3 = LegacyMigration::legacyModelIndexRemapV2ToV3[(size_t) expectedV2];
+                expectEquals(remapped, expectedV3);
+            }
+        }
+
+        beginTest("Legacy model index remap: schema-v2 session only gets the v2->v3 hop");
+        {
+            for (int oldIndex = 0; oldIndex < (int) LegacyMigration::legacyModelIndexRemapV2ToV3.size(); ++oldIndex)
+            {
+                juce::XmlElement xml("PARAMETERS");
+                xml.setAttribute(LegacyMigration::stateSchemaVersionAttribute, 2);
+                auto* param = xml.createNewChildElement("PARAM");
+                param->setAttribute("id", ParamIDs::model);
+                param->setAttribute("value", (double) oldIndex);
+
+                LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
+
+                const int remapped = (int) xml.getChildElement(0)->getDoubleAttribute("value");
+                expectEquals(remapped, LegacyMigration::legacyModelIndexRemapV2ToV3[(size_t) oldIndex]);
             }
         }
 
@@ -167,11 +186,11 @@ public:
             xml.setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
             auto* param = xml.createNewChildElement("PARAM");
             param->setAttribute("id", ParamIDs::model);
-            param->setAttribute("value", 7.0); // TOY in the current table - must NOT be remapped
+            param->setAttribute("value", 8.0); // TOY in the current (v3) table - must NOT be remapped
 
             LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
 
-            expectEquals((int) xml.getChildElement(0)->getDoubleAttribute("value"), 7);
+            expectEquals((int) xml.getChildElement(0)->getDoubleAttribute("value"), 8);
         }
     }
 };

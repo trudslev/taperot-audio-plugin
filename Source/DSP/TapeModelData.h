@@ -33,10 +33,16 @@ struct TapeModel
     float makeupGainDb;
 };
 
-// Ordered cleanest to nastiest so the MODEL control sweeps hi-fi -> trash; NONE is appended last
-// (not reordered to the front) to keep existing session/automation indices for the 8 real models
-// stable.
+// NONE first (index 0, the "least processing" option), then the eight real models ordered cleanest
+// to nastiest so the rest of the MODEL control still sweeps hi-fi -> trash. NONE used to be
+// appended last instead, specifically to keep the 8 real models' indices stable - moving it here
+// intentionally breaks that stability, so see LegacyMigration's schema-version-3 remap in
+// Parameters.h for how old sessions/presets are kept pointing at the right model.
 inline constexpr std::array<TapeModel, 9> kTapeModels{{
+    // No EQ, no makeup gain, no GEN cascading (PluginProcessor forces GEN to 1 generation when
+    // this is selected) - a full bypass of the tape-model system for manual, unconstrained control
+    // over DRIVE/WOW/FLUTTER/NOISE.
+    {"NONE", {{ {}, {}, {} }}, 0, 0.0f},
     // Approximates published Revox/Studer B77 specs at 7.5ips/19cm/s, cross-referenced across
     // multiple listings: frequency response 50Hz-15kHz +/-1.5dB (tight band), extending to
     // 30Hz-20kHz +2/-3dB (outer tolerance); S/N ~67dB(A) - the lowest noise floor of the eight
@@ -89,11 +95,7 @@ inline constexpr std::array<TapeModel, 9> kTapeModels{{
         {EQBandType::HighPass, 300.0f, 0.0f, 0.8f},
         {}
     }}, 2, 4.22f},
-    // No EQ, no makeup gain, no GEN cascading (PluginProcessor forces GEN to 1 generation when
-    // this is selected) - a full bypass of the tape-model system for manual, unconstrained control
-    // over DRIVE/WOW/FLUTTER/NOISE.
-    {"NONE", {{ {}, {}, {} }}, 0, 0.0f},
 }};
 
 constexpr size_t kNumTapeModels = kTapeModels.size();
-constexpr size_t noneModelIndex = kNumTapeModels - 1;
+constexpr size_t noneModelIndex = 0;

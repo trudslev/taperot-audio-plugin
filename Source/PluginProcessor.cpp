@@ -238,6 +238,9 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     genSmoothed.setCurrentAndTargetValue(genParam->load());
     genFloorSnapshot.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, true);
 
+    transportGateSmoothed.reset(sampleRate, 0.05);
+    transportGateSmoothed.setCurrentAndTargetValue(1.0f);
+
     displaySampleRate = sampleRate;
 
     setLatencySamples(saturator.getLatencySamples());
@@ -331,6 +334,15 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     tapeStop.process(buffer, stopEnabled, rampSeconds);
     filterSweep.process(buffer, filterAuxEnabled, rampSeconds);
     outputStage.process(buffer, dryBuffer, mix01, outputDb);
+
+    bool hostIsPlaying = true;
+    if (auto* playHead = getPlayHead())
+        if (auto position = playHead->getPosition())
+            hostIsPlaying = position->getIsPlaying();
+
+    transportGateSmoothed.setTargetValue(hostIsPlaying ? 1.0f : 0.0f);
+    transportGateSmoothed.skip(numSamples);
+    buffer.applyGain(transportGateSmoothed.getCurrentValue());
 
     constexpr float displayTimeConstantSeconds = 0.15f;
     const float blockSeconds = (float) buffer.getNumSamples() / (float) displaySampleRate;

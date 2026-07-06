@@ -86,7 +86,7 @@ public:
 
         beginTest("GEN=6 shows measurably reduced high-frequency bandwidth versus GEN=1");
         {
-            constexpr int model = 2; // VCR LP: rolloff from 8kHz, compounds each pass
+            constexpr int model = 3; // VCR LP: rolloff from 8kHz, compounds each pass (NONE is index 0)
             constexpr float testToneHz = 15000.0f;
 
             std::array<std::unique_ptr<DegradationCore>, 8> stages;

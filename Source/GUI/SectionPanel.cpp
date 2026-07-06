@@ -163,12 +163,11 @@ void SectionPanel::paintFailureDotLabels(juce::Graphics& g)
 void SectionPanel::paintNewControlLabels(juce::Graphics& g)
 {
     const auto font = dotLabelFont();
-    constexpr float labelY = 366.0f;
 
     auto drawBelow = [&](float x, const char* text)
     {
         drawTrackedText(g, text, font, dotLabelTracking,
-                         juce::Rectangle<float>(x - 16.0f, labelY - 6.0f, 32.0f, 12.0f),
+                         juce::Rectangle<float>(x - 16.0f, Layout::stripLabelY - 6.0f, 32.0f, 12.0f),
                          juce::Justification::centred, Colour::mutedLabel);
     };
 
