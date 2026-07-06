@@ -1,0 +1,89 @@
+name: Edge Build
+
+# Builds TapeRot from develop on every push, runs the DSP test suite, packages a macOS installer
+# (.pkg) that drops the AU/VST3/Standalone into their standard install locations, and publishes it
+# as the rolling "edge" pre-release. Ad-hoc signed only (no Apple Developer account wired in) -
+# recipients need to right-click > Open (or clear the quarantine flag) the first time they run it.
+
+on:
+  push:
+    branches: [develop]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure (ad-hoc signing, arm64)
+        run: |
+          cmake -B build -G Xcode \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE=Manual \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="-" \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=YES \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=YES
+
+      - name: Build (AU/VST3/Standalone + tests)
+        run: cmake --build build --config Release
+
+      - name: Run DSP test suite
+        run: ./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests
+
+      - name: Determine version/build identifiers
+        id: version
+        run: |
+          VERSION=$(grep -oE 'VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1 | awk '{print $2}')
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "pkg_name=TapeRot-${VERSION}-edge-${SHORT_SHA}.pkg" >> "$GITHUB_OUTPUT"
+
+      - name: Stage installer payload
+        run: |
+          set -euo pipefail
+          STAGE="$RUNNER_TEMP/pkgroot"
+          rm -rf "$STAGE"
+          mkdir -p "$STAGE/Applications" \
+                   "$STAGE/Library/Audio/Plug-Ins/Components" \
+                   "$STAGE/Library/Audio/Plug-Ins/VST3"
+          cp -R build/TapeRot_artefacts/Release/Standalone/TapeRot.app \
+                "$STAGE/Applications/"
+          cp -R build/TapeRot_artefacts/Release/AU/TapeRot.component \
+                "$STAGE/Library/Audio/Plug-Ins/Components/"
+          cp -R build/TapeRot_artefacts/Release/VST3/TapeRot.vst3 \
+                "$STAGE/Library/Audio/Plug-Ins/VST3/"
+          echo "STAGE=$STAGE" >> "$GITHUB_ENV"
+
+      - name: Build installer package
+        run: |
+          pkgbuild \
+            --root "$STAGE" \
+            --identifier com.taperot.taperot.installer \
+            --version "${{ steps.version.outputs.version }}" \
+            --install-location / \
+            "${{ steps.version.outputs.pkg_name }}"
+
+      - name: Publish rolling edge pre-release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: edge
+          name: "Edge build (${{ steps.version.outputs.short_sha }})"
+          body: |
+            Automatic bleeding-edge build from `develop` @ ${{ steps.version.outputs.short_sha }}.
+            Not signed with an Apple Developer ID or notarized - macOS will flag it as unverified
+            on first run. Either right-click the installer and choose Open, or run:
+
+            ```
+            xattr -dr com.apple.quarantine ~/Downloads/${{ steps.version.outputs.pkg_name }}
+            ```
+          prerelease: true
+          allowUpdates: true
+          removeArtifacts: true
+          artifacts: "${{ steps.version.outputs.pkg_name }}"
+          token: ${{ secrets.GITHUB_TOKEN }}
