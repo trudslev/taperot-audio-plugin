@@ -81,14 +81,13 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Configure/build/test run in the runner's native shell (pwsh) rather than bash - CMake's
+      # Visual Studio generator locates VS via vswhere.exe internally, which is unreliable when
+      # invoked from Git Bash on these runners (a known gotcha, not specific to this project).
       - name: Configure
         run: cmake -B build -G "Visual Studio 17 2022" -A x64
 
@@ -96,10 +95,11 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Run DSP test suite
-        run: ./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests.exe
+        run: .\build\Tests\TapeRotTests_artefacts\Release\TapeRotTests.exe
 
       - name: Determine version/build identifiers
         id: version
+        shell: bash
         run: |
           VERSION=$(grep -oE 'VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | head -1 | awk '{print $2}')
           SHORT_SHA=$(git rev-parse --short HEAD)
@@ -108,6 +108,7 @@ jobs:
           echo "zip_name=TapeRot-${VERSION}-edge-${SHORT_SHA}-windows.zip" >> "$GITHUB_OUTPUT"
 
       - name: Stage build output
+        shell: bash
         run: |
           set -euo pipefail
           STAGE="$RUNNER_TEMP/stage"
