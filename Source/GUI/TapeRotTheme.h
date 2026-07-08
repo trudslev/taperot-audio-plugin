@@ -129,42 +129,6 @@ namespace TapeRotTheme
     inline juce::Font switchCaptionFont() { return juce::Font(sansRegularTypeface()).withHeight(7.0f); }
     inline juce::Font modelReadoutFont(float sizePx) { return juce::Font(sansBoldTypeface()).withHeight(sizePx); }
     inline juce::Font dotLabelFont() { return juce::Font(sansRegularTypeface()).withHeight(6.5f); }
-    // Rasterizes text and measures its true rendered ink height in pixels, by scanning an offscreen
-    // image for non-transparent pixels. Unlike Font/GlyphArrangement metrics (ascent, descent,
-    // getBoundingBox) - which reflect each platform's own interpretation of the typeface's declared
-    // metrics tables, not what actually gets painted - this goes through the same rasterization path
-    // as the real on-screen paint, so it's a faithful cross-platform measurement.
-    inline float measureRenderedInkHeight(const juce::Font& font, const juce::String& text)
-    {
-        // Sized relative to the requested font height, not a fixed constant: if a backend's
-        // interpretation of this typeface's metrics disagrees badly enough with the height we
-        // asked for (the exact cross-platform problem this function exists to catch), a fixed-size
-        // canvas can end up clipping the glyphs, under-measuring the ink height and leaving the
-        // caller's correction under-corrected - a generous, height-proportional margin means
-        // clipping can't happen regardless of how differently a platform renders this font.
-        const int canvasW = juce::jmax(400, (int) (font.getHeight() * 40.0f));
-        const int canvasH = juce::jmax(200, (int) (font.getHeight() * 20.0f));
-        juce::Image img(juce::Image::ARGB, canvasW, canvasH, true);
-        juce::Graphics g(img);
-        g.setColour(juce::Colours::white);
-        g.setFont(font);
-        g.drawText(text, 0, 0, canvasW, canvasH, juce::Justification::centred, false);
-
-        int minY = canvasH, maxY = -1;
-        for (int y = 0; y < canvasH; ++y)
-        {
-            for (int x = 0; x < canvasW; ++x)
-            {
-                if (img.getPixelAt(x, y).getAlpha() > 10)
-                {
-                    minY = juce::jmin(minY, y);
-                    maxY = juce::jmax(maxY, y);
-                    break;
-                }
-            }
-        }
-        return maxY >= minY ? (float) (maxY - minY + 1) : 0.0f;
-    }
 
     // Impact Label (design/impact-label/, by Michael Tension - commercial use permitted,
     // donationware), embedded as binary data rather than depending on it being installed as a
@@ -178,65 +142,37 @@ namespace TapeRotTheme
             juce::Typeface::createSystemTypefaceFor(BinaryData::Impact_label_reversed_ttf,
                                                      (size_t) BinaryData::Impact_label_reversed_ttfSize);
 
-        // withHeight()'s nominal "height" is ascent+descent as each OS's font backend (CoreText on
-        // macOS, DirectWrite/FreeType on Windows) derives them from the typeface's own metrics
-        // tables - for this hand-drawn display font those disagree badly enough between backends
-        // that the same withHeight() value renders visibly smaller on Windows than on macOS. So
-        // rather than trust a hardcoded height, measure the actual rendered ink on whatever
-        // platform/backend is running right now and solve for the height that reproduces the
-        // macOS-tuned look (18px ink height at 29.4pt, confirmed via measureRenderedInkHeight on
-        // macOS) on it.
+        // withHeight()'s nominal "height" is ascent+descent as each OS's font backend derives them
+        // from the typeface's own metrics tables - for this hand-drawn display font those disagree
+        // badly enough between backends that the same withHeight() value renders visibly smaller
+        // on Windows than on macOS.
         //
-        // A single measure-and-rescale pass isn't quite enough: the ink-height-to-requested-height
-        // ratio isn't constant across sizes (confirmed on macOS itself - rounding/hinting/pixel-
-        // snapping shift it a few percent between e.g. 30pt and 200pt), and a Windows backend can
-        // exhibit a different, and differently-sized, version of that same nonlinearity - a report
-        // of "smaller than before, but still too large" after the first version of this fix is
-        // exactly what an under-correcting single pass looks like. So this iterates a few times,
-        // re-measuring at each new guess, which converges to the actual target regardless of how
-        // that ratio moves with size on whatever backend is running.
-        constexpr float nominalHeight = 29.4f;
-        constexpr float targetInkHeightPx = 18.0f;
-        static const float correctedHeight = []
-        {
-            // TEMPORARY diagnostic (remove once the Windows sizing mismatch is root-caused): logs
-            // every iteration's measured ink height to a user-visible file, since a report of "the
-            // fix had no effect" gives no way to tell, from the developer's machine, whether this
-            // loop ran at all, converged trivially (measured == target immediately, meaning the
-            // *target itself* is the problem), or converged to a heightGuess that still doesn't
-            // reproduce 18px in practice on that machine's font backend.
-            juce::File logFile = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                                      .getChildFile("TapeRot")
-                                      .getChildFile("TapeRot")
-                                      .getChildFile("dymo-debug.log");
-            logFile.create();
-            juce::String log;
-            log << "--- dymoFont calibration ---\n";
-           #if JUCE_WINDOWS
-            log << "platform=Windows\n";
-           #elif JUCE_MAC
-            log << "platform=macOS\n";
-           #else
-            log << "platform=other\n";
-           #endif
+        // This used to be "corrected" by rendering a probe string to an offscreen Image and
+        // measuring its actual ink height, then solving for whatever height reproduces the
+        // macOS-tuned look on the current backend. That approach is fundamentally broken on
+        // Windows, not just mistuned: a diagnostic build logging every iteration showed the probe
+        // measuring zero ink height on real Windows hardware, despite the live plugin window
+        // clearly showing (small but legible) text. The reason is a rendering-path split that has
+        // nothing to do with font metrics - JUCE 8 defaults every Windows window to a Direct2D
+        // peer (HWNDComponentPeer's ctor picks engine 1 = D2DRenderContext unless running under
+        // Wine; see juce_Windowing_windows.cpp), but a plain juce::Image is always backed by
+        // SoftwarePixelData, whose createLowLevelContext() unconditionally returns
+        // LowLevelGraphicsSoftwareRenderer instead. So the calibration probe and the real on-screen
+        // paint go through two different renderers, and this particular embedded TTF's outlines
+        // apparently don't extract correctly for JUCE's software rasteriser on Windows even though
+        // DirectWrite renders the glyphs fine - no probe rendered through that path could ever
+        // measure anything.
+        //
+        // So this is a manually-tuned constant instead of a runtime measurement. Windows' value is
+        // a starting estimate (visually not yet confirmed) - if it's still off, it needs adjusting
+        // directly here rather than by any further auto-calibration attempt.
+       #if JUCE_WINDOWS
+        constexpr float platformHeight = 43.0f;
+       #else
+        constexpr float platformHeight = 29.4f;
+       #endif
 
-            float heightGuess = nominalHeight;
-            for (int iteration = 0; iteration < 6; ++iteration)
-            {
-                const float measured = measureRenderedInkHeight(juce::Font(typeface).withHeight(heightGuess), "TAPEROT");
-                log << "iteration " << iteration << ": heightGuess=" << heightGuess
-                    << " measuredInkHeight=" << measured << "\n";
-                if (measured <= 0.0f)
-                    break;
-                heightGuess *= targetInkHeightPx / measured;
-            }
-            log << "final correctedHeight=" << heightGuess << "\n\n";
-            logFile.appendText(log);
-
-            return heightGuess;
-        }();
-
-        return juce::Font(typeface).withHeight(correctedHeight);
+        return juce::Font(typeface).withHeight(platformHeight);
     }
     inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
     inline juce::Font versionFont() { return juce::Font(sansRegularTypeface()).withHeight(8.0f); }
