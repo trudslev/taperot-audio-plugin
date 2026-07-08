@@ -30,16 +30,17 @@ void FailLamp::paint(juce::Graphics& g)
 
     if (displayedLevel > 0.01f)
     {
-        juce::ColourGradient glow(Colour::lampGlowInner.withAlpha(displayedLevel), centre.x, centre.y,
-                                   Colour::lampGlowInner.withAlpha(0.0f), centre.x + Layout::lampGlowRadius,
+        juce::ColourGradient glow(Colour::ledRedCore.withAlpha(displayedLevel), centre.x, centre.y,
+                                   Colour::ledRedCore.withAlpha(0.0f), centre.x + Layout::lampGlowRadius,
                                    centre.y + Layout::lampGlowRadius, true);
         g.setGradientFill(glow);
         g.fillEllipse(centre.x - Layout::lampGlowRadius, centre.y - Layout::lampGlowRadius,
                       Layout::lampGlowRadius * 2.0f, Layout::lampGlowRadius * 2.0f);
     }
 
-    const auto bulbColour = Colour::lamp.interpolatedWith(Colour::lampRing, 1.0f - displayedLevel)
-                                 .interpolatedWith(Colour::specular, displayedLevel * 0.5f);
+    // Dark saturated red when lit (darker still toward lampRing as it fades out), rather than the
+    // amber/white-hot look used elsewhere - matches AuxButton/FailureDotToggle's red diode colour.
+    const auto bulbColour = Colour::ledRedCore.interpolatedWith(Colour::lampRing, 1.0f - displayedLevel);
     g.setColour(bulbColour);
     g.fillEllipse(centre.x - Layout::lampRadius, centre.y - Layout::lampRadius,
                   Layout::lampRadius * 2.0f, Layout::lampRadius * 2.0f);
@@ -53,5 +54,5 @@ void FailLamp::paint(juce::Graphics& g)
 
     // Sharp lens-flare sparkle from the hot core, same treatment as AuxButton/FailureDotToggle -
     // scales with the same envelope that drives the glow, so it fades in/out with it.
-    drawSparkleHighlight(g, centre, Layout::lampRadius, Colour::specular, displayedLevel);
+    drawSparkleHighlight(g, centre, Layout::lampRadius, Colour::ledRedSparkle, displayedLevel);
 }

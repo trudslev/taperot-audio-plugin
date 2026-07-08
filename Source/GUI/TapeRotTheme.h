@@ -20,8 +20,12 @@ namespace TapeRotTheme
         inline const juce::Colour knobFaceBottom{0xFFE4DAC2};
         inline const juce::Colour amber{0xFFD98324};
         inline const juce::Colour amberBright{0xFFF0A94B};
-        inline const juce::Colour lamp{0xFFF5A83C};
-        inline const juce::Colour lampGlowInner{0xFFFFB347};
+        // Lit-LED red (aux buttons, failure dots, fail lamp): darker/more saturated toward the
+        // centre rather than the near-white hot spot used elsewhere, so the diode itself reads red
+        // rather than white with a red rim.
+        inline const juce::Colour ledRedCore{0xFF7A1414};
+        inline const juce::Colour ledRedEdge{0xFF3D0A0A};
+        inline const juce::Colour ledRedSparkle{0xFFCC3A2E};
         inline const juce::Colour dark{0xFF17140F};
         inline const juce::Colour rim{0xFF4A443C};
         inline const juce::Colour ink{0xFF3A342C};

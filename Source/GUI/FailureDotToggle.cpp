@@ -19,8 +19,8 @@ void FailureDotToggle::paintButton(juce::Graphics& g, bool, bool)
 
     if (getToggleState())
     {
-        juce::ColourGradient glow(Colour::specular, centre.x, centre.y,
-                                   Colour::amber, centre.x + r, centre.y + r, true);
+        juce::ColourGradient glow(Colour::ledRedCore, centre.x, centre.y,
+                                   Colour::ledRedEdge, centre.x + r, centre.y + r, true);
         g.setGradientFill(glow);
     }
     else
@@ -35,6 +35,6 @@ void FailureDotToggle::paintButton(juce::Graphics& g, bool, bool)
     {
         // Sharp lens-flare sparkle from the hot core, same treatment as AuxButton - reads as an
         // intensely lit diode even at this much smaller size.
-        drawSparkleHighlight(g, centre, r, Colour::specular, 1.0f, 2.0f);
+        drawSparkleHighlight(g, centre, r, Colour::ledRedSparkle, 1.0f, 2.0f);
     }
 }

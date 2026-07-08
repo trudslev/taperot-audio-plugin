@@ -34,16 +34,17 @@ void AuxButton::paintButton(juce::Graphics& g, bool, bool)
 
     if (getToggleState())
     {
-        // Hot white-amber core fading to amber at the rim - much brighter than a flat amber fill.
-        juce::ColourGradient glow(Colour::specular, centre.x, centre.y,
-                                   Colour::amber, centre.x + r, centre.y + r, true);
+        // Dark saturated red core fading darker still at the rim - reads as a red diode, not a
+        // white-hot lamp with a red tint at the edge.
+        juce::ColourGradient glow(Colour::ledRedCore, centre.x, centre.y,
+                                   Colour::ledRedEdge, centre.x + r, centre.y + r, true);
         g.setGradientFill(glow);
         g.fillEllipse(centre.x - r + 2.0f, centre.y - r + 2.0f, (r - 2.0f) * 2.0f, (r - 2.0f) * 2.0f);
 
         // Sharp lens-flare sparkle from the hot core - reads as an intensely lit diode rather than
         // a flat bright disc (a soft outward halo was tried here and rejected as looking like a
         // ring rather than a light source).
-        drawSparkleHighlight(g, centre, r, Colour::specular, 1.0f, 1.5f);
+        drawSparkleHighlight(g, centre, r, Colour::ledRedSparkle, 1.0f, 1.5f);
     }
 
     g.setColour(Colour::rim);
