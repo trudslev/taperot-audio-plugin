@@ -4,10 +4,6 @@
 AuxButton::AuxButton(const juce::String& name) : juce::Button(name)
 {
     setClickingTogglesState(false);
-    // The lit-up glow deliberately bleeds a few px past this button's own (tightly-packed, 3px
-    // padding) bounds - without this, JUCE's default per-component clip region would crop it back
-    // down to invisible.
-    setPaintingIsUnclipped(true);
 }
 
 void AuxButton::mouseDown(const juce::MouseEvent& e)
@@ -28,18 +24,6 @@ void AuxButton::paintButton(juce::Graphics& g, bool, bool)
 
     const auto centre = getLocalBounds().toFloat().getCentre();
     const float r = Layout::auxButtonRadius;
-
-    if (getToggleState())
-    {
-        // Soft outward bloom, well outside the button's own footprint, so the panel around it
-        // reads as lit rather than just the button itself looking a brighter colour.
-        juce::ColourGradient bloom(Colour::amberBright.withAlpha(0.85f), centre.x, centre.y,
-                                    Colour::amberBright.withAlpha(0.0f), centre.x + Layout::auxButtonGlowRadius,
-                                    centre.y + Layout::auxButtonGlowRadius, true);
-        g.setGradientFill(bloom);
-        g.fillEllipse(centre.x - Layout::auxButtonGlowRadius, centre.y - Layout::auxButtonGlowRadius,
-                      Layout::auxButtonGlowRadius * 2.0f, Layout::auxButtonGlowRadius * 2.0f);
-    }
 
     g.setColour(Colour::dark);
     g.fillEllipse(centre.x - r, centre.y - r, r * 2.0f, r * 2.0f);
