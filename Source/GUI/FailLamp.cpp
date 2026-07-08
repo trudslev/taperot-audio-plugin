@@ -30,9 +30,16 @@ void FailLamp::paint(juce::Graphics& g)
 
     if (displayedLevel > 0.01f)
     {
+        // A plain 2-stop gradient interpolates alpha linearly with radius, which reads as a
+        // fairly constant-brightness disc that then cuts off abruptly right near the boundary
+        // (the same "ring" look rejected on the aux buttons/failure dots). Extra stops easing the
+        // alpha down faster than linear make it actually fade out well before the true edge.
         juce::ColourGradient glow(Colour::ledRedCore.withAlpha(displayedLevel), centre.x, centre.y,
                                    Colour::ledRedCore.withAlpha(0.0f), centre.x + Layout::lampGlowRadius,
                                    centre.y + Layout::lampGlowRadius, true);
+        glow.addColour(0.25, Colour::ledRedCore.withAlpha(displayedLevel * 0.55f));
+        glow.addColour(0.55, Colour::ledRedCore.withAlpha(displayedLevel * 0.22f));
+        glow.addColour(0.8, Colour::ledRedCore.withAlpha(displayedLevel * 0.06f));
         g.setGradientFill(glow);
         g.fillEllipse(centre.x - Layout::lampGlowRadius, centre.y - Layout::lampGlowRadius,
                       Layout::lampGlowRadius * 2.0f, Layout::lampGlowRadius * 2.0f);
