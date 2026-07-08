@@ -50,4 +50,8 @@ void FailLamp::paint(juce::Graphics& g)
     g.setColour(Colour::specular.withAlpha(0.7f));
     g.fillEllipse(Layout::lampSpecularX - Layout::lampSpecularRadius, Layout::lampSpecularY - Layout::lampSpecularRadius,
                   Layout::lampSpecularRadius * 2.0f, Layout::lampSpecularRadius * 2.0f);
+
+    // Sharp lens-flare sparkle from the hot core, same treatment as AuxButton/FailureDotToggle -
+    // scales with the same envelope that drives the glow, so it fades in/out with it.
+    drawSparkleHighlight(g, centre, Layout::lampRadius, Colour::specular, displayedLevel);
 }

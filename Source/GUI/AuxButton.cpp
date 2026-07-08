@@ -4,6 +4,10 @@
 AuxButton::AuxButton(const juce::String& name) : juce::Button(name)
 {
     setClickingTogglesState(false);
+    // The lit sparkle's spike tips deliberately reach a few px past this button's own (tightly-
+    // packed, 3px padding) bounds - without this, JUCE's default per-component clip region would
+    // crop them to an abrupt flat cut instead of a tapered point.
+    setPaintingIsUnclipped(true);
 }
 
 void AuxButton::mouseDown(const juce::MouseEvent& e)
@@ -35,6 +39,11 @@ void AuxButton::paintButton(juce::Graphics& g, bool, bool)
                                    Colour::amber, centre.x + r, centre.y + r, true);
         g.setGradientFill(glow);
         g.fillEllipse(centre.x - r + 2.0f, centre.y - r + 2.0f, (r - 2.0f) * 2.0f, (r - 2.0f) * 2.0f);
+
+        // Sharp lens-flare sparkle from the hot core - reads as an intensely lit diode rather than
+        // a flat bright disc (a soft outward halo was tried here and rejected as looking like a
+        // ring rather than a light source).
+        drawSparkleHighlight(g, centre, r, Colour::specular, 1.0f, 1.5f);
     }
 
     g.setColour(Colour::rim);

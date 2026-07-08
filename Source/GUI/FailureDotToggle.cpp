@@ -4,6 +4,10 @@
 FailureDotToggle::FailureDotToggle(const juce::String& name) : juce::Button(name)
 {
     setClickingTogglesState(true);
+    // The lit sparkle's spike tips deliberately reach a few px past this dot's own (tightly-
+    // packed, 3px padding) bounds - without this, JUCE's default per-component clip region would
+    // crop them to an abrupt flat cut instead of a tapered point.
+    setPaintingIsUnclipped(true);
 }
 
 void FailureDotToggle::paintButton(juce::Graphics& g, bool, bool)
@@ -26,4 +30,11 @@ void FailureDotToggle::paintButton(juce::Graphics& g, bool, bool)
     g.fillEllipse(centre.x - r, centre.y - r, r * 2.0f, r * 2.0f);
     g.setColour(Colour::switchThumbStroke);
     g.drawEllipse(centre.x - r, centre.y - r, r * 2.0f, r * 2.0f, 1.0f);
+
+    if (getToggleState())
+    {
+        // Sharp lens-flare sparkle from the hot core, same treatment as AuxButton - reads as an
+        // intensely lit diode even at this much smaller size.
+        drawSparkleHighlight(g, centre, r, Colour::specular, 1.0f, 2.0f);
+    }
 }

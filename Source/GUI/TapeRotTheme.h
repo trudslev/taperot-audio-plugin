@@ -51,6 +51,47 @@ namespace TapeRotTheme
         inline const juce::Colour dymoEmbossFace{0xFFFFFDF6};
     }
 
+    // A lit LED's lens reads as a tiny intense point source with sharp radiating spikes (a camera-
+    // lens-flare "sparkle"), not a soft diffuse halo - a halo bleeding onto the surrounding panel
+    // was tried for the aux buttons/failure dots and rejected as looking like a distracting ring
+    // rather than a bright diode. Eight tapered spikes (four long on the axes, four short on the
+    // diagonals) fanning out from centre, each its own gradient-filled triangle so it fades to
+    // nothing at the tip - drawn on top of an already-lit disc.
+    inline void drawSparkleHighlight(juce::Graphics& g, juce::Point<float> centre, float radius,
+                                      juce::Colour colour, float intensity = 1.0f, float reach = 2.4f)
+    {
+        if (intensity <= 0.0f)
+            return;
+
+        const float longSpike = radius * reach * intensity;
+        const float shortSpike = radius * reach * (1.4f / 2.4f) * intensity;
+        const float halfWidth = juce::jmax(0.6f, radius * 0.14f);
+
+        auto drawSpike = [&](float length, float angleDegrees)
+        {
+            const float angle = juce::degreesToRadians(angleDegrees);
+            const juce::Point<float> dir(std::cos(angle), std::sin(angle));
+            const juce::Point<float> perp(-dir.y, dir.x);
+            const juce::Point<float> tip = centre + dir * length;
+
+            juce::Path spike;
+            spike.startNewSubPath(centre + perp * halfWidth);
+            spike.lineTo(tip);
+            spike.lineTo(centre - perp * halfWidth);
+            spike.closeSubPath();
+
+            juce::ColourGradient gradient(colour.withAlpha(intensity), centre.x, centre.y,
+                                           colour.withAlpha(0.0f), tip.x, tip.y, false);
+            g.setGradientFill(gradient);
+            g.fillPath(spike);
+        };
+
+        for (float angle : {0.0f, 90.0f, 180.0f, 270.0f})
+            drawSpike(longSpike, angle);
+        for (float angle : {45.0f, 135.0f, 225.0f, 315.0f})
+            drawSpike(shortSpike, angle);
+    }
+
     inline juce::String monoFontName() { return juce::Font::getDefaultMonospacedFontName(); }
 
     // Inter (design/inter/, SIL Open Font License 1.1 - explicitly permits embedding/bundling in
