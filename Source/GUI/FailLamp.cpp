@@ -46,13 +46,13 @@ void FailLamp::paint(juce::Graphics& g)
                       Layout::lampGlowRadius * 2.0f, Layout::lampGlowRadius * 2.0f);
     }
 
-    // Dark saturated red when lit (darker still toward lampRing as it fades out), rather than the
+    // Dark saturated red when lit, fading to a neutral gray (unlit diode housing) rather than the
     // amber/white-hot look used elsewhere - matches AuxButton/FailureDotToggle's red diode colour.
-    const auto bulbColour = Colour::ledRedCore.interpolatedWith(Colour::lampRing, 1.0f - displayedLevel);
+    const auto bulbColour = Colour::ledRedCore.interpolatedWith(Colour::lampUnlit, 1.0f - displayedLevel);
     g.setColour(bulbColour);
     g.fillEllipse(centre.x - Layout::lampRadius, centre.y - Layout::lampRadius,
                   Layout::lampRadius * 2.0f, Layout::lampRadius * 2.0f);
-    g.setColour(Colour::lampRing);
+    g.setColour(Colour::lampUnlit);
     g.drawEllipse(centre.x - Layout::lampRadius, centre.y - Layout::lampRadius,
                   Layout::lampRadius * 2.0f, Layout::lampRadius * 2.0f, 1.5f);
 

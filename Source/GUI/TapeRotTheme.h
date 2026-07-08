@@ -42,7 +42,9 @@ namespace TapeRotTheme
         inline const juce::Colour screwFill{0xFFCFC8B8};
         inline const juce::Colour screwStroke{0xFF7A7263};
         inline const juce::Colour versionText{0xFFA2967A};
-        inline const juce::Colour lampRing{0xFF7A4A0F};
+        // Unlit FAIL lamp: a neutral gray diode housing rather than a brown/amber-tinted one, since
+        // the lit colour is now red rather than amber.
+        inline const juce::Colour lampUnlit{0xFF6E675A};
         inline const juce::Colour specular{0xFFFFE0AC};
         inline const juce::Colour digitText{0xFFEDE6D2};
         inline const juce::Colour digitCellFill{0xFF17140F};
