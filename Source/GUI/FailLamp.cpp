@@ -37,9 +37,10 @@ void FailLamp::paint(juce::Graphics& g)
         juce::ColourGradient glow(Colour::ledRedCore.withAlpha(displayedLevel), centre.x, centre.y,
                                    Colour::ledRedCore.withAlpha(0.0f), centre.x + Layout::lampGlowRadius,
                                    centre.y + Layout::lampGlowRadius, true);
-        glow.addColour(0.25, Colour::ledRedCore.withAlpha(displayedLevel * 0.55f));
-        glow.addColour(0.55, Colour::ledRedCore.withAlpha(displayedLevel * 0.22f));
-        glow.addColour(0.8, Colour::ledRedCore.withAlpha(displayedLevel * 0.06f));
+        glow.addColour(0.15, Colour::ledRedCore.withAlpha(displayedLevel * 0.61f));
+        glow.addColour(0.35, Colour::ledRedCore.withAlpha(displayedLevel * 0.27f));
+        glow.addColour(0.55, Colour::ledRedCore.withAlpha(displayedLevel * 0.09f));
+        glow.addColour(0.75, Colour::ledRedCore.withAlpha(displayedLevel * 0.02f));
         g.setGradientFill(glow);
         g.fillEllipse(centre.x - Layout::lampGlowRadius, centre.y - Layout::lampGlowRadius,
                       Layout::lampGlowRadius * 2.0f, Layout::lampGlowRadius * 2.0f);
