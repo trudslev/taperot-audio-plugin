@@ -152,14 +152,40 @@ namespace TapeRotTheme
         constexpr float targetInkHeightPx = 18.0f;
         static const float correctedHeight = []
         {
+            // TEMPORARY diagnostic (remove once the Windows sizing mismatch is root-caused): logs
+            // every iteration's measured ink height to a user-visible file, since a report of "the
+            // fix had no effect" gives no way to tell, from the developer's machine, whether this
+            // loop ran at all, converged trivially (measured == target immediately, meaning the
+            // *target itself* is the problem), or converged to a heightGuess that still doesn't
+            // reproduce 18px in practice on that machine's font backend.
+            juce::File logFile = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                                      .getChildFile("TapeRot")
+                                      .getChildFile("TapeRot")
+                                      .getChildFile("dymo-debug.log");
+            logFile.create();
+            juce::String log;
+            log << "--- dymoFont calibration ---\n";
+           #if JUCE_WINDOWS
+            log << "platform=Windows\n";
+           #elif JUCE_MAC
+            log << "platform=macOS\n";
+           #else
+            log << "platform=other\n";
+           #endif
+
             float heightGuess = nominalHeight;
             for (int iteration = 0; iteration < 6; ++iteration)
             {
                 const float measured = measureRenderedInkHeight(juce::Font(typeface).withHeight(heightGuess), "TAPEROT");
+                log << "iteration " << iteration << ": heightGuess=" << heightGuess
+                    << " measuredInkHeight=" << measured << "\n";
                 if (measured <= 0.0f)
                     break;
                 heightGuess *= targetInkHeightPx / measured;
             }
+            log << "final correctedHeight=" << heightGuess << "\n\n";
+            logFile.appendText(log);
+
             return heightGuess;
         }();
 
