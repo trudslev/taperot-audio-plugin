@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
-project(TapeRot VERSION 0.1.0 LANGUAGES CXX)
+# LANGUAGES needs C as well as CXX: JUCE/VST3-SDK/other fetched third-party deps bundle some .c
+# sources, and Xcode/Visual Studio tolerate that without an explicit enable_language(C), but
+# Linux's single-config Makefiles/Ninja generator does not - it fails at CMake's generate step
+# with "CMAKE_C_COMPILE_OBJECT not set" if C was never enabled at the top level.
+project(TapeRot VERSION 0.1.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
