@@ -142,34 +142,28 @@ namespace TapeRotTheme
             juce::Typeface::createSystemTypefaceFor(BinaryData::Impact_label_reversed_ttf,
                                                      (size_t) BinaryData::Impact_label_reversed_ttfSize);
 
-        // withHeight()'s nominal "height" is ascent+descent as each OS's font backend derives them
-        // from the typeface's own metrics tables - for this hand-drawn display font those disagree
-        // badly enough between backends that the same withHeight() value renders visibly smaller
-        // on Windows than on macOS.
+        // withHeight()'s nominal "height" maps to a real glyph scale through each backend's own
+        // reading of this hand-drawn font's vertical-metrics tables, and the two disagree sharply.
+        // Measured on real hardware, a cap-only string's ink height comes out as:
+        //   - macOS   (CoreText):    ~0.61x the requested withHeight - so withHeight(29.4) -> 18px
+        //   - Windows (DirectWrite):  ~1.00x, linear (verified at 29.4/35/40/43px)
+        // i.e. the SAME withHeight renders the caps ~1.6x TALLER on Windows than macOS - the
+        // opposite of an earlier assumption that Windows rendered smaller, which led to a bumped-up
+        // 43.0f that came out ~2.4x oversized. macOS is the reference and looks right at 29.4
+        // (18px cap-ink); reproducing that same 18px cap-ink on Windows needs withHeight = 18.0.
         //
-        // This used to be "corrected" by rendering a probe string to an offscreen Image and
-        // measuring its actual ink height, then solving for whatever height reproduces the
-        // macOS-tuned look on the current backend. That approach is fundamentally broken on
-        // Windows, not just mistuned: a diagnostic build logging every iteration showed the probe
-        // measuring zero ink height on real Windows hardware, despite the live plugin window
-        // clearly showing (small but legible) text. The reason is a rendering-path split that has
-        // nothing to do with font metrics - JUCE 8 defaults every Windows window to a Direct2D
-        // peer (HWNDComponentPeer's ctor picks engine 1 = D2DRenderContext unless running under
-        // Wine; see juce_Windowing_windows.cpp), but a plain juce::Image is always backed by
-        // SoftwarePixelData, whose createLowLevelContext() unconditionally returns
-        // LowLevelGraphicsSoftwareRenderer instead. So the calibration probe and the real on-screen
-        // paint go through two different renderers, and this particular embedded TTF's outlines
-        // apparently don't extract correctly for JUCE's software rasteriser on Windows even though
-        // DirectWrite renders the glyphs fine - no probe rendered through that path could ever
-        // measure anything.
-        //
-        // So this is a manually-tuned constant instead of a runtime measurement. Windows' value is
-        // a starting estimate (visually not yet confirmed) - if it's still off, it needs adjusting
-        // directly here rather than by any further auto-calibration attempt.
+        // These are pinned constants from a controlled offscreen measurement, deliberately NOT a
+        // runtime probe. Two runtime approaches were tried and both are the wrong tool here:
+        // measuring a software-rendered juce::Image returns zero ink for this font on Windows (JUCE
+        // 8 gives the window a Direct2D peer, but a plain juce::Image is always SoftwarePixelData /
+        // LowLevelGraphicsSoftwareRenderer, and this TTF's outlines don't extract through that
+        // rasteriser); and even a GlyphArrangement probe - correct in an offscreen console test -
+        // can't be trusted to run at a well-defined point in a plugin host's font/graphics
+        // lifecycle. So the value lives here as a constant instead.
        #if JUCE_WINDOWS
-        constexpr float platformHeight = 43.0f;
+        constexpr float platformHeight = 18.0f;
        #else
-        constexpr float platformHeight = 29.4f;
+        constexpr float platformHeight = 29.4f;   // macOS path unchanged
        #endif
 
         return juce::Font(typeface).withHeight(platformHeight);
