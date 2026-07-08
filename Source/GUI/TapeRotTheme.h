@@ -162,6 +162,13 @@ namespace TapeRotTheme
         // lifecycle. So the value lives here as a constant instead.
        #if JUCE_WINDOWS
         constexpr float platformHeight = 18.0f;
+       #elif JUCE_LINUX
+        // UNVERIFIED: Linux renders this TTF through FreeType, a third backend distinct from both
+        // DirectWrite and CoreText above, so there's no reason to assume it agrees with either
+        // measured value. This is a placeholder (macOS's value) pending the same controlled
+        // offscreen ink-bounds measurement done for Windows, done on real Linux hardware - don't
+        // treat it as correct.
+        constexpr float platformHeight = 29.4f;
        #else
         constexpr float platformHeight = 29.4f;   // macOS path unchanged
        #endif

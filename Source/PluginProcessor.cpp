@@ -76,10 +76,11 @@ const juce::String TapeRotAudioProcessor::getProgramName(int index)
 
 juce::File TapeRotAudioProcessor::getUserPresetDirectory()
 {
-   #if JUCE_WINDOWS
-    // %APPDATA%\<Manufacturer>\<Plugin>\Presets - there's no Windows equivalent of macOS's
-    // ~/Library/Audio/Presets convention, so this follows the common per-vendor AppData layout
-    // instead.
+   #if JUCE_WINDOWS || JUCE_LINUX
+    // Windows: %APPDATA%\<Manufacturer>\<Plugin>\Presets. Linux: ~/.config/<Manufacturer>/<Plugin>/Presets
+    // (JUCE's userApplicationDataDirectory resolves to the right per-OS location on each). Neither
+    // platform has an equivalent of macOS's ~/Library/Audio/Presets convention, so both share this
+    // common per-vendor AppData/XDG-config layout instead.
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
         .getChildFile(JucePlugin_Manufacturer)
         .getChildFile(JucePlugin_Name)

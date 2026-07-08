@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-TapeRot builds on macOS (AU + VST3 + Standalone) and Windows (VST3 + Standalone — AU is
-Apple-only; `CMakeLists.txt` conditionalizes `FORMATS`/`*_COPY_DIR` on `APPLE`). JUCE 8.0.14 is
-fetched automatically via CMake `FetchContent` on either platform, no local checkout needed.
+TapeRot builds on macOS (AU + VST3 + Standalone), Windows (VST3 + Standalone), and Linux
+(VST3 + Standalone) — AU is Apple-only; `CMakeLists.txt` conditionalizes `FORMATS`/`*_COPY_DIR` on
+`APPLE`, so Windows and Linux share the same non-Apple branch (`VST3 Standalone`, unset copy dirs →
+JUCE's own per-OS default). JUCE 8.0.14 is fetched automatically via CMake `FetchContent` on any
+platform, no local checkout needed.
 
 Configure once — macOS:
 
@@ -20,9 +22,15 @@ Configure once — Windows:
 cmake -B build -A x64
 ```
 
+Configure once — Linux (single-config generator, so `CMAKE_BUILD_TYPE` must be set here rather than only at build time):
+
+```sh
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+```
+
 Re-run the configure step whenever `CMakeLists.txt` changes (new sources, new `juce_add_plugin` args, etc.) — a plain rebuild won't pick those up.
 
-Build (macOS auto-installs AU/VST3 to `~/Library/Audio/Plug-Ins/...`; Windows installs VST3 to JUCE's own default, `%COMMONPROGRAMFILES%\VST3\`):
+Build (macOS auto-installs AU/VST3 to `~/Library/Audio/Plug-Ins/...`; Windows installs VST3 to JUCE's own default, `%COMMONPROGRAMFILES%\VST3\`; Linux installs VST3 to JUCE's own default, `~/.vst3/`):
 
 ```sh
 cmake --build build --config Release
@@ -31,7 +39,7 @@ cmake --build build --config Release
 Run the DSP unit tests (Catch2-style, built as a console app target `TapeRotTests`):
 
 ```sh
-./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests          # macOS
+./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests          # macOS / Linux
 build\Tests\TapeRotTests_artefacts\Release\TapeRotTests.exe        # Windows
 ```
 
@@ -54,7 +62,13 @@ Validate on Windows (VST3 only, no AU/`auval` equivalent):
 pluginval.exe --strictness-level 8 --validate "%COMMONPROGRAMFILES%\VST3\TapeRot.vst3"
 ```
 
-If Logic Pro doesn't pick up a freshly built AU: Audio Units Manager → "Reset & Rescan Selection", or restart Logic. If a rebuilt app/plugin icon doesn't refresh, LaunchServices/Dock/Finder are caching by bundle path — `touch` the bundle, re-run `lsregister -f <bundle>`, then `killall Dock Finder`. (macOS-only tips — on Windows, a host's own plugin rescan action, e.g. Reaper's "re-scan VST paths", covers the equivalent case.)
+Validate on Linux (VST3 only, no AU/`auval` equivalent):
+
+```sh
+./pluginval --strictness-level 8 --validate ~/.vst3/TapeRot.vst3
+```
+
+If Logic Pro doesn't pick up a freshly built AU: Audio Units Manager → "Reset & Rescan Selection", or restart Logic. If a rebuilt app/plugin icon doesn't refresh, LaunchServices/Dock/Finder are caching by bundle path — `touch` the bundle, re-run `lsregister -f <bundle>`, then `killall Dock Finder`. (macOS-only tips — on Windows/Linux, a host's own plugin rescan action, e.g. Reaper's "re-scan VST paths", covers the equivalent case.)
 
 See [BUILDING.md](BUILDING.md) for full per-platform requirements (Xcode/Visual Studio, CMake 3.24+, pluginval).
 
@@ -112,6 +126,14 @@ Scaling to the actual window size is handled once, centrally: `PluginEditor::res
 
 `juce_add_binary_data(TapeRotBinaryData SOURCES design/impact-label/... design/inter/...)` embeds the Dymo-label and Inter font files as C++ byte arrays (`BinaryData::Impact_label_reversed_ttf`/`..._ttfSize`, `BinaryData::InterRegular_ttf`/`InterBold_ttf` — note JUCE's binary-data name-mangling strips hyphens rather than converting them to underscores, so `Inter-Regular.ttf` becomes `InterRegular_ttf`, not `Inter_Regular_ttf`) rather than loading them from disk at runtime; it's linked into both the `TapeRot` plugin target and `TapeRotTests` (anything that includes `TapeRotTheme.h`, which calls `Typeface::createSystemTypefaceFor` on both, needs the link). New embedded assets go in this same `juce_add_binary_data` call, not as raw `target_sources`.
 
-### Windows-specific notes
+### Platform-specific notes
 
-No exotic macOS APIs exist anywhere in `Source/DSP/` (confirmed by audit — no Objective-C++, no CoreAudio/CoreMIDI/AudioToolbox/Accelerate, no SIMD intrinsics), so the DSP side ports unmodified. The only platform branches anywhere in the codebase are `Source/PluginProcessor.cpp`'s `getUserPresetDirectory()` (`#if JUCE_WINDOWS` → `%APPDATA%\<Manufacturer>\<Plugin>\Presets`, else macOS's `~/Library/Audio/Presets/...`) and the `CMakeLists.txt` items above — everything else was already cross-platform-correct (icon generation, `createLegalFileName`, JUCE's own MSVC-aware recommended-flags targets) or has no Windows equivalent by nature (AU). `.github/workflows/edge-build.yml` builds and publishes both a macOS installer (`.pkg`, ad-hoc signed) and a Windows installer (`installer/windows/TapeRot.iss`, built via Inno Setup - pre-installed on GitHub's Windows runners, no setup step needed - unsigned) to the same rolling `edge` GitHub pre-release on every push to `develop`. The Windows installer places the VST3 in `%COMMONPROGRAMFILES%\VST3\` and the Standalone under `{autopf}\TapeRot\` (Program Files), both requiring admin elevation.
+No exotic macOS APIs exist anywhere in `Source/DSP/` (confirmed by audit — no Objective-C++, no CoreAudio/CoreMIDI/AudioToolbox/Accelerate, no SIMD intrinsics), so the DSP side ports unmodified to both Windows and Linux. The only platform branches anywhere in the codebase are:
+
+- `Source/PluginProcessor.cpp`'s `getUserPresetDirectory()` — `#if JUCE_WINDOWS || JUCE_LINUX` → `<AppData>/<Manufacturer>/<Plugin>/Presets` (JUCE's `userApplicationDataDirectory` resolves this to `%APPDATA%` on Windows and `~/.config` on Linux), else macOS's `~/Library/Audio/Presets/...`.
+- `Source/GUI/TapeRotTheme.h`'s `dymoFont()` — per-backend pinned `withHeight` constant for the Dymo-label typeface (`JUCE_WINDOWS`: `18.0f`, measured against DirectWrite; else `29.4f`, measured against CoreText). The `JUCE_LINUX` branch currently reuses the macOS value as an explicitly-flagged placeholder — Linux renders through FreeType, a third backend, and hasn't been measured on real hardware the way Windows was (see the Windows Dymo-sizing fix in git history for the measurement methodology to repeat here).
+- the `CMakeLists.txt` items above (`if(APPLE)` gating `FORMATS`/copy dirs/deployment target).
+
+Everything else was already cross-platform-correct (icon generation, `createLegalFileName`, JUCE's own MSVC-aware recommended-flags targets) or has no Windows/Linux equivalent by nature (AU).
+
+`.github/workflows/edge-build.yml` builds and publishes a macOS installer (`.pkg`, ad-hoc signed), a Windows installer (`installer/windows/TapeRot.iss`, built via Inno Setup - pre-installed on GitHub's Windows runners, no setup step needed - unsigned), and a Linux tarball (`.tar.gz` containing the VST3/Standalone plus `installer/linux/README.txt`, unsigned — no Linux equivalent of code-signing to bypass) to the same rolling `edge` GitHub pre-release on every push to `develop`. The Windows installer places the VST3 in `%COMMONPROGRAMFILES%\VST3\` and the Standalone under `{autopf}\TapeRot\` (Program Files), both requiring admin elevation. The Linux `build-linux` CI job runs on `ubuntu-22.04` (not `ubuntu-latest`) for an older glibc baseline and broader binary compatibility with users' distros, and needs the JUCE Linux apt dependency list (ALSA/JACK/FreeType/Fontconfig/X11/GTK/mesa dev packages — see the job or `BUILDING.md` for the full list) installed before configuring.

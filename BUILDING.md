@@ -1,8 +1,8 @@
 # Building TapeRot
 
-TapeRot builds on both macOS (AU + VST3 + Standalone) and Windows (VST3 + Standalone — AU is
-Apple-only). JUCE 8.0.14 is fetched automatically via CMake `FetchContent` on first configure (no
-local JUCE checkout needed) on either platform.
+TapeRot builds on macOS (AU + VST3 + Standalone), Windows (VST3 + Standalone), and Linux
+(VST3 + Standalone) — AU is Apple-only. JUCE 8.0.14 is fetched automatically via CMake
+`FetchContent` on first configure (no local JUCE checkout needed) on any platform.
 
 ## macOS
 
@@ -74,6 +74,49 @@ pluginval.exe --strictness-level 8 --validate "%COMMONPROGRAMFILES%\VST3\TapeRot
 
 ```bat
 build\Tests\TapeRotTests_artefacts\Release\TapeRotTests.exe
+```
+
+## Linux
+
+### Requirements
+
+- A C++20-capable compiler (GCC or Clang) and CMake 3.24+.
+- JUCE's standard Linux build dependencies:
+  ```sh
+  sudo apt-get install -y \
+      libasound2-dev libjack-jackd2-dev \
+      libcurl4-openssl-dev \
+      libfreetype6-dev libfontconfig1-dev \
+      libx11-dev libxcomposite-dev libxcursor-dev libxext-dev libxinerama-dev libxrandr-dev libxrender-dev \
+      libwebkit2gtk-4.1-dev \
+      libglu1-mesa-dev mesa-common-dev
+  ```
+  (package names above are for Debian/Ubuntu — adjust for other distros).
+- [pluginval](https://github.com/Tracktion/pluginval) for VST3 validation (Linux build available from the same releases page) — no `auval` equivalent, since AU doesn't exist on Linux.
+
+### Build
+
+```sh
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+```
+
+Unlike the Xcode/Visual Studio generators used on macOS/Windows, CMake's default Linux generators
+(Makefiles/Ninja) are single-config, so `CMAKE_BUILD_TYPE=Release` must be set at configure time.
+
+This builds VST3 and a Standalone app. VST3 install location is JUCE's own platform default
+(`~/.vst3/TapeRot.vst3`) — TapeRot doesn't override `VST3_COPY_DIR` on Linux.
+
+### Validate
+
+```sh
+./pluginval --strictness-level 8 --validate ~/.vst3/TapeRot.vst3
+```
+
+### Run the unit/DSP tests
+
+```sh
+./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests
 ```
 
 ## What the DSP test suite covers
