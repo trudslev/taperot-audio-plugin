@@ -283,7 +283,7 @@ namespace TapeRotTheme
         constexpr float digitCellFirstX = 682.0f, digitCellY = 41.0f;
         constexpr float resetStubX = 800.0f, resetStubY = 80.0f, resetStubRadius = 5.0f;
 
-        constexpr float lampX = 838.0f, lampY = 58.0f, lampRadius = 8.0f, lampGlowRadius = 20.0f;
+        constexpr float lampX = 838.0f, lampY = 58.0f, lampRadius = 8.0f, lampGlowRadius = 28.0f;
         constexpr float lampSpecularX = 835.5f, lampSpecularY = 55.0f, lampSpecularRadius = 2.2f;
 
         constexpr float sectionLabelY = 180.0f;
@@ -350,6 +350,7 @@ namespace TapeRotTheme
         constexpr float spreadSwitchX = 610.0f;
 
         constexpr float failureDotY = 399.0f, failureDotRadius = 4.0f, failureDotLabelY = 411.0f;
+        constexpr float failureDotGlowRadius = 11.0f;
         constexpr float failureDotFirstX = 592.0f, failureDotSpacing = 28.0f;
 
         struct FailureDotSpec
@@ -388,6 +389,7 @@ namespace TapeRotTheme
         constexpr float genSelectorSegmentW = 14.0f, genSelectorSegmentH = 22.0f, genSelectorGap = 4.0f;
 
         constexpr float auxButtonCentreY = 369.0f, auxButtonRadius = 16.0f; // under INPUT
+        constexpr float auxButtonGlowRadius = 24.0f;
         constexpr float stopButtonX = 36.0f, filterButtonX = 72.0f, failButtonX = 108.0f;
 
         // Shared label row for GEN/LP/RAMP/HP/STP/FLT/FAI (paintNewControlLabels) - must clear the

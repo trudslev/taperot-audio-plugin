@@ -30,7 +30,7 @@ void FailLamp::paint(juce::Graphics& g)
 
     if (displayedLevel > 0.01f)
     {
-        juce::ColourGradient glow(Colour::lampGlowInner.withAlpha(displayedLevel * 0.9f), centre.x, centre.y,
+        juce::ColourGradient glow(Colour::lampGlowInner.withAlpha(displayedLevel), centre.x, centre.y,
                                    Colour::lampGlowInner.withAlpha(0.0f), centre.x + Layout::lampGlowRadius,
                                    centre.y + Layout::lampGlowRadius, true);
         g.setGradientFill(glow);
@@ -38,7 +38,8 @@ void FailLamp::paint(juce::Graphics& g)
                       Layout::lampGlowRadius * 2.0f, Layout::lampGlowRadius * 2.0f);
     }
 
-    const auto bulbColour = Colour::lamp.interpolatedWith(Colour::lampRing, 1.0f - displayedLevel);
+    const auto bulbColour = Colour::lamp.interpolatedWith(Colour::lampRing, 1.0f - displayedLevel)
+                                 .interpolatedWith(Colour::specular, displayedLevel * 0.5f);
     g.setColour(bulbColour);
     g.fillEllipse(centre.x - Layout::lampRadius, centre.y - Layout::lampRadius,
                   Layout::lampRadius * 2.0f, Layout::lampRadius * 2.0f);
