@@ -167,8 +167,12 @@ jobs:
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
+      # Capped at 2 parallel jobs rather than the default (one per core, 4 on this runner) -
+      # JUCE's amalgamated per-module translation units (juce_dsp.cpp, juce_gui_basics.cpp, etc.)
+      # are heavy enough per-TU that building several concurrently OOM-killed cc1plus on this
+      # runner's 16GB with full parallelism.
       - name: Build (VST3/Standalone + tests)
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 2
 
       - name: Run DSP test suite
         run: ./build/Tests/TapeRotTests_artefacts/Release/TapeRotTests
