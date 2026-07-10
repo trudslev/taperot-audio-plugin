@@ -239,6 +239,12 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     genSmoothed.setCurrentAndTargetValue(genParam->load());
     genFloorSnapshot.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, true);
 
+    const int maxDryDelaySamples =
+        (int) std::ceil((double) maxGenerations * WowFlutter::nominalDelayMs * 0.001 * sampleRate);
+    dryCompensationDelay.setMaximumDelayInSamples(juce::jmax(1, maxDryDelaySamples));
+    dryCompensationDelay.prepare(spec);
+    dryCompensationDelay.reset();
+
     transportGateSmoothed.reset(sampleRate, 0.05);
     transportGateSmoothed.setCurrentAndTargetValue(1.0f);
 
@@ -334,6 +340,22 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     toneFilters.process(buffer, lpHz, hpHz);
     tapeStop.process(buffer, stopEnabled, rampSeconds);
     filterSweep.process(buffer, filterAuxEnabled, rampSeconds);
+
+    // Re-time the dry copy to match the wet path's per-stage WowFlutter group delay (see the
+    // dryCompensationDelay member comment in PluginProcessor.h) before MIX blends them.
+    const float perStageDrySamples = (float) (WowFlutter::nominalDelayMs * 0.001 * displaySampleRate);
+    dryCompensationDelay.setDelay(juce::jlimit(0.0f, (float) dryCompensationDelay.getMaximumDelayInSamples(),
+                                                genValue * perStageDrySamples));
+    for (int ch = 0; ch < numChannels; ++ch)
+    {
+        auto* dry = dryBuffer.getWritePointer(ch);
+        for (int i = 0; i < numSamples; ++i)
+        {
+            dryCompensationDelay.pushSample(ch, dry[i]);
+            dry[i] = dryCompensationDelay.popSample(ch);
+        }
+    }
+
     outputStage.process(buffer, dryBuffer, mix01, outputDb);
 
     bool hostIsPlaying = true;

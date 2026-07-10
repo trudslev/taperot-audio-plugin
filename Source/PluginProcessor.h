@@ -4,6 +4,7 @@
 #include "DSP/FactoryPresets.h"
 #include "DSP/Saturator.h"
 #include "DSP/DegradationCore.h"
+#include "DSP/WowFlutter.h"
 #include "DSP/Hum.h"
 #include "DSP/FailureEngine.h"
 #include "DSP/StereoSpread.h"
@@ -146,6 +147,17 @@ private:
     std::atomic<int> scopeWriteIndex{0};
 
     juce::AudioBuffer<float> dryBuffer;
+
+    // Each active GEN cascade stage's WowFlutter centers its pitch-modulation delay line at
+    // WowFlutter::nominalDelayMs even at wow=flutter=0 (it's not an optional effect - the delay
+    // line IS the modulation mechanism), so the wet path always lags the live input by that much
+    // per stage, up to ~200ms at GEN=8. dryBuffer was previously mixed in unshifted, so MIX blended
+    // a live dry sample against a wet sample that was actually up to ~200ms old - this delay line
+    // re-times the dry copy to match, tracking genSmoothed's current (possibly mid-transition)
+    // value each block. It only needs to track the *nominal* per-stage delay, not the wow/flutter
+    // modulation itself - the modulation's own smearing between dry and wet is inherent to the
+    // effect and can't be undone without defeating it.
+    juce::dsp::DelayLine<float> dryCompensationDelay{1};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TapeRotAudioProcessor)
 };
