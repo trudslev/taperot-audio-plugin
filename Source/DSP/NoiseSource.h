@@ -44,7 +44,11 @@ private:
     static constexpr float dustCrackleRatePerSecAtFull = 45.0f;
     static constexpr float dustBigPopProbability = 0.07f;
     static constexpr float dustBigPopMultiplier = 3.2f;
-    static constexpr float dustCrackleImpulseBase = 0.55f;
+    // 25% of the original 0.55 base - crackle pops (especially big ones, at 3.2x this) were
+    // reading as too invasive even though DUST's average RMS was already loudness-matched to
+    // TAPE/VCR (see NoiseSourceTests.cpp) - it's peak/crest-factor invasiveness, not average
+    // loudness, so this scales the transient pop amplitude down rather than DUST's overall level.
+    static constexpr float dustCrackleImpulseBase = 0.1375f;
     static constexpr float dustCrackleFilterHz = 3000.0f;
     static constexpr float dustCrackleFilterQ = 0.7f;
 

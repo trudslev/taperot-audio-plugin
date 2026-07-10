@@ -118,7 +118,7 @@ public:
             }
         }
 
-        beginTest("Loudness roughly matches across characters at 25/50/75% knob positions");
+        beginTest("VCR matches TAPE; DUST is intentionally quieter (crackle toned down) at 25/50/75% knob positions");
         {
             for (float amount : { 0.25f, 0.5f, 0.75f })
             {
@@ -160,11 +160,28 @@ public:
                 for (int character = 1; character < 3; ++character)
                 {
                     const float db = juce::Decibels::gainToDecibels(rmsByCharacter[character]);
+                    const float delta = db - tapeDb;
                     logMessage("amount=" + juce::String(amount) + " character=" + juce::String(character)
-                               + " delta=" + juce::String(db - tapeDb, 2) + " dB");
-                    expect(std::abs(db - tapeDb) < 3.0f,
-                           "Character " + juce::String(character)
-                               + " should be within 3dB of TAPE at amount " + juce::String(amount));
+                               + " delta=" + juce::String(delta, 2) + " dB");
+
+                    if (character == NoiseSource::dust)
+                    {
+                        // DUST's crackle pops (the "invasive" part - see dustCrackleImpulseBase's
+                        // comment in NoiseSource.h) carry ~90% of its total energy, so cutting them
+                        // to ~25% intensity intentionally leaves DUST noticeably quieter than
+                        // TAPE/VCR at the same knob position now - roughly -7.7dB measured. Still
+                        // enforce it isn't louder than TAPE (would defeat the NOISE knob's original
+                        // calibration intent) and hasn't drifted to some other unexpected level.
+                        expect(delta > -10.0f && delta < 3.0f,
+                               "DUST should be quieter than TAPE by a bounded amount (crackle "
+                               "intentionally toned down), not silent and not louder");
+                    }
+                    else
+                    {
+                        expect(std::abs(delta) < 3.0f,
+                               "Character " + juce::String(character)
+                                   + " should be within 3dB of TAPE at amount " + juce::String(amount));
+                    }
                 }
             }
         }
