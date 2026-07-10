@@ -40,7 +40,7 @@ inline constexpr std::array<FactoryPreset, 14> kFactoryPresets{{
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
     {"Warm Cassette", "Just a little warmth",
-     5 /* CASSETTE I */, 15.0f, 20.0f, 7.5f, 10.0f, 0, false, 0.0f, true, true, true, true,
+     5 /* CASSETTE I */, 15.0f, 20.0f, 6.7f, 10.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
     {"Revox Reference", "The cleanest model, barely-there tape warmth",
@@ -52,7 +52,7 @@ inline constexpr std::array<FactoryPreset, 14> kFactoryPresets{{
      true, false, false, false, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
     {"Home Movie Night", "Camcorder pushed further: more failure, hum",
-     4 /* CAMCORDER */, 25.0f, 20.0f, 7.5f, 45.0f, 1 /* VCR */, true, 40.0f,
+     4 /* CAMCORDER */, 25.0f, 20.0f, 6.5f, 23.1f, 1 /* VCR */, true, 40.0f,
      true, false, false, true, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
     {"Answering Machine", "Dictaphone, narrowed band, occasional snag",
@@ -60,15 +60,15 @@ inline constexpr std::array<FactoryPreset, 14> kFactoryPresets{{
      false, true, false, false, 100.0f, 0.0f, false, 1, 4000.0f, 300.0f, 0.3f, false},
 
     {"Bedroom 4-Track", "Cassette II, moderate drive and wow/flutter",
-     6 /* CASSETTE II */, 35.0f, 30.0f, 12.5f, 25.0f, 0 /* TAPE */, false, 0.0f,
+     6 /* CASSETTE II */, 35.0f, 30.0f, 9.2f, 13.4f, 0 /* TAPE */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
     {"Third Generation Dub", "Cassette I, GEN3, decorrelated stereo",
-     5 /* CASSETTE I */, 20.0f, 25.0f, 10.0f, 20.0f, 0 /* TAPE */, false, 35.0f,
+     5 /* CASSETTE I */, 8.8f, 25.0f, 4.5f, 20.0f, 0 /* TAPE */, false, 35.0f,
      true, true, true, true, 100.0f, 0.0f, true, 3, 20000.0f, 20.0f, 0.3f, false},
 
     {"Lo-Fi Beat Tape", "Toy model, dust noise, boxy LP-shaped tone",
-     8 /* TOY */, 45.0f, 30.0f, 12.5f, 30.0f, 2 /* DUST */, false, 0.0f,
+     8 /* TOY */, 5.8f, 8.2f, 5.7f, 30.0f, 2 /* DUST */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 2, 6000.0f, 20.0f, 0.3f, false},
 
     {"Radio Drift", "Toy model, prominent wow, thinned low end",
@@ -76,11 +76,11 @@ inline constexpr std::array<FactoryPreset, 14> kFactoryPresets{{
      true, true, true, true, 100.0f, 0.0f, false, 1, 20000.0f, 250.0f, 0.3f, false},
 
     {"Fifth Gen Fade", "Cassette II, GEN5 - degraded but still musical",
-     6 /* CASSETTE II */, 15.0f, 25.0f, 10.0f, 25.0f, 0 /* TAPE */, false, 15.0f,
-     true, true, false, false, 100.0f, 0.0f, false, 5, 20000.0f, 20.0f, 0.3f, false},
+     6 /* CASSETTE II */, 3.5f, 15.1f, 5.8f, 25.0f, 0 /* TAPE */, false, 15.0f,
+     true, true, false, false, 100.0f, -5.1f, false, 5, 20000.0f, 20.0f, 0.3f, false},
 
     {"Dust and Crackle", "Revox B77, dust noise as the featured element",
-     1 /* REVOX B77 */, 10.0f, 10.0f, 4.0f, 55.0f, 2 /* DUST */, false, 5.0f,
+     1 /* REVOX B77 */, 10.0f, 10.0f, 4.0f, 25.0f, 2 /* DUST */, false, 5.0f,
      true, false, false, false, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
     {"Tape Stop Ready", "Near-clean base, short ramp for a snappy stop",
