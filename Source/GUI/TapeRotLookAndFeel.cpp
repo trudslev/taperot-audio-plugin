@@ -9,6 +9,13 @@ TapeRotLookAndFeel::TapeRotLookAndFeel()
     setColour(juce::ComboBox::backgroundColourId, TapeRotTheme::Colour::dark);
     setColour(juce::ComboBox::textColourId, TapeRotTheme::Colour::cream);
     setColour(juce::Label::textColourId, TapeRotTheme::Colour::ink);
+
+    // Knob drag-value popup (see createKnobSlider's setPopupDisplayEnabled) - BubbleComponent's
+    // own fill/outline plus TooltipWindow::textColourId for its text (that's the colour ID
+    // Slider::PopupDisplayComponent::paintContent actually reads, not a Slider/Label one).
+    setColour(juce::BubbleComponent::backgroundColourId, TapeRotTheme::Colour::dark);
+    setColour(juce::BubbleComponent::outlineColourId, TapeRotTheme::Colour::amber);
+    setColour(juce::TooltipWindow::textColourId, TapeRotTheme::Colour::cream);
 }
 
 int TapeRotLookAndFeel::getTickCountForSlider(const juce::Slider& slider) noexcept

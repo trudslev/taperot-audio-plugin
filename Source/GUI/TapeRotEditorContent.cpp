@@ -18,6 +18,27 @@ namespace
         if (paramID == ParamIDs::output)   return "Output level trim, applied after the dry/wet mix.";
         return nullptr;
     }
+
+    // Knob drag-value popup text (see setPopupDisplayEnabled below). Deliberately not
+    // param->getText(param->convertTo0to1(value), 0): AudioParameterFloat's default getText()
+    // ignores AudioParameterFloatAttributes::withLabel() entirely (that label only feeds
+    // getLabel(), used elsewhere) and, for any continuous (interval == 0) float param - every
+    // knob here except MODEL - falls back to 7 decimal places, so it renders "19.9999981" with no
+    // unit rather than "20.0%". Choice params (MODEL) have no such label and format fine through
+    // getText(), so those are left alone.
+    juce::String formatKnobPopupText(const juce::RangedAudioParameter& param, double value)
+    {
+        const auto label = param.getLabel();
+        if (label.isEmpty())
+            return param.getText(param.convertTo0to1((float) value), 0);
+
+        int decimalPlaces = 1;
+        if (label == "Hz")      decimalPlaces = 0;
+        else if (label == "s")  decimalPlaces = 2;
+
+        const juce::String text(value, decimalPlaces);
+        return label == "%" ? text + label : text + " " + label;
+    }
 }
 
 TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
@@ -68,6 +89,18 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
 
         knobAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
             processorRef.apvts, spec.paramID, *slider);
+
+        // Live value readout while dragging - text goes through the parameter's own getText()
+        // (via RangedAudioParameter::convertTo0to1) so it matches each param's unit/precision
+        // (%, Hz, dB, s, or a MODEL/NOISE choice name) instead of a bare unlabelled number.
+        // parent = this (not nullptr) keeps the popup inside TapeRotEditorContent's transform
+        // hierarchy so PluginEditor::resized()'s uniform scale factor applies to it too, same as
+        // every other on-canvas element - see the GUI scaling note in CLAUDE.md.
+        if (auto* param = processorRef.apvts.getParameter(spec.paramID))
+        {
+            slider->textFromValueFunction = [param](double value) { return formatKnobPopupText(*param, value); };
+            slider->setPopupDisplayEnabled(true, false, this);
+        }
 
         addAndMakeVisible(*slider);
         knobSliders[i] = std::move(slider);
@@ -184,6 +217,13 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
         knob.setTooltip(tooltip);
         addLabelTooltip({x - 16.0f, Layout::stripLabelY - 6.0f, 32.0f, 12.0f}, tooltip);
         attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(processorRef.apvts, paramID, knob);
+
+        if (auto* param = processorRef.apvts.getParameter(paramID))
+        {
+            knob.textFromValueFunction = [param](double value) { return formatKnobPopupText(*param, value); };
+            knob.setPopupDisplayEnabled(true, false, this);
+        }
+
         addAndMakeVisible(knob);
     };
 
