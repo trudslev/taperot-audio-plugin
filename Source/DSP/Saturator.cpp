@@ -127,7 +127,8 @@ void Saturator::process(juce::AudioBuffer<float>& buffer, float driveTarget01)
         {
             const int baseIndex = juce::jmin(numSamples - 1, i * numSamples / overSamples);
             const float driveNorm = driveGainScratch[(size_t) baseIndex];
-            const float driveGain = juce::jmax(1.0e-3f, 1.0f + driveNorm * (maxDriveGain - 1.0f));
+            const float shapedDriveNorm = std::pow(driveNorm, driveCurveExponent);
+            const float driveGain = juce::jmax(1.0e-3f, 1.0f + shapedDriveNorm * (maxDriveGain - 1.0f));
             data[i] = std::tanh(data[i] * driveGain) / std::tanh(driveGain);
         }
     }

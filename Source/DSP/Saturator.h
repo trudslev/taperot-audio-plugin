@@ -16,6 +16,12 @@ private:
     static constexpr float shelfQ = 0.707f;
     static constexpr float maxShelfBoostDb = 18.0f;
     static constexpr float maxDriveGain = 12.0f;
+    // Applied to driveNorm (physical DRIVE/100) only where driveGain is computed, not to
+    // driveGainScratch itself (also used for the dry/wet crossfade further down, which should
+    // stay tied to the raw physical percent). >1 gentles the gain ramp in the low-mid range while
+    // leaving both ends unchanged (driveNorm=0 -> gain=1, driveNorm=1 -> gain=maxDriveGain still)
+    // - keeps the "crazy" top end exactly as crazy, just reached later in the physical range.
+    static constexpr float driveCurveExponent = 2.0f;
     static constexpr int numDriveSteps = 41;
 
     void buildCoefficientCache();
