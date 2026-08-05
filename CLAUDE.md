@@ -13,7 +13,7 @@ platform, no local checkout needed.
 Configure once — macOS:
 
 ```sh
-cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake -B build -G Xcode
 ```
 
 Configure once — Windows:
@@ -49,7 +49,7 @@ Validate plugin formats after building — macOS (AU + VST3):
 
 ```sh
 auval -a | grep -i tapero                    # confirm AU registration + 4-char codes
-auval -v aufx Rota Trot                      # full AU validation
+auval -v aufx Rota Nfdy                      # full AU validation
 
 /Applications/pluginval.app/Contents/MacOS/pluginval \
     --strictness-level 8 \
@@ -118,20 +118,19 @@ Scaling to the actual window size is handled once, centrally: `PluginEditor::res
 
 `design/taperot-interface.svg` is the reference visual mock the theme/layout constants were derived from — check it when adjusting layout numbers or colours. `design/icon/` holds the app icon source (SVG) and exported PNGs at each required size; the plugin/app icon is wired via `ICON_BIG`/`ICON_SMALL` in `CMakeLists.txt` (`juce_add_plugin`), which JUCE turns into a generated `.icns` at build time — don't hand-maintain an `.icns` file.
 
-`DymoLabel` draws the "TAPEROT" nameplate using `design/impact-label/Impact_label_reversed.ttf` (donationware, commercial use confirmed with the author - check license terms before swapping in any other third-party font the same way), embedded as binary data rather than depended on as an installed system font — see Build system below. Its glyphs are placed via `GlyphArrangement` at an explicit baseline computed from actual ink bounds (not `drawText`'s ascent/descent-based centring, which doesn't line up for this hand-drawn display font); the plate itself has intentionally-imperfect "hand-applied label" geometry (rotation, asymmetric hand-cut edges, slight bow, contact shadow) via named `dymo*` constants in `TapeRotTheme.h`.
+`DymoLabel` blits the "TAPEROT" nameplate from a pre-baked transparent PNG (`design/dymo/taperot-dymo@3x.png`) covering the whole plate — hand-applied geometry (rotation, asymmetric hand-cut edges, slight bow, contact shadow) and embossed lettering together. It used to draw all of that live in Impact Label, but that font's vertical metrics are read very differently by each text backend (~0.61x cap-ink through CoreText vs ~1.00x through DirectWrite), which forced a pinned per-backend height constant with an unverified Linux placeholder. Baking on macOS — the reference the design was approved against — makes every platform render identical artwork and removed that whole branch. Every element was static and deterministic (the per-character jitter is keyed on character index, not an RNG), so the bake is lossless. `design/impact-label/` still carries the font, purely so the artwork can be regenerated; it is no longer embedded and is not needed to build. See `Source/GUI/DymoLabel.h` and `design/impact-label/LICENSE.txt`.
 
 ### Build system
 
-`CMakeLists.txt` fetches JUCE via `FetchContent` (pinned to `8.0.14`) and defines one `juce_add_plugin(TapeRot ...)` target. `FORMATS` and `VST3_COPY_DIR`/`AU_COPY_DIR` are set from an `if(APPLE)`/`else()` block (`TAPEROT_FORMATS`/`TAPEROT_EXTRA_ARGS`) — AU only builds on Apple, and the Windows branch leaves the copy dirs unset so JUCE applies its own correct Windows default rather than a macOS path built on `$ENV{HOME}`. `CMAKE_OSX_DEPLOYMENT_TARGET`/`CMAKE_OSX_ARCHITECTURES` are likewise only set `if(APPLE)`. `PLUGIN_MANUFACTURER_CODE` (`Trot`), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID`, and `COMPANY_NAME` are placeholders per BUILDING.md — treat them as effectively permanent once anything is shipped or automated against them, so confirm before changing. `Tests/` is a separate `juce_add_console_app` target that compiles the DSP `.cpp` files directly (not linked against the plugin target) plus its own Catch2-style test files — new DSP `.cpp` files need to be added to both `target_sources(TapeRot ...)` in the root `CMakeLists.txt` and `target_sources(TapeRotTests ...)` in `Tests/CMakeLists.txt` if you want them covered by tests.
+`CMakeLists.txt` fetches JUCE via `FetchContent` (pinned to `8.0.14`) and defines one `juce_add_plugin(TapeRot ...)` target. `FORMATS` and `VST3_COPY_DIR`/`AU_COPY_DIR` are set from an `if(APPLE)`/`else()` block (`TAPEROT_FORMATS`/`TAPEROT_EXTRA_ARGS`) — AU only builds on Apple, and the Windows branch leaves the copy dirs unset so JUCE applies its own correct Windows default rather than a macOS path built on `$ENV{HOME}`. `CMAKE_OSX_DEPLOYMENT_TARGET`/`CMAKE_OSX_ARCHITECTURES` are likewise only set `if(APPLE)`. `PLUGIN_MANUFACTURER_CODE` (`Nfdy`, shared by every Neon Foundry plugin), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID` (`com.neonfoundry.taperot`) and `COMPANY_NAME` (`Neon Foundry`) are settled, not placeholders — changing them again breaks saved projects in both AU and VST3, since JUCE derives the VST3 class ID from the manufacturer and plugin codes together. `Tests/` is a separate `juce_add_console_app` target that compiles the DSP `.cpp` files directly (not linked against the plugin target) plus its own Catch2-style test files — new DSP `.cpp` files need to be added to both `target_sources(TapeRot ...)` in the root `CMakeLists.txt` and `target_sources(TapeRotTests ...)` in `Tests/CMakeLists.txt` if you want them covered by tests.
 
-`juce_add_binary_data(TapeRotBinaryData SOURCES design/impact-label/... design/inter/...)` embeds the Dymo-label and Inter font files as C++ byte arrays (`BinaryData::Impact_label_reversed_ttf`/`..._ttfSize`, `BinaryData::InterRegular_ttf`/`InterBold_ttf` — note JUCE's binary-data name-mangling strips hyphens rather than converting them to underscores, so `Inter-Regular.ttf` becomes `InterRegular_ttf`, not `Inter_Regular_ttf`) rather than loading them from disk at runtime; it's linked into both the `TapeRot` plugin target and `TapeRotTests` (anything that includes `TapeRotTheme.h`, which calls `Typeface::createSystemTypefaceFor` on both, needs the link). New embedded assets go in this same `juce_add_binary_data` call, not as raw `target_sources`.
+`juce_add_binary_data(TapeRotBinaryData SOURCES design/dymo/... design/inter/...)` embeds the baked Dymo nameplate PNG and the Inter font files as C++ byte arrays (`BinaryData::taperotdymo3x_png`, `BinaryData::InterRegular_ttf`/`InterBold_ttf` — note JUCE's binary-data name-mangling strips hyphens rather than converting them to underscores, so `Inter-Regular.ttf` becomes `InterRegular_ttf`, not `Inter_Regular_ttf`) rather than loading them from disk at runtime; it's linked into both the `TapeRot` plugin target and `TapeRotTests` (anything that includes `TapeRotTheme.h`, which calls `Typeface::createSystemTypefaceFor` on both, needs the link). New embedded assets go in this same `juce_add_binary_data` call, not as raw `target_sources`.
 
 ### Platform-specific notes
 
 No exotic macOS APIs exist anywhere in `Source/DSP/` (confirmed by audit — no Objective-C++, no CoreAudio/CoreMIDI/AudioToolbox/Accelerate, no SIMD intrinsics), so the DSP side ports unmodified to both Windows and Linux. The only platform branches anywhere in the codebase are:
 
 - `Source/PluginProcessor.cpp`'s `getUserPresetDirectory()` — `#if JUCE_WINDOWS || JUCE_LINUX` → `<AppData>/<Manufacturer>/<Plugin>/Presets` (JUCE's `userApplicationDataDirectory` resolves this to `%APPDATA%` on Windows and `~/.config` on Linux), else macOS's `~/Library/Audio/Presets/...`.
-- `Source/GUI/TapeRotTheme.h`'s `dymoFont()` — per-backend pinned `withHeight` constant for the Dymo-label typeface (`JUCE_WINDOWS`: `18.0f`, measured against DirectWrite; else `29.4f`, measured against CoreText). The `JUCE_LINUX` branch currently reuses the macOS value as an explicitly-flagged placeholder — Linux renders through FreeType, a third backend, and hasn't been measured on real hardware the way Windows was (see the Windows Dymo-sizing fix in git history for the measurement methodology to repeat here).
 - the `CMakeLists.txt` items above (`if(APPLE)` gating `FORMATS`/copy dirs/deployment target).
 
 Everything else was already cross-platform-correct (icon generation, `createLegalFileName`, JUCE's own MSVC-aware recommended-flags targets) or has no Windows/Linux equivalent by nature (AU).

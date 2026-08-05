@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
-    set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "")
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
 endif()
 
 include(FetchContent)
@@ -22,8 +22,7 @@ FetchContent_MakeAvailable(JUCE)
 
 juce_add_binary_data(TapeRotBinaryData
     SOURCES
-        design/impact-label/Impact_label.ttf
-        design/impact-label/Impact_label_reversed.ttf
+        design/dymo/taperot-dymo@3x.png
         design/inter/Inter-Regular.ttf
         design/inter/Inter-Bold.ttf)
 
@@ -42,11 +41,11 @@ endif()
 
 juce_add_plugin(TapeRot
     PRODUCT_NAME "TapeRot"
-    COMPANY_NAME "TapeRot"
-    BUNDLE_ID "com.taperot.taperot"
+    COMPANY_NAME "Neon Foundry"
+    BUNDLE_ID "com.neonfoundry.taperot"
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-1024.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-256.png"
-    PLUGIN_MANUFACTURER_CODE Trot
+    PLUGIN_MANUFACTURER_CODE Nfdy
     PLUGIN_CODE Rota
     FORMATS ${TAPEROT_FORMATS}
     VST3_CATEGORIES Fx

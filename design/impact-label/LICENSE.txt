@@ -1,0 +1,30 @@
+Impact Label / Impact Label Reversed
+Copyright (c) 2008 Michael Tension (Tension Type). All rights reserved.
+"Impacted" is a trademark of Michael Tension.
+
+Source: https://www.dafont.com/impact-label.font
+
+LICENCE
+-------
+Donationware. The author's terms, as published with the font:
+
+    "For commercial use I request a one-time donation via PayPal
+     (mtension@gmail.com) for whatever amount you feel is fair for the usage.
+     Every bit helps. Cheers."
+
+Commercial use has been confirmed directly with the author for this project.
+
+HOW IT IS USED HERE
+-------------------
+This font is NOT embedded in any shipped binary and is NOT required to build
+TapeRot. It was used once, offline, to render the "TAPEROT" Dymo nameplate to
+design/dymo/taperot-dymo@3x.png, which is what the plugin actually ships.
+
+It is kept in the repository solely so that artwork can be regenerated if the
+nameplate design ever changes. See Source/GUI/DymoLabel.h for the rendering
+history and the reason the live text was baked.
+
+Note that the author's terms address *use* rather than redistribution of the
+font file. If that distinction ever matters — for example if this project stops
+being free and non-commercial — revisit it with the author rather than assuming
+this notice covers it.

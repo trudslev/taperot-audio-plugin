@@ -15,7 +15,7 @@ TapeRot builds on macOS (AU + VST3 + Standalone), Windows (VST3 + Standalone), a
 ### Build
 
 ```sh
-cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake -B build -G Xcode
 cmake --build build --config Release
 ```
 
@@ -30,7 +30,7 @@ This builds AU, VST3, and a Standalone app, and installs the AU/VST3 bundles to:
 
 ```sh
 auval -a | grep -i tapero                    # confirm AU registration + 4-char codes
-auval -v aufx Rota Trot                      # full AU validation
+auval -v aufx Rota Nfdy                      # full AU validation
 
 /Applications/pluginval.app/Contents/MacOS/pluginval \
     --strictness-level 8 \
@@ -125,6 +125,10 @@ Exact-null at `drive = 0`, bounded/finite output at full drive, fixed-delay beha
 
 ## Notes
 
-- `PLUGIN_MANUFACTURER_CODE` (`Trot`), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID` (`com.taperot.taperot`), and `COMPANY_NAME` in `CMakeLists.txt` are placeholders — finalize these before any real release, since they're effectively permanent once shipped or automated against.
+- `PLUGIN_MANUFACTURER_CODE` (`Nfdy`, shared across the suite), `PLUGIN_CODE` (`Rota`), `BUNDLE_ID` (`com.neonfoundry.taperot`), and `COMPANY_NAME` (`Neon Foundry`).
+  These are the shipped, settled values, not placeholders: the vendor identity was
+  unified across the Neon Foundry suite before any versioned release. Changing them again
+  would break saved projects in both AU and VST3, since JUCE derives the VST3 class ID from
+  the manufacturer and plugin codes together.
 - JUCE's free/personal tier splash screen is enabled (no paid license configured).
 - All signal-chain stages have real DSP implemented (drive/saturation, wow & flutter, the 8-model GEN-cascading tape EQ with FADE/CLUNK switching, noise/hum, the failure engine, LP/HP tone shaping, STOP/FILTER/FAIL performance triggers, stereo spread, mix/output). The one intentional placeholder is the REVOX B77 model's EQ curve, deliberately near-transparent pending measured reference data.

@@ -130,51 +130,17 @@ namespace TapeRotTheme
     inline juce::Font modelReadoutFont(float sizePx) { return juce::Font(sansBoldTypeface()).withHeight(sizePx); }
     inline juce::Font dotLabelFont() { return juce::Font(sansRegularTypeface()).withHeight(6.5f); }
 
-    // Impact Label (design/impact-label/, by Michael Tension - commercial use permitted,
-    // donationware), embedded as binary data rather than depending on it being installed as a
-    // system font. Deliberately the "_reversed" variant: the regular one's glyphs are a pre-baked
-    // solid tile with the letter cut out as a negative-space hole (a complete look on its own),
-    // while "_reversed" is plain open letterforms, which is what drawEmbossedGlyph needs to work
-    // with - the font's own rough strokes already read as embossed without any further bevel.
-    inline juce::Font dymoFont()
+    // The Dymo nameplate is a pre-baked transparent PNG, not live type - see DymoLabel's class
+    // comment for why (Impact Label's metrics are read very differently by CoreText, DirectWrite and
+    // FreeType, which used to force a pinned per-backend height here). The font itself is therefore
+    // no longer embedded; design/impact-label/ keeps it only so the artwork can be regenerated.
+    inline const juce::Image& dymoLabelImage()
     {
-        static const juce::Typeface::Ptr typeface =
-            juce::Typeface::createSystemTypefaceFor(BinaryData::Impact_label_reversed_ttf,
-                                                     (size_t) BinaryData::Impact_label_reversed_ttfSize);
-
-        // withHeight()'s nominal "height" maps to a real glyph scale through each backend's own
-        // reading of this hand-drawn font's vertical-metrics tables, and the two disagree sharply.
-        // Measured on real hardware, a cap-only string's ink height comes out as:
-        //   - macOS   (CoreText):    ~0.61x the requested withHeight - so withHeight(29.4) -> 18px
-        //   - Windows (DirectWrite):  ~1.00x, linear (verified at 29.4/35/40/43px)
-        // i.e. the SAME withHeight renders the caps ~1.6x TALLER on Windows than macOS - the
-        // opposite of an earlier assumption that Windows rendered smaller, which led to a bumped-up
-        // 43.0f that came out ~2.4x oversized. macOS is the reference and looks right at 29.4
-        // (18px cap-ink); reproducing that same 18px cap-ink on Windows needs withHeight = 18.0.
-        //
-        // These are pinned constants from a controlled offscreen measurement, deliberately NOT a
-        // runtime probe. Two runtime approaches were tried and both are the wrong tool here:
-        // measuring a software-rendered juce::Image returns zero ink for this font on Windows (JUCE
-        // 8 gives the window a Direct2D peer, but a plain juce::Image is always SoftwarePixelData /
-        // LowLevelGraphicsSoftwareRenderer, and this TTF's outlines don't extract through that
-        // rasteriser); and even a GlyphArrangement probe - correct in an offscreen console test -
-        // can't be trusted to run at a well-defined point in a plugin host's font/graphics
-        // lifecycle. So the value lives here as a constant instead.
-       #if JUCE_WINDOWS
-        constexpr float platformHeight = 18.0f;
-       #elif JUCE_LINUX
-        // UNVERIFIED: Linux renders this TTF through FreeType, a third backend distinct from both
-        // DirectWrite and CoreText above, so there's no reason to assume it agrees with either
-        // measured value. This is a placeholder (macOS's value) pending the same controlled
-        // offscreen ink-bounds measurement done for Windows, done on real Linux hardware - don't
-        // treat it as correct.
-        constexpr float platformHeight = 29.4f;
-       #else
-        constexpr float platformHeight = 29.4f;   // macOS path unchanged
-       #endif
-
-        return juce::Font(typeface).withHeight(platformHeight);
+        static const juce::Image image = juce::ImageFileFormat::loadFrom(
+            BinaryData::taperotdymo3x_png, (size_t) BinaryData::taperotdymo3x_pngSize);
+        return image;
     }
+
     inline juce::Font counterDigitFont() { return juce::FontOptions(monoFontName(), 22.0f, juce::Font::bold); }
     inline juce::Font versionFont() { return juce::Font(sansRegularTypeface()).withHeight(8.0f); }
 
@@ -230,6 +196,12 @@ namespace TapeRotTheme
         constexpr float presetDeleteW = presetSaveW, presetDeleteH = presetSaveH, presetDeleteRadius = presetSaveRadius;
 
         constexpr float dymoX = 32.0f, dymoY = 40.0f, dymoW = 168.0f, dymoH = 34.0f;
+
+        // The baked Dymo label PNG's rect. Generously larger than dymoX/Y/W/H because the plate is
+        // rotated about its own top-left (so its lower-right corner swings well past dymoX+dymoW)
+        // and then carries a blurred contact shadow offset further down-right again. Sized to clear
+        // the rotated corners plus shadow blur and offset with room to spare.
+        constexpr float dymoArtX = 20.0f, dymoArtY = 24.0f, dymoArtW = 200.0f, dymoArtH = 68.0f;
         // A hand-applied Dymo label doesn't sit dead-square on the panel - keep this visibly but
         // subtly off from 0deg (roughly -1.5 to -3deg reads as "manually stuck on" without looking
         // broken).
