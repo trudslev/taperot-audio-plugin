@@ -17,7 +17,7 @@
 AppId={{FB4BE57D-CB56-4F49-A6A1-1CC9C066B110}
 AppName=TapeRot
 AppVersion={#MyAppVersion}
-AppPublisher=TapeRot
+AppPublisher=Neon Foundry
 DefaultDirName={autopf}\TapeRot
 DefaultGroupName=TapeRot
 DisableProgramGroupPage=yes

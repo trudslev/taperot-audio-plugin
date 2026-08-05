@@ -25,10 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure (ad-hoc signing, arm64)
+      - name: Configure (ad-hoc signing, universal arm64+x86_64)
         run: |
           cmake -B build -G Xcode \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE=Manual \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="-" \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=YES \
@@ -69,7 +68,7 @@ jobs:
         run: |
           pkgbuild \
             --root "$STAGE" \
-            --identifier com.taperot.taperot.installer \
+            --identifier com.neonfoundry.installer.taperot \
             --version "${{ steps.version.outputs.version }}" \
             --install-location / \
             "${{ steps.version.outputs.pkg_name }}"
