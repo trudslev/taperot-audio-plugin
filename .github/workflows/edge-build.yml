@@ -64,14 +64,51 @@ jobs:
                 "$STAGE/Library/Audio/Plug-Ins/VST3/"
           echo "STAGE=$STAGE" >> "$GITHUB_ENV"
 
+      # --component-plist with BundleIsRelocatable=NO is not optional here.
+      #
+      # pkgbuild marks .app bundles relocatable by default (pkgbuild --analyze reports
+      # BundleIsRelocatable=true for TapeRot.app and no such key for the .vst3/.component). A
+      # relocatable bundle tells Installer to look up an existing copy through LaunchServices and
+      # install *over that*, rather than at the declared path - so on a machine that already has a
+      # TapeRot.app anywhere (a previous install outside /Applications, or a build tree), the
+      # update silently lands there and /Applications is never written.
+      #
+      # Measured, not assumed: packaging the same payload with and without this plist yields one
+      # <relocate><bundle .../></relocate> entry versus an empty <relocate/>. Note the top-level
+      # relocatable="false" attribute appears in *both* and does not govern the behaviour - the
+      # contents of <relocate> do.
       - name: Build installer package
         run: |
+          set -euo pipefail
+          pkgbuild --analyze --root "$STAGE" components.plist
+          python3 -c "
+          import plistlib
+          path = 'components.plist'
+          with open(path, 'rb') as fh:
+              components = plistlib.load(fh)
+          for component in components:
+              component['BundleIsRelocatable'] = False
+          with open(path, 'wb') as fh:
+              plistlib.dump(components, fh)
+          "
           pkgbuild \
             --root "$STAGE" \
+            --component-plist components.plist \
             --identifier com.neonfoundry.installer.taperot \
             --version "${{ steps.version.outputs.version }}" \
             --install-location / \
             "${{ steps.version.outputs.pkg_name }}"
+
+      - name: Verify the package will not relocate itself
+        run: |
+          set -euo pipefail
+          rm -rf pkgcheck && pkgutil --expand "${{ steps.version.outputs.pkg_name }}" pkgcheck
+          if grep -q "<bundle id=" <(sed -n '/<relocate>/,/<\/relocate>/p' pkgcheck/PackageInfo); then
+            echo "::error::PackageInfo still registers bundles for relocation - this pkg can install into ~/Library instead of /Library."
+            sed -n '/<relocate>/,/<\/relocate>/p' pkgcheck/PackageInfo
+            exit 1
+          fi
+          echo "relocation disabled; package installs to its declared paths"
 
       - name: Upload macOS installer artifact
         uses: actions/upload-artifact@v4
