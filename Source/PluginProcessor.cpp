@@ -41,6 +41,7 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     refreshUserProgramList();
     applyFactoryProgram(kFactoryPrograms[warmCassetteProgramIndex]);
     currentProgramIndex.store((int) warmCassetteProgramIndex, std::memory_order_relaxed);
+    captureProgramSnapshot();
 }
 
 void TapeRotAudioProcessor::handleAsyncUpdate()
@@ -112,6 +113,56 @@ void TapeRotAudioProcessor::refreshUserProgramList()
                [](const juce::File& a, const juce::File& b) { return a.getFileName() < b.getFileName(); });
 }
 
+const juce::StringArray& TapeRotAudioProcessor::snapshotParamIds()
+{
+    // Everything a Program stores. STOP/FILTER/FAIL are deliberately absent - they are momentary
+    // triggers, never saved, so holding one must not make the Program look modified.
+    static const juce::StringArray ids {
+        ParamIDs::drive, ParamIDs::wow, ParamIDs::flutter, ParamIDs::model, ParamIDs::noise,
+        ParamIDs::noiseCharacter, ParamIDs::hum, ParamIDs::failure, ParamIDs::failureDropouts,
+        ParamIDs::failureSnags, ParamIDs::failureCrinkles, ParamIDs::failureImbalance,
+        ParamIDs::mix, ParamIDs::output, ParamIDs::spread, ParamIDs::gen, ParamIDs::lp,
+        ParamIDs::hp, ParamIDs::ramp, ParamIDs::switchMode };
+    return ids;
+}
+
+void TapeRotAudioProcessor::captureProgramSnapshot()
+{
+    const auto& ids = snapshotParamIds();
+    std::vector<float> fresh;
+    fresh.reserve((size_t) ids.size());
+
+    for (const auto& id : ids)
+        if (auto* v = apvts.getRawParameterValue(id))
+            fresh.push_back(v->load(std::memory_order_relaxed));
+        else
+            fresh.push_back(0.0f);
+
+    const juce::SpinLock::ScopedLockType lock(snapshotLock);
+    programSnapshot = std::move(fresh);
+}
+
+bool TapeRotAudioProcessor::isProgramModified() const
+{
+    const auto& ids = snapshotParamIds();
+
+    const juce::SpinLock::ScopedLockType lock(snapshotLock);
+    if (programSnapshot.size() != (size_t) ids.size())
+        return false;                       // nothing captured yet - nothing to compare against
+
+    for (int i = 0; i < ids.size(); ++i)
+        if (auto* v = apvts.getRawParameterValue(ids[i]))
+        {
+            // Physical values, so the tolerance has to suit the widest range here (LP, 1k-20k).
+            // Anything a user can hear moving is far larger than this.
+            const float current = v->load(std::memory_order_relaxed);
+            if (std::abs(current - programSnapshot[(size_t) i]) > 1.0e-3f)
+                return true;
+        }
+
+    return false;
+}
+
 void TapeRotAudioProcessor::applyProgramByIndex(int index)
 {
     if (isFactoryProgram(index))
@@ -140,6 +191,7 @@ void TapeRotAudioProcessor::applyProgramByIndex(int index)
     }
 
     currentProgramIndex.store(index, std::memory_order_relaxed);
+    captureProgramSnapshot();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 }
 
@@ -174,8 +226,13 @@ void TapeRotAudioProcessor::applyFactoryProgram(const FactoryProgram& program)
     *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failAux)) = false;
 }
 
-void TapeRotAudioProcessor::saveUserProgram(const juce::String& name)
+void TapeRotAudioProcessor::saveUserProgram(const juce::String& rawName)
 {
+    // The GUI lets the name be typed, so it can arrive empty or as whitespace. Falling back here
+    // rather than in the caller means every future caller is safe too - an empty name would
+    // otherwise reduce to an empty filename and write a dotfile.
+    const auto name = rawName.trim().isEmpty() ? juce::String("USER PROGRAM") : rawName.trim();
+
     const auto dir = getUserProgramDirectory();
     if (!dir.isDirectory())
         dir.createDirectory();
@@ -469,6 +526,10 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
             currentProgramIndex.store(juce::isPositiveAndBelow(savedProgramIndex, getNumPrograms())
                                            ? savedProgramIndex : (int) warmCassetteProgramIndex,
                                        std::memory_order_relaxed);
+
+            // Snapshot the restored state, not the named Program's definition: reopening a session
+            // should not present as "modified" before the user has touched anything.
+            captureProgramSnapshot();
         }
 }
 

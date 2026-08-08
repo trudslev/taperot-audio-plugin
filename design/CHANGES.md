@@ -1,33 +1,45 @@
-# TapeRot GUI — delta v1.0.6
+# TapeRot GUI — delta v1.0.7
 
-Pointer reach only. Three filmstrips re-exported; **the plate is unchanged** and needs no re-import.
+Program header buttons move out of the plate and into sprites. Knob strips, icons and every other sprite are unchanged.
 
 ## Changed
 
 | File | Size |
 |---|---|
-| `assets/1x/knob_large.png` / `assets/2x/knob_large_2x.png` | 90 × 11520 / 180 × 23040 |
-| `assets/1x/knob_small.png` / `assets/2x/knob_small_2x.png` | 52 × 6656 / 104 × 13312 |
-| `assets/1x/knob_model.png` / `assets/2x/knob_model_2x.png` | 90 × 810 / 180 × 1620 |
-| `TapeRot-GUI-Spec.md` | one line added to §2 |
+| `assets/1x/panel_background.png` / `assets/2x/panel_background_2x.png` | 1336 × 679 / 2672 × 1358 |
+| `assets/1x/btn_save_on.png`, `btn_save_off.png` | 82 × 46 |
+| `assets/1x/btn_delete_on.png`, `btn_delete_off.png` | 82 × 46 |
+| `assets/1x/btn_cancel.png` | 82 × 46 |
+| `assets/2x/…_2x.png` | 164 × 92 |
+| `TapeRot-GUI-Spec.md` | §4 gains a Program header section |
 
-## Longer needle
+## Both frames are now empty in the plate
 
-The needle now runs to **0.462 × cap diameter** from the dial centre, one factor applied to all three strips:
+SAVE and DELETE are gone from the panel bitmap — the header band runs clean through both rects. Nothing else in the header moved: the LCD frame, its divider and chevron, and the IN/OUT meter frames are pixel-identical to v1.0.6.
 
-| Strip | Tip was | Tip now | Cap edge | Reach |
-|---|---|---|---|---|
-| `knob_large`, `knob_model` | r 30.8 | **r 36.0** | r 39.0 | 92 % |
-| `knob_small` | r 15.8 | **r 18.0** | r 20.0 | 90 % |
+| Button | Plate rect (1×) | Sprite top-left (1×) | Sprite |
+|---|---|---|---|
+| SAVE | 897.0, 47.0, 76 × 40 | **894.0, 44.0** | 82 × 46 |
+| DELETE / CANCEL | 983.0, 47.0, 76 × 40 | **980.0, 44.0** | 82 × 46 |
 
-Measured off the exported PNGs, not the source. The gap between tip and the start of the tick arc closes from 11.7 px to 6.5 px on the large caps and from 7.7 px to 5.5 px on the small ones, and the tip now clears the cap's dark ring rather than stopping behind it.
+Sprite top-left includes the 3 px transparent bleed carrying the drop shadow, so they blit with no further offset — same convention as §3.
 
-Inner end, taper, width (3.2 px), corner radius and colour (`#2B251C`) are untouched, as are sweep, frame count, frame size, sheet layout, bleed, cap face artwork and ring weight. Frame 0 is still minimum.
+Your measured rects came out 71.5 × 39.5 at x 899.0 / 985.5; those are the fill inside the 1 px border and the antialiased edge. The figures above are the full border-box, which is what the sprite covers.
 
-### Why the needle and not the tick arc
+## Five sprites
 
-Both close the gap, and the tick arc is the more invasive of the two: moving it inward is a plate re-export, which re-opens the coordinate surface we have just spent three deltas settling, and it would crowd the printed numerals back toward the marks after v1.0.4 spent effort pushing them apart. Extending the needle changes three sprites and nothing else. It also suits the fascia better — the long thin needle against a wide scale is the vintage-meter idiom the panel is drawn in, and a short needle on a broad cap is what made it read as an unmarked knob in the first place.
+| Sprite | State |
+|---|---|
+| `btn_save_on` | SAVE enabled |
+| `btn_save_off` | SAVE disabled |
+| `btn_delete_on` | DELETE enabled |
+| `btn_delete_off` | DELETE disabled |
+| `btn_cancel` | replaces DELETE during name entry |
 
-### On the v1.0.4 sweep re-export
+Enabled and disabled are the two treatments already on the panel, so the header keeps its existing vocabulary: enabled is the raised cream plate — `#EFE6D0 → #DBD0B4`, border `#8E8471`, 1 px white top highlight, `0 2px 3px rgba(0,0,0,.4)` shadow, label `#26221B`; disabled is the recessed dark plate — `#2A2721`, border `#3E382F`, inset top shade, label `#8F8574`. Both are drawn from the same source the plate was, so the enabled sprite lands on the pixels the baked SAVE occupied.
 
-Noted, and it matches what I found from the other end: the ±135° plate and ±135° strips were consistent, and so are today's ±120° pair. Both plates were right; the offset centre made each of them look wrong in a different way. The one thing worth keeping from that round is that `knob_model` has to be re-exported alongside the other two whenever the cap changes — as it was here — because nothing else keeps its nine frames in step.
+The slight difference from the colours you sampled (`#E6DDC5 → #D9CEB2`, ink `#29241C`) is the shadow and the header band showing through the antialiased edge in the composite; the sprite itself carries the source values above.
+
+**CANCEL is neutral**, taking the enabled treatment with different lettering — your instinct was right. It is an escape hatch, and giving it an alert colour would put two loaded buttons side by side and dilute the one that actually destroys something. DELETE stays the only weighted control in the header.
+
+Do not re-import: knob strips, tick placement, LCD divider and chevron, scope legend rows, frame counts, sheet layout, icons.

@@ -55,6 +55,13 @@ public:
     void saveUserProgram(const juce::String& name);
     void deleteUserProgram(int index);
 
+    /** True once any stored parameter differs from the Program that is currently showing, so the
+        GUI can keep SAVE disabled until there is actually something worth saving. The snapshot is
+        retaken whenever a Program is applied or a session is restored, and deliberately ignores
+        the momentary STOP/FILTER/FAIL triggers - those are never part of a Program, so holding one
+        must not light SAVE up. */
+    bool isProgramModified() const;
+
     juce::AudioProcessorValueTreeState apvts;
 
     FailureEngine& getFailureEngine() noexcept { return failureEngine; }
@@ -90,6 +97,17 @@ private:
     void applyFactoryProgram(const FactoryProgram& program);
     void refreshUserProgramList();
     static juce::File getUserProgramDirectory();
+
+    // Taken from the live APVTS right after a Program is applied or a session restored, rather
+    // than reconstructed from the Program's definition - that way there is exactly one description
+    // of what a Program sets, in applyFactoryProgram, and no second copy to drift out of step.
+    void captureProgramSnapshot();
+    static const juce::StringArray& snapshotParamIds();
+    std::vector<float> programSnapshot;
+    // setStateInformation can arrive on any thread; the GUI polls isProgramModified on the message
+    // thread. Contention is near-zero (writes happen on program change only), so a spin lock costs
+    // nothing and never allocates.
+    mutable juce::SpinLock snapshotLock;
 
     std::atomic<int> currentProgramIndex{(int) warmCassetteProgramIndex};
     // Sorted alphabetically by filename (stable across relaunches, unlike mtime-sort). Index i in

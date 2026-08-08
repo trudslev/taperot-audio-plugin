@@ -50,6 +50,11 @@ juce_add_binary_data(TapeRotBinaryData
         design/assets/2x/btn_on_on_2x.png       design/assets/2x/btn_on_off_2x.png
         design/assets/2x/btn_linked_on_2x.png   design/assets/2x/btn_linked_off_2x.png
         design/assets/2x/btn_stereo_on_2x.png   design/assets/2x/btn_stereo_off_2x.png
+        # Program header. The plate leaves both frames empty (delta v1.0.7); these carry every
+        # state, including CANCEL, which replaces DELETE while a Program name is being typed.
+        design/assets/2x/btn_save_on_2x.png     design/assets/2x/btn_save_off_2x.png
+        design/assets/2x/btn_delete_on_2x.png   design/assets/2x/btn_delete_off_2x.png
+        design/assets/2x/btn_cancel_2x.png
         design/assets/2x/gen_seg_on_2x.png      design/assets/2x/gen_seg_off_2x.png
         design/assets/2x/lamp_on_2x.png         # shared: 4 fault dots + 3 FAIL buttons
         design/assets/2x/lamp_off_2x.png

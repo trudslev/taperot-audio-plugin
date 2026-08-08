@@ -95,6 +95,27 @@ Plate 98 × 25 with a 2 px bleed for the drop shadow → sprite **102 × 29**; p
 
 Each group is exclusive-select: exactly one member lit at all times.
 
+### Program header — SAVE / DELETE / CANCEL
+
+Plate 76 × 40, corner radius 4, with a 3 px bleed for the drop shadow → sprite **82 × 46**. Placement below is the sprite's top-left (plate top-left is +3, +3). The plate leaves both frames empty; the sprite carries every state.
+
+| Button | Sprite x | Sprite y |
+|---|---|---|
+| SAVE | 894.0 | 44.0 |
+| DELETE / CANCEL | 980.0 | 44.0 |
+
+| Sprite | State |
+|---|---|
+| `btn_save_on.png` | SAVE enabled |
+| `btn_save_off.png` | SAVE disabled — until a knob has been moved |
+| `btn_delete_on.png` | DELETE enabled — a User Program is selected |
+| `btn_delete_off.png` | DELETE disabled |
+| `btn_cancel.png` | replaces DELETE while a name is being typed |
+
+Enabled: vertical `#EFE6D0 → #DBD0B4`, border `#8E8471`, 1 px white inner top highlight, drop shadow `0 2px 3px rgba(0,0,0,.4)`, label `#26221B`. Disabled: `#2A2721`, border `#3E382F`, inset top shade, label `#8F8574`. Label is Helvetica Bold 11 px, +2.2 px tracking, centred.
+
+CANCEL takes the enabled treatment unchanged — it is an escape hatch, not a destructive action, so it stays neutral and lets DELETE keep the only loaded lettering in the header.
+
 ---
 
 ## 4. Lit / unlit pairs
@@ -201,7 +222,7 @@ LCD behaviour: while a knob is dragged the LCD shows `PARAMETER: value unit` and
 export/
   assets/1x/   panel_background.png
                knob_large.png, knob_small.png, knob_model.png
-               btn_*_on|off.png (18)
+               btn_*_on|off.png (18) + btn_save|delete_on|off.png, btn_cancel.png
                gen_seg_on|off.png
                lamp_on|off|press.png
                led_fail_on|off.png

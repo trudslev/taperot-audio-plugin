@@ -166,6 +166,18 @@ namespace Layout
         8.5px left of centre in its own field. */
     inline constexpr float lcdDivider    = 491.0f;
     inline constexpr float lcdNameInset  =  19.0f;
+
+    /** SAVE and DELETE/CANCEL. Delta v1.0.7 cleared both from the plate and moved every state into
+        sprites, so these are the only header controls drawn rather than baked. Plate is 76 x 40
+        with a 3px shadow bleed, hence an 82 x 46 sprite whose top-left is 3px up and left of the
+        plate's - the same convention as the two-state buttons in spec section 3. */
+    inline constexpr float headerButtonW = 82.0f;
+    inline constexpr float headerButtonH = 46.0f;
+    inline constexpr juce::Point<float> saveSpriteTopLeft   { 894.0f, 44.0f };
+    inline constexpr juce::Point<float> deleteSpriteTopLeft { 980.0f, 44.0f };
+    /** The plate rects, which are the hit areas - the sprite's bleed must not be clickable. */
+    inline const juce::Rectangle<float> saveHitArea   { 897.0f, 47.0f, 76.0f, 40.0f };
+    inline const juce::Rectangle<float> deleteHitArea { 983.0f, 47.0f, 76.0f, 40.0f };
     inline const juce::Rectangle<float> scopeWell   {  43.0f, 158.5f, 1250.0f, 70.0f };
     /** The two legend rows above and below the well. They carry live values - deviation range, wow
         and flutter rates, GEN - so spec section 6 lists them as runtime drawn. The v1.0.1 plate had
@@ -407,6 +419,36 @@ namespace Asset
         static const juce::Image off = load (BinaryData::gen_seg_off_2x_png,
                                              BinaryData::gen_seg_off_2x_pngSize);
         return lit ? on : off;
+    }
+
+    inline const juce::Image& saveButton (bool enabled)
+    {
+        static const juce::Image on  = load (BinaryData::btn_save_on_2x_png,
+                                             BinaryData::btn_save_on_2x_pngSize);
+        static const juce::Image off = load (BinaryData::btn_save_off_2x_png,
+                                             BinaryData::btn_save_off_2x_pngSize);
+        return enabled ? on : off;
+    }
+
+    /** DELETE has three faces: live, dead, and CANCEL while a Program name is being typed. */
+    enum class DeleteFace { enabled, disabled, cancel };
+
+    inline const juce::Image& deleteButton (DeleteFace face)
+    {
+        static const juce::Image on     = load (BinaryData::btn_delete_on_2x_png,
+                                                BinaryData::btn_delete_on_2x_pngSize);
+        static const juce::Image off    = load (BinaryData::btn_delete_off_2x_png,
+                                                BinaryData::btn_delete_off_2x_pngSize);
+        static const juce::Image cancel = load (BinaryData::btn_cancel_2x_png,
+                                                BinaryData::btn_cancel_2x_pngSize);
+
+        switch (face)
+        {
+            case DeleteFace::enabled:  return on;
+            case DeleteFace::cancel:   return cancel;
+            case DeleteFace::disabled:
+            default:                   return off;
+        }
     }
 
     inline const juce::Image& failLed (bool lit)

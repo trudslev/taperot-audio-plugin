@@ -26,6 +26,7 @@ public:
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
+    bool keyPressed(const juce::KeyPress&) override;
 
     /** Spans the canvas to draw the LCD, MODEL readout and IN/OUT numerals, but owns only the
         three clickable header cells. See LampStrip::hitTest for why this matters. */
@@ -40,6 +41,20 @@ private:
     void showProgramMenu();
     juce::String lcdText() const;
     juce::String describe(const juce::String& paramId) const;
+
+    // --- naming a User Program, typed straight into the LCD ------------------------------------
+    // SAVE opens an entry field in the glass rather than saving immediately, so a User Program can
+    // be named. DELETE acts as cancel while it is open, as does Escape; Enter commits. The same
+    // interaction the rest of the suite uses - see Gatecrasher's ProgramHeader.
+    void enterNamingMode();
+    void commitName();
+    void cancelNaming();
+
+    bool namingMode = false;
+    juce::String typedName;
+    /** The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits about
+        27 characters; this leaves room for the caret without the text reaching the chevron. */
+    static constexpr int maxProgramNameLength = 24;
 
     TapeRotAudioProcessor& processorRef;
     juce::String editingParam;

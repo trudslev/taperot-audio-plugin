@@ -5,17 +5,75 @@ using namespace TapeRotTheme;
 
 namespace
 {
-    // SAVE and DELETE are printed on the plate; these are their hit areas, measured off
-    // panel_background_2x.png rather than taken from the spec's prose - the earlier figures were
-    // 5-6px out. The plate draws both states of DELETE, so only the enable test lives here.
-    const juce::Rectangle<float> saveBounds   { 899.0f, 47.0f, 71.5f, 39.5f };
-    const juce::Rectangle<float> deleteBounds { 985.5f, 47.0f, 70.5f, 39.5f };
+    // Hit areas are the plate rects from spec section 4, NOT the sprite rects - the 3px shadow
+    // bleed around each sprite must not be clickable.
+    const auto& saveBounds   = TapeRotTheme::Layout::saveHitArea;
+    const auto& deleteBounds = TapeRotTheme::Layout::deleteHitArea;
 }
 
 ProgramHeader::ProgramHeader(TapeRotAudioProcessor& p) : processorRef(p)
 {
     setBounds(0, 0, (int) Layout::canvasWidth, (int) Layout::canvasHeight);
     setInterceptsMouseClicks(true, false);
+    setWantsKeyboardFocus(true);          // naming a User Program is typed straight into the LCD
+}
+
+void ProgramHeader::enterNamingMode()
+{
+    namingMode = true;
+    typedName.clear();
+    grabKeyboardFocus();
+    repaint();
+}
+
+void ProgramHeader::commitName()
+{
+    // An empty name is handled by the processor's own fallback rather than duplicated here.
+    processorRef.saveUserProgram(typedName);
+
+    namingMode = false;
+    typedName.clear();
+    giveAwayKeyboardFocus();
+    repaint();
+}
+
+void ProgramHeader::cancelNaming()
+{
+    // Must not touch any parameter: knob values tweaked but not yet saved have to survive a
+    // cancel, so leaving the mode is the whole of it.
+    namingMode = false;
+    typedName.clear();
+    giveAwayKeyboardFocus();
+    repaint();
+}
+
+bool ProgramHeader::keyPressed(const juce::KeyPress& key)
+{
+    if (! namingMode)
+        return false;
+
+    if (key.isKeyCode(juce::KeyPress::returnKey))   { commitName();  return true; }
+    if (key.isKeyCode(juce::KeyPress::escapeKey))   { cancelNaming(); return true; }
+
+    if (key.isKeyCode(juce::KeyPress::backspaceKey))
+    {
+        if (typedName.isNotEmpty())
+            typedName = typedName.dropLastCharacters(1);
+        repaint();
+        return true;
+    }
+
+    const juce::juce_wchar c = key.getTextCharacter();
+
+    if (c >= 32 && c != 127 && typedName.length() < maxProgramNameLength)
+    {
+        // Uppercase throughout: the LCD has no lowercase idiom anywhere on this panel.
+        typedName += juce::String::charToString(c).toUpperCase();
+        repaint();
+        return true;
+    }
+
+    return false;
 }
 
 bool ProgramHeader::hitTest(int x, int y)
@@ -37,15 +95,24 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
     if (saveBounds.contains(e.position))
     {
         // SAVE always creates a new Program and never overwrites, so there is no "New" action.
-        processorRef.saveUserProgram(processorRef.getProgramName(processorRef.getCurrentProgram()));
-        repaint();
+        // First press opens the name field; the second commits what was typed, so the button works
+        // for someone who never touches the keyboard beyond typing the name.
+        if (namingMode)
+            commitName();
+        else if (processorRef.isProgramModified())
+            enterNamingMode();
         return;
     }
 
-    if (deleteBounds.contains(e.position)
-        && ! processorRef.isFactoryProgram(processorRef.getCurrentProgram()))
+    if (deleteBounds.contains(e.position))
     {
-        processorRef.deleteUserProgram(processorRef.getCurrentProgram());
+        // While naming, this button IS cancel - it wears the CANCEL sprite, and Escape does the
+        // same thing from the keyboard.
+        if (namingMode)
+            cancelNaming();
+        else if (! processorRef.isFactoryProgram(processorRef.getCurrentProgram()))
+            processorRef.deleteUserProgram(processorRef.getCurrentProgram());
+
         repaint();
     }
 }
@@ -54,10 +121,13 @@ void ProgramHeader::mouseMove(const juce::MouseEvent& e)
 {
     // Position-dependent, so it can't be a one-off setMouseCursor in the constructor: this
     // component spans the whole canvas and only these three cells are clickable.
+    const bool saveLive   = namingMode || processorRef.isProgramModified();
+    const bool deleteLive = namingMode
+                         || ! processorRef.isFactoryProgram(processorRef.getCurrentProgram());
+
     const bool clickable = Layout::programLcd.contains(e.position)
-                        || saveBounds.contains(e.position)
-                        || (deleteBounds.contains(e.position)
-                            && ! processorRef.isFactoryProgram(processorRef.getCurrentProgram()));
+                        || (saveBounds.contains(e.position) && saveLive)
+                        || (deleteBounds.contains(e.position) && deleteLive);
 
     setMouseCursor(clickable ? juce::MouseCursor::PointingHandCursor
                              : juce::MouseCursor::NormalCursor);
@@ -117,6 +187,9 @@ void ProgramHeader::showProgramMenu()
 
 void ProgramHeader::showParameter(const juce::String& paramId)
 {
+    if (namingMode)
+        return;           // the glass belongs to the name field until it is committed or cancelled
+
     stopTimer();
     editingParam = paramId;
     repaint();
@@ -174,11 +247,48 @@ void ProgramHeader::paint(juce::Graphics& g)
     const auto nameArea = glass.withLeft(Layout::lcdDivider + Layout::lcdNameInset)
                                .withRight(Layout::lcdChevron.getX() - 8.0f);
 
-    Text::drawTracked(g, processorRef.isFactoryProgram(index) ? "FACT" : "USER", lcdFont,
+    // Naming always produces a User Program, so the chip says so from the first keystroke.
+    const bool userBank = namingMode || ! processorRef.isFactoryProgram(index);
+
+    Text::drawTracked(g, userBank ? "USER" : "FACT", lcdFont,
                       Layout::lcdTracking, bankArea, juce::Justification::centred, Colour::lcdText);
 
-    Text::drawTracked(g, lcdText(), lcdFont, Layout::lcdTracking, nameArea,
-                      juce::Justification::left, Colour::lcdText);
+    if (namingMode)
+    {
+        // Block caret, 1 s period at 50% duty. The editor repaints this component at 60 Hz for the
+        // meters, so the blink needs no timer of its own.
+        const bool caretOn = (juce::Time::getMillisecondCounter() % 1000) < 500;
+        const auto caret = juce::String::charToString((juce::juce_wchar) 0x2588);   // U+2588
+
+        Text::drawTracked(g, typedName + (caretOn ? caret : juce::String()), lcdFont,
+                          Layout::lcdTracking, nameArea, juce::Justification::left, Colour::lcdText);
+    }
+    else
+    {
+        Text::drawTracked(g, lcdText(), lcdFont, Layout::lcdTracking, nameArea,
+                          juce::Justification::left, Colour::lcdText);
+    }
+
+    // --- SAVE / DELETE / CANCEL -----------------------------------------------------------------
+    // The plate leaves both frames empty as of delta v1.0.7, so every state is a sprite. SAVE stays
+    // dark until a parameter differs from the Program on display, so it never invites a save that
+    // would do nothing; DELETE is live only on a User Program, and becomes CANCEL while a name is
+    // being typed.
+    const auto blitButton = [&g](const juce::Image& img, juce::Point<float> topLeft)
+    {
+        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
+        g.drawImage(img, juce::Rectangle<float>(topLeft.x, topLeft.y,
+                                                Layout::headerButtonW, Layout::headerButtonH));
+    };
+
+    blitButton(Asset::saveButton(namingMode || processorRef.isProgramModified()),
+               Layout::saveSpriteTopLeft);
+
+    blitButton(Asset::deleteButton(namingMode ? Asset::DeleteFace::cancel
+                                   : (processorRef.isFactoryProgram(index)
+                                          ? Asset::DeleteFace::disabled
+                                          : Asset::DeleteFace::enabled)),
+               Layout::deleteSpriteTopLeft);
 
     // --- MODEL readout --------------------------------------------------------------------------
     if (auto* modelParam = processorRef.apvts.getParameter("model"))
