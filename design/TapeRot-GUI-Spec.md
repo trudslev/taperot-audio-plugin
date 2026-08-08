@@ -41,7 +41,9 @@ Two strips cover all ten continuous knobs — the cap art is identical, only the
 - `knob_small.png` — cap ⌀40, frame **52 × 52**, 128 frames → strip **52 × 6656**
 - `knob_model.png` — cap ⌀78, frame **90 × 90**, 9 frames → strip **90 × 810**
 
-Frame index = `round(value01 * 127)`. Pointer sweeps −135° → +135°.
+Frame index = `round(value01 * 127)`. Pointer sweeps **−120° → +120°** (measured from vertical, positive clockwise) — matching the printed scales on the plate.
+
+Rotation is not proportional to value on every control. Five parameters use `rotation01 = ((value − min) / (max − min)) ^ skew`: DRIVE and FLUTTER (skew 0.2), LP and HP (skew 0.3), RAMP (skew 0.4). The remaining continuous controls are linear. The printed ticks are placed under those curves, so the frame index must be derived from `rotation01`, not from the raw value.
 
 | Control | Strip | Frames | Frame | Sprite x | Sprite y | Cap centre |
 |---|---|---|---|---|---|---|
