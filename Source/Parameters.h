@@ -114,7 +114,7 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     // before DRIVE=100. A skew front-loads knob resolution into that useful low range instead.
     // FLUTTER shares the same skew for the same reason - it has no DSP-side curve shaping of its
     // own, but real usage clustered its musically-useful range into roughly the first 10% of a
-    // linear knob (see the flutter-preset values in FactoryPresets.h), same complaint as DRIVE.
+    // linear knob (see the flutter values in FactoryPrograms.h), same complaint as DRIVE.
     //
     // 0.3 (DRIVE's original value) wasn't aggressive enough once musically-useful DRIVE values
     // turned out to sit even lower than the ~30-35% originally assumed above - dropped to 0.2 for

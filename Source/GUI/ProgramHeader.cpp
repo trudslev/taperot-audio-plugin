@@ -22,15 +22,15 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
     if (saveBounds.contains(e.position))
     {
         // SAVE always creates a new Program and never overwrites, so there is no "New" action.
-        processorRef.saveUserPreset(processorRef.getProgramName(processorRef.getCurrentProgram()));
+        processorRef.saveUserProgram(processorRef.getProgramName(processorRef.getCurrentProgram()));
         repaint();
         return;
     }
 
     if (deleteBounds.contains(e.position)
-        && ! processorRef.isFactoryPreset(processorRef.getCurrentProgram()))
+        && ! processorRef.isFactoryProgram(processorRef.getCurrentProgram()))
     {
-        processorRef.deleteUserPreset(processorRef.getCurrentProgram());
+        processorRef.deleteUserProgram(processorRef.getCurrentProgram());
         repaint();
     }
 }
@@ -94,7 +94,7 @@ void ProgramHeader::paint(juce::Graphics& g)
                                .withRight(Layout::lcdChevron.getX() - 8.0f)
                                .reduced(8.0f, 0.0f);
 
-    Text::drawTracked(g, processorRef.isFactoryPreset(index) ? "FACT" : "USER", lcdFont,
+    Text::drawTracked(g, processorRef.isFactoryProgram(index) ? "FACT" : "USER", lcdFont,
                       Layout::lcdTracking, bankArea, juce::Justification::left, Colour::lcdText);
 
     Text::drawTracked(g, lcdText(), lcdFont, Layout::lcdTracking, nameArea,

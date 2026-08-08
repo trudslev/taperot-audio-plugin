@@ -4,10 +4,10 @@
 #include <array>
 
 // A full parameter-state snapshot, one field per APVTS parameter except the three momentary aux
-// triggers (STOP/FILTER/FAIL) - those are deliberately not part of a preset's own state at all;
-// applying any preset always forces them false, so a preset can never load in a "stuck engaged"
+// triggers (STOP/FILTER/FAIL) - those are deliberately not part of a program's own state at all;
+// applying any program always forces them false, so a program can never load in a "stuck engaged"
 // state (see PluginProcessor's applyProgramSnapshot).
-struct FactoryPreset
+struct FactoryProgram
 {
     const char* name;
     const char* description;
@@ -31,10 +31,10 @@ struct FactoryPreset
     bool switchMode; // false = FADE, true = CLUNK
 };
 
-// Ordered per the brief's own list. Values are directionally correct per each preset's
+// Ordered per the brief's own list. Values are directionally correct per each program's
 // description, not yet tuned by ear (that's a deliberate later pass - build, load, listen,
 // adjust - not something to guess precisely up front).
-inline constexpr std::array<FactoryPreset, 14> kFactoryPresets{{
+inline constexpr std::array<FactoryProgram, 14> kFactoryPrograms{{
     {"Init", "Clean pass-through starting point",
      (int) noneModelIndex, 0.0f, 0.0f, 0.0f, 0.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
@@ -92,5 +92,5 @@ inline constexpr std::array<FactoryPreset, 14> kFactoryPresets{{
      true, true, true, true, 100.0f, 0.0f, true, 8, 20000.0f, 20.0f, 0.3f, false},
 }};
 
-constexpr size_t kNumFactoryPresets = kFactoryPresets.size();
+constexpr size_t kNumFactoryPrograms = kFactoryPrograms.size();
 constexpr size_t warmCassetteProgramIndex = 1;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Parameters.h"
-#include "DSP/FactoryPresets.h"
+#include "DSP/FactoryPrograms.h"
 #include "DSP/Saturator.h"
 #include "DSP/DegradationCore.h"
 #include "DSP/PitchDeviationMeter.h"
@@ -47,13 +47,13 @@ public:
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // Factory presets (indices [0, kNumFactoryPresets)) are the read-only, always-present entries
-    // in kFactoryPresets; user presets (indices [kNumFactoryPresets, getNumPrograms())) are files
-    // in getUserPresetDirectory(), sorted alphabetically by filename. "Save" is never in-place for
-    // a factory preset - the GUI's Save always calls saveUserPreset, which creates a new file.
-    bool isFactoryPreset(int index) const noexcept { return index >= 0 && index < (int) kNumFactoryPresets; }
-    void saveUserPreset(const juce::String& name);
-    void deleteUserPreset(int index);
+    // Factory programs (indices [0, kNumFactoryPrograms)) are the read-only, always-present entries
+    // in kFactoryPrograms; user programs (indices [kNumFactoryPrograms, getNumPrograms())) are files
+    // in getUserProgramDirectory(), sorted alphabetically by filename. "Save" is never in-place for
+    // a factory program - the GUI's Save always calls saveUserProgram, which creates a new file.
+    bool isFactoryProgram(int index) const noexcept { return index >= 0 && index < (int) kNumFactoryPrograms; }
+    void saveUserProgram(const juce::String& name);
+    void deleteUserProgram(int index);
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -76,7 +76,7 @@ public:
 
 
 private:
-    // Applying a factory/user preset (see setCurrentProgram) sets every parameter via
+    // Applying a factory/user program (see setCurrentProgram) sets every parameter via
     // setValueNotifyingHost, which is message-thread-only - but a host can call setCurrentProgram
     // itself from a non-message thread (VST3 delivers program-change as an ordinary automatable
     // parameter, which can arrive on the audio/process thread during playback automation). So the
@@ -87,14 +87,14 @@ private:
     std::atomic<int> pendingProgramIndex{-1};
 
     void applyProgramByIndex(int index);
-    void applyFactoryPreset(const FactoryPreset& preset);
-    void refreshUserPresetList();
-    static juce::File getUserPresetDirectory();
+    void applyFactoryProgram(const FactoryProgram& program);
+    void refreshUserProgramList();
+    static juce::File getUserProgramDirectory();
 
     std::atomic<int> currentProgramIndex{(int) warmCassetteProgramIndex};
     // Sorted alphabetically by filename (stable across relaunches, unlike mtime-sort). Index i in
-    // this array is program index kNumFactoryPresets + i.
-    juce::Array<juce::File> userPresetFiles;
+    // this array is program index kNumFactoryPrograms + i.
+    juce::Array<juce::File> userProgramFiles;
 
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* wowParam = nullptr;

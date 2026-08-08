@@ -38,8 +38,8 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     // Boots into Warm Cassette, not Init - construction is single-threaded and has no host/
     // automation attached yet, so applying this synchronously (rather than through the
     // pendingProgramIndex/AsyncUpdater path used by setCurrentProgram) is safe.
-    refreshUserPresetList();
-    applyFactoryPreset(kFactoryPresets[warmCassetteProgramIndex]);
+    refreshUserProgramList();
+    applyFactoryProgram(kFactoryPrograms[warmCassetteProgramIndex]);
     currentProgramIndex.store((int) warmCassetteProgramIndex, std::memory_order_relaxed);
 }
 
@@ -52,7 +52,7 @@ void TapeRotAudioProcessor::handleAsyncUpdate()
 
 int TapeRotAudioProcessor::getNumPrograms()
 {
-    return (int) kNumFactoryPresets + userPresetFiles.size();
+    return (int) kNumFactoryPrograms + userProgramFiles.size();
 }
 
 void TapeRotAudioProcessor::setCurrentProgram(int index)
@@ -65,27 +65,30 @@ void TapeRotAudioProcessor::setCurrentProgram(int index)
 
 const juce::String TapeRotAudioProcessor::getProgramName(int index)
 {
-    if (isFactoryPreset(index))
-        return kFactoryPresets[(size_t) index].name;
+    if (isFactoryProgram(index))
+        return kFactoryPrograms[(size_t) index].name;
 
-    const int userIndex = index - (int) kNumFactoryPresets;
-    if (userIndex >= 0 && userIndex < userPresetFiles.size())
-        return userPresetFiles.getReference(userIndex).getFileNameWithoutExtension();
+    const int userIndex = index - (int) kNumFactoryPrograms;
+    if (userIndex >= 0 && userIndex < userProgramFiles.size())
+        return userProgramFiles.getReference(userIndex).getFileNameWithoutExtension();
     return {};
 }
 
-juce::File TapeRotAudioProcessor::getUserPresetDirectory()
+juce::File TapeRotAudioProcessor::getUserProgramDirectory()
 {
    #if JUCE_WINDOWS || JUCE_LINUX
-    // Windows: %APPDATA%\<Manufacturer>\<Plugin>\Presets. Linux: ~/.config/<Manufacturer>/<Plugin>/Presets
+    // Windows: %APPDATA%\<Manufacturer>\<Plugin>\Programs. Linux: ~/.config/<Manufacturer>/<Plugin>/Programs
     // (JUCE's userApplicationDataDirectory resolves to the right per-OS location on each). Neither
     // platform has an equivalent of macOS's ~/Library/Audio/Presets convention, so both share this
     // common per-vendor AppData/XDG-config layout instead.
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
         .getChildFile(JucePlugin_Manufacturer)
         .getChildFile(JucePlugin_Name)
-        .getChildFile("Presets");
+        .getChildFile("Programs");
    #else
+    // The trailing "Presets" here is Apple's shared convention directory, not our own naming - the
+    // Preset->Program rename stops at our leaf. Renaming it would move saved Programs somewhere no
+    // other tool looks. Gatecrasher resolves this the same way.
     return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
         .getChildFile("Library")
         .getChildFile("Audio")
@@ -95,41 +98,41 @@ juce::File TapeRotAudioProcessor::getUserPresetDirectory()
    #endif
 }
 
-void TapeRotAudioProcessor::refreshUserPresetList()
+void TapeRotAudioProcessor::refreshUserProgramList()
 {
-    userPresetFiles.clear();
-    const auto dir = getUserPresetDirectory();
+    userProgramFiles.clear();
+    const auto dir = getUserProgramDirectory();
     if (!dir.isDirectory())
         return;
 
-    for (const auto& entry : juce::RangedDirectoryIterator(dir, false, "*.taperotpreset"))
-        userPresetFiles.add(entry.getFile());
+    for (const auto& entry : juce::RangedDirectoryIterator(dir, false, "*.taperotprogram"))
+        userProgramFiles.add(entry.getFile());
 
-    std::sort(userPresetFiles.begin(), userPresetFiles.end(),
+    std::sort(userProgramFiles.begin(), userProgramFiles.end(),
                [](const juce::File& a, const juce::File& b) { return a.getFileName() < b.getFileName(); });
 }
 
 void TapeRotAudioProcessor::applyProgramByIndex(int index)
 {
-    if (isFactoryPreset(index))
+    if (isFactoryProgram(index))
     {
-        applyFactoryPreset(kFactoryPresets[(size_t) index]);
+        applyFactoryProgram(kFactoryPrograms[(size_t) index]);
     }
     else
     {
-        const int userIndex = index - (int) kNumFactoryPresets;
-        if (userIndex < 0 || userIndex >= userPresetFiles.size())
+        const int userIndex = index - (int) kNumFactoryPrograms;
+        if (userIndex < 0 || userIndex >= userProgramFiles.size())
             return;
 
-        std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(userPresetFiles.getReference(userIndex)));
+        std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(userProgramFiles.getReference(userIndex)));
         if (xml == nullptr || !xml->hasTagName(apvts.state.getType()))
             return;
 
         LegacyMigration::remapLegacyModelIndexIfNeeded(*xml);
         apvts.replaceState(juce::ValueTree::fromXml(*xml));
 
-        // Momentary triggers are stripped on save (see saveUserPreset) but a hand-edited or
-        // pre-existing file could still have one set - force them off regardless, so a preset can
+        // Momentary triggers are stripped on save (see saveUserProgram) but a hand-edited or
+        // pre-existing file could still have one set - force them off regardless, so a program can
         // never load in a "stuck engaged" state.
         *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::stop)) = false;
         *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::filterAux)) = false;
@@ -140,40 +143,40 @@ void TapeRotAudioProcessor::applyProgramByIndex(int index)
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 }
 
-void TapeRotAudioProcessor::applyFactoryPreset(const FactoryPreset& preset)
+void TapeRotAudioProcessor::applyFactoryProgram(const FactoryProgram& program)
 {
-    *dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(ParamIDs::model)) = preset.modelIndex;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::drive)) = preset.drivePercent;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::wow)) = preset.wowPercent;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::flutter)) = preset.flutterPercent;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::noise)) = preset.noisePercent;
-    *dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(ParamIDs::noiseCharacter)) = preset.noiseCharacter;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::hum)) = preset.hum;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::failure)) = preset.failurePercent;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureDropouts)) = preset.failureDropouts;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureSnags)) = preset.failureSnags;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureCrinkles)) = preset.failureCrinkles;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureImbalance)) = preset.failureImbalance;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::mix)) = preset.mixPercent;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::output)) = preset.outputDb;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::spread)) = preset.spread;
-    *dynamic_cast<juce::AudioParameterInt*>(apvts.getParameter(ParamIDs::gen)) = preset.gen;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::lp)) = preset.lpHz;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::hp)) = preset.hpHz;
-    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::ramp)) = preset.rampSeconds;
-    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::switchMode)) = preset.switchMode;
+    *dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(ParamIDs::model)) = program.modelIndex;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::drive)) = program.drivePercent;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::wow)) = program.wowPercent;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::flutter)) = program.flutterPercent;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::noise)) = program.noisePercent;
+    *dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(ParamIDs::noiseCharacter)) = program.noiseCharacter;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::hum)) = program.hum;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::failure)) = program.failurePercent;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureDropouts)) = program.failureDropouts;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureSnags)) = program.failureSnags;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureCrinkles)) = program.failureCrinkles;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failureImbalance)) = program.failureImbalance;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::mix)) = program.mixPercent;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::output)) = program.outputDb;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::spread)) = program.spread;
+    *dynamic_cast<juce::AudioParameterInt*>(apvts.getParameter(ParamIDs::gen)) = program.gen;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::lp)) = program.lpHz;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::hp)) = program.hpHz;
+    *dynamic_cast<juce::AudioParameterFloat*>(apvts.getParameter(ParamIDs::ramp)) = program.rampSeconds;
+    *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::switchMode)) = program.switchMode;
 
-    // stop/filterAux/failAux are momentary triggers, not part of a preset's own state at all -
+    // stop/filterAux/failAux are momentary triggers, not part of a program's own state at all -
     // always forced false, regardless of what the struct/file might (never should, but might)
-    // contain, so a preset can never load in a "stuck engaged" state.
+    // contain, so a program can never load in a "stuck engaged" state.
     *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::stop)) = false;
     *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::filterAux)) = false;
     *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failAux)) = false;
 }
 
-void TapeRotAudioProcessor::saveUserPreset(const juce::String& name)
+void TapeRotAudioProcessor::saveUserProgram(const juce::String& name)
 {
-    const auto dir = getUserPresetDirectory();
+    const auto dir = getUserProgramDirectory();
     if (!dir.isDirectory())
         dir.createDirectory();
 
@@ -181,8 +184,8 @@ void TapeRotAudioProcessor::saveUserPreset(const juce::String& name)
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     xml->setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
 
-    // Momentary triggers are never part of a saved preset (see applyProgramByIndex/
-    // applyFactoryPreset) - stripped here too so the file on disk doesn't imply otherwise.
+    // Momentary triggers are never part of a saved program (see applyProgramByIndex/
+    // applyFactoryProgram) - stripped here too so the file on disk doesn't imply otherwise.
     for (auto* id : {ParamIDs::stop, ParamIDs::filterAux, ParamIDs::failAux})
         for (int i = xml->getNumChildElements(); --i >= 0;)
         {
@@ -191,27 +194,27 @@ void TapeRotAudioProcessor::saveUserPreset(const juce::String& name)
                 xml->removeChildElement(child, true);
         }
 
-    const juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + ".taperotpreset");
+    const juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + ".taperotprogram");
     xml->writeTo(file);
 
-    refreshUserPresetList();
-    const int newIndex = (int) kNumFactoryPresets + userPresetFiles.indexOf(file);
+    refreshUserProgramList();
+    const int newIndex = (int) kNumFactoryPrograms + userProgramFiles.indexOf(file);
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
     setCurrentProgram(newIndex);
 }
 
-void TapeRotAudioProcessor::deleteUserPreset(int index)
+void TapeRotAudioProcessor::deleteUserProgram(int index)
 {
-    if (isFactoryPreset(index))
+    if (isFactoryProgram(index))
         return;
 
-    const int userIndex = index - (int) kNumFactoryPresets;
-    if (userIndex < 0 || userIndex >= userPresetFiles.size())
+    const int userIndex = index - (int) kNumFactoryPrograms;
+    if (userIndex < 0 || userIndex >= userProgramFiles.size())
         return;
 
     const bool wasCurrent = currentProgramIndex.load(std::memory_order_relaxed) == index;
-    userPresetFiles.getReference(userIndex).deleteFile();
-    refreshUserPresetList();
+    userProgramFiles.getReference(userIndex).deleteFile();
+    refreshUserProgramList();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 
     if (wasCurrent)
@@ -439,8 +442,8 @@ void TapeRotAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     xml->setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
     // Sticky display metadata only - restored clamped/defaulted below, never re-validated against
-    // the session's actual knob values (a session saved after manually tweaking a loaded preset
-    // still remembers which preset name it was tweaked from).
+    // the session's actual knob values (a session saved after manually tweaking a loaded program
+    // still remembers which program name it was tweaked from).
     xml->setAttribute("taperotCurrentProgramIndex", currentProgramIndex.load(std::memory_order_relaxed));
     copyXmlToBinary(*xml, destData);
 }
@@ -454,7 +457,7 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
             // requested just before a session/state restore could still be sitting in
             // pendingProgramIndex, waiting for the message thread's next AsyncUpdater dispatch -
             // and if that dispatch lands *after* this restore returns, it would silently
-            // overwrite the just-restored parameter values with the stale pending preset. A full
+            // overwrite the just-restored parameter values with the stale pending program. A full
             // state restore is always authoritative, so any such pending program change is
             // dropped rather than left to fire later.
             pendingProgramIndex.store(-1, std::memory_order_relaxed);
