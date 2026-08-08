@@ -24,6 +24,7 @@ public:
 
     void paint(juce::Graphics&) override;
     void mouseDown(const juce::MouseEvent&) override;
+    void mouseMove(const juce::MouseEvent&) override;
 
     void showParameter(const juce::String& paramId);
     void releaseParameter();
@@ -31,6 +32,7 @@ public:
 
 private:
     void timerCallback() override;
+    void showProgramMenu();
     juce::String lcdText() const;
     juce::String describe(const juce::String& paramId) const;
 

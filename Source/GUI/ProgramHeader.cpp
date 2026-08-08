@@ -19,6 +19,14 @@ ProgramHeader::ProgramHeader(TapeRotAudioProcessor& p) : processorRef(p)
 
 void ProgramHeader::mouseDown(const juce::MouseEvent& e)
 {
+    // The glass is the selector. The plate prints a dropdown chevron at its right-hand end
+    // (delta v1.0.3), so the whole cell has to be clickable or that chevron is a lie.
+    if (Layout::programLcd.contains(e.position))
+    {
+        showProgramMenu();
+        return;
+    }
+
     if (saveBounds.contains(e.position))
     {
         // SAVE always creates a new Program and never overwrites, so there is no "New" action.
@@ -33,6 +41,64 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
         processorRef.deleteUserProgram(processorRef.getCurrentProgram());
         repaint();
     }
+}
+
+void ProgramHeader::mouseMove(const juce::MouseEvent& e)
+{
+    // Position-dependent, so it can't be a one-off setMouseCursor in the constructor: this
+    // component spans the whole canvas and only these three cells are clickable.
+    const bool clickable = Layout::programLcd.contains(e.position)
+                        || saveBounds.contains(e.position)
+                        || (deleteBounds.contains(e.position)
+                            && ! processorRef.isFactoryProgram(processorRef.getCurrentProgram()));
+
+    setMouseCursor(clickable ? juce::MouseCursor::PointingHandCursor
+                             : juce::MouseCursor::NormalCursor);
+}
+
+void ProgramHeader::showProgramMenu()
+{
+    const int numPrograms = processorRef.getNumPrograms();
+    const int currentIndex = processorRef.getCurrentProgram();
+
+    // Item IDs are index + 1 because PopupMenu reserves 0 for "dismissed without choosing".
+    juce::PopupMenu menu;
+    bool hasUserPrograms = false;
+
+    menu.addSectionHeader("Factory");
+    for (int i = 0; i < numPrograms; ++i)
+    {
+        if (processorRef.isFactoryProgram(i))
+            menu.addItem(i + 1, processorRef.getProgramName(i), true, i == currentIndex);
+        else
+            hasUserPrograms = true;
+    }
+
+    // Second pass rather than one loop building two menus: user Programs always sort after the
+    // factory bank by index, so this keeps the menu in index order with no intermediate submenu.
+    if (hasUserPrograms)
+    {
+        menu.addSeparator();
+        menu.addSectionHeader("User");
+        for (int i = 0; i < numPrograms; ++i)
+            if (! processorRef.isFactoryProgram(i))
+                menu.addItem(i + 1, processorRef.getProgramName(i), true, i == currentIndex);
+    }
+
+    menu.showMenuAsync(juce::PopupMenu::Options()
+                           .withTargetComponent(this)
+                           .withTargetScreenArea(
+                               localAreaToGlobal(Layout::programLcd.getSmallestIntegerContainer())),
+                       [safeThis = juce::Component::SafePointer<ProgramHeader>(this)](int result)
+                       {
+                           if (safeThis == nullptr || result == 0)
+                               return;
+
+                           // setCurrentProgram defers through the processor's AsyncUpdater (a host
+                           // can call it off the message thread), so the repaint has to wait for
+                           // the apply rather than happen here.
+                           safeThis->processorRef.setCurrentProgram(result - 1);
+                       });
 }
 
 void ProgramHeader::showParameter(const juce::String& paramId)
