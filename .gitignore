@@ -6,3 +6,9 @@ cmake-build-*/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
 .DS_Store
+
+# Designer hand-off archives dropped into design/ - the extracted contents are tracked, the
+# archive itself is not. design/ itself must stay tracked: assets/2x, fonts/ and icon/ are
+# build inputs (juce_add_binary_data and ICON_BIG/ICON_SMALL), so an untracked design/ is a
+# repo that does not build.
+design/*.zip
