@@ -61,7 +61,7 @@ Placement is the sprite's top-left. **Dial centre** is the centre of the printed
 | RAMP | `knob_small` | 128 | 52 | 1131.0 | 505.6 | 1157.0, 531.6 |
 | HP | `knob_small` | 128 | 52 | 1231.0 | 505.6 | 1257.0, 531.6 |
 
-Tick arc radius is 46 (large) / 27 (small) from the dial centre.
+Tick arc radius is 46 (large) / 27 (small) from the dial centre. The needle reaches r 36 (large) / 18.5 (small) — 92 % of cap radius — so the eye can carry a straight line from pointer to mark.
 
 > **MODEL is 9 frames, not 8.** The shipped tuning has nine machine positions — NONE, REVOX B77, VCR HIFI, VCR LP, CAMCORDER, CASSETTE I, CASSETTE II, DICTAPHONE, TOY. Frame index = model index (0–8), no interpolation. Say the word if the build wants eight and one gets dropped.
 
