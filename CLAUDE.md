@@ -118,17 +118,38 @@ Scaling is handled once, centrally: `PluginEditor::resized()` computes a single 
 
 Components, all in `Source/GUI/`:
 
-- `KnobFilmstrip` — a `juce::Slider` that paints one frame of a vertical filmstrip. `frame = round(valueToProportionOfLength(value) * (frames-1))`; the strip sweeps -135° to +135°, baked frame by frame. Large caps and small caps are 128 frames; MODEL is 9, indexed directly with no interpolation (NONE plus eight machines — `FilmstripConformanceTests` fails if the strip and `kTapeModels` ever disagree). The sprite is the **cap only**; ticks, numerals and the control's name are in the plate.
+- `KnobFilmstrip` — a `juce::Slider` that paints one frame of a vertical filmstrip. `frame = round(valueToProportionOfLength(value) * (frames-1))`; the strip sweeps **−120° to +120°**, baked frame by frame. Large caps and small caps are 128 frames; MODEL is 9, indexed directly with no interpolation (NONE plus eight machines — `FilmstripConformanceTests` fails if the strip and `kTapeModels` ever disagree). The sprite is the **cap only**; ticks, numerals and the control's name are in the plate.
+
+  Note `valueToProportionOfLength`, not the raw value: five parameters are skewed (DRIVE and FLUTTER 0.2, LP and HP 0.3, RAMP 0.4), so rotation is `((value − min) / (max − min)) ^ skew` and the printed ticks are placed under those curves. Deriving the frame from the raw value would put the needle nowhere near its mark on those five.
+
+  **`Layout::knobs` holds the sprite's top-left, and the dial centre is that + frameSize/2** — y 386.0 for the large row, 531.6 for the small. Those y values were 7.27px lower until delta v1.0.5: the handoff had measured the centre of the whole knob *element* (dial box plus the control name printed under it), so the name dragged it below the tick arc's real centre. Blitting the cap there put the needle's pivot below the arc it sweeps and the tip landed ~7° past the printed end mark, which reads as the knob showing a small negative value at minimum. If the needle ever looks off again, measure the tick arc's centre before suspecting the sweep angle — a wrong centre compresses measured tick angles symmetrically toward vertical and looks exactly like a sweep mismatch.
 - `SpriteButton` — two-state exclusive-select groups (SWITCHING, NOISE BED, HUM, SPREAD). Selecting never toggles off.
 - `LampStrip` — GENERATION segments, the FAULT ACTIVITY dots, the momentary FAIL buttons and the scope's FAIL LED. Drains `FailureEngine::popEvents` on a 30 Hz timer and flashes each dot for 260 ms.
 - `PitchScope` — the trace, grid and both legend rows.
-- `ProgramHeader` — the PROGRAM LCD (bank chip, name, selector menu), SAVE/DELETE, the MODEL readout and the IN/OUT numerals.
+- `ProgramHeader` — the PROGRAM LCD (bank chip, name, selector menu, name entry), SAVE/DELETE/CANCEL, the MODEL readout and the IN/OUT numerals. See **The Program header** below; it carries more behaviour than anything else in the GUI.
+- `ProgramMenuLookAndFeel` — the Program dropdown, painted as an extension of the LCD glass. The menu is the one thing here that can't be a bitmap (its height depends on how many User Programs exist), so it's the only place a JUCE default would otherwise show through.
 
-Several controls deliberately **share** one sprite: `knob_large` serves all seven large knobs, `knob_small` all three small ones, and one lamp serves both the fault dots and the FAIL buttons. The handoff ships those as separate byte-identical files; only one copy of each is embedded (29 sprites, ~9.9 MB, rather than 51 files and 41 MB). `TapeRotTheme.h`'s `Asset` namespace is the role-to-sprite map — if a strip looks "missing", check there before adding a file.
+Several controls deliberately **share** one sprite: `knob_large` serves all seven large knobs, `knob_small` all three small ones, and one lamp serves both the fault dots and the FAIL buttons. The handoff ships those as separate byte-identical files; only one copy of each is embedded (34 sprites, ~9.5 MB, rather than the 50-odd files the bundle contains). `TapeRotTheme.h`'s `Asset` namespace is the role-to-sprite map — if a strip looks "missing", check there before adding a file.
+
+**A full-canvas component must override `hitTest`.** `LampStrip` and `ProgramHeader` both size themselves to the whole canvas so they can draw anywhere on it, and both intercept mouse clicks. `TapeRotEditorContent`'s `toBack()` ordering leaves LampStrip in front of ProgramHeader, so before they were given `hitTest` overrides LampStrip silently swallowed every click on the header and the Program dropdown, SAVE and DELETE were all dead. Each now claims only the pixels it actually handles. Any new overlay component drawn across the panel needs the same treatment.
 
 `design/TapeRot-GUI-Spec.md` is authoritative for coordinates; `design/CHANGES.md` records each delta on top of it, and `design/Handoff Assembly.dc.html` is the reference build (open it straight from `design/`). `design/icon/` holds the icon PNGs; the plugin/app icon is wired via `ICON_BIG`/`ICON_SMALL` in `CMakeLists.txt`, which JUCE turns into a generated `.icns` — don't hand-maintain one. **JUCE builds the `.icns`/`.ico` at *configure* time and the PNGs are not configure dependencies, so after changing icon artwork you must re-run `cmake -B build` or the previous icon ships silently.**
 
 The nameplate is baked rather than drawn live, deliberately. It used to be drawn in ImpactLabel, whose vertical metrics are read very differently by each text backend (~0.61x cap-ink through CoreText vs ~1.00x through DirectWrite), forcing a pinned per-backend height constant with an unverified Linux placeholder. Baking made all three platforms render identical artwork and deleted that branch. The same reasoning is why nothing else on this panel is drawn live either.
+
+### The Program header
+
+Four behaviours share the one LCD, which is why `ProgramHeader` is the busiest component here.
+
+**Selecting.** Clicking the glass opens the Program menu — Factory section, then User if any exist, current one marked with a lit amber pip. Selection goes through `setCurrentProgram`, which defers via the processor's `AsyncUpdater` because a host can call it off the message thread, so the repaint waits for the apply rather than happening in the callback.
+
+**Naming.** SAVE opens an entry field in the glass rather than saving immediately: characters uppercase as they arrive, a block caret (U+2588) blinks at 1 s / 50 % duty, **Enter commits, Escape cancels**, and DELETE wears the CANCEL sprite and does the same. `TapeRotEditorContent` already repaints this component at 60 Hz for the meters, so the caret needs no timer of its own. An empty name falls back to `USER PROGRAM` **inside `saveUserProgram`**, not in the caller, so no future caller can write a dotfile. Cancelling must never touch a parameter — knob values tweaked but not yet saved have to survive it.
+
+**SAVE gating.** `TapeRotAudioProcessor::isProgramModified()` compares the live parameters against a snapshot taken whenever a Program is applied or a session restored, so SAVE stays dark until something has actually moved. Two decisions worth keeping: the snapshot is taken from the **live APVTS**, not rebuilt from the Program's definition, so `applyFactoryProgram` stays the single description of what a Program sets with no second copy to drift; and STOP/FILTER/FAIL are excluded from it, because they're momentary and never saved, so holding one must not light SAVE up. `setStateInformation` can arrive on any thread while the GUI polls on the message thread — hence the spin lock.
+
+**Parameter takeover.** While a control is dragged the LCD shows `PARAMETER: value unit`, reverting 1.1 s after release. Guarded on the control's own drag state, because a `SliderAttachment` also fires when a Program is applied and on every host automation step — without the guard the display latches onto whichever parameter was written last and flickers for the length of a song. It also stands down entirely during naming; the glass belongs to the name field until it commits or cancels.
+
+The three header buttons are sprites, not baked (delta v1.0.7 cleared both frames from the plate). **Their hit areas are the plate rects, not the sprite rects** — the sprites carry a 3 px shadow bleed that must not be clickable.
 
 ### Metering taps
 
