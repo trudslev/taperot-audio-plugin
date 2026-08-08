@@ -1,6 +1,6 @@
-# TapeRot GUI — delta v1.0.2
+# TapeRot GUI — delta v1.0.3
 
-Supersedes the corresponding files in v1.0.1. No sprite, coordinate, frame count or icon changes.
+Supersedes the corresponding files in v1.0.2. Panel bitmap only — no sprite, coordinate, frame count or icon changes, and the scope legend rows stay exactly as v1.0.2 shipped them.
 
 ## Changed
 
@@ -8,23 +8,18 @@ Supersedes the corresponding files in v1.0.1. No sprite, coordinate, frame count
 |---|---|
 | `assets/1x/panel_background.png` | 1336 × 679 |
 | `assets/2x/panel_background_2x.png` | 2672 × 1358 |
-| `Handoff Assembly.dc.html` (+ `support.js`) | reference build |
 
-### Scope strip legends removed from the plate
+### PROGRAM LCD marks moved right
 
-Both legend rows are now blank in the panel bitmap — dark strip fill, bezel and the canvas well between them are pixel-identical to v1.0.1.
+Horizontal only — both marks keep their y, stroke weight, angle, colour and 16 × 16 box.
 
-| Row | Cleared region (1×) | Cleared region (2×) |
-|---|---|---|
-| Top | x 43–1293, y 140–154 | x 86–2586, y 280–308 |
-| Bottom | x 43–1293, y 233–247 | x 86–2586, y 466–494 |
+| Mark | Was (1×) | Now (1×) | Now (2×) |
+|---|---|---|---|
+| Divider rule | x 444 | **x 490.9** | x 981.8 |
+| Chevron ink | x 457.5–468.0 | **x 859.3–870.7** | x 1718.6–1741.4 |
 
-Cleared in full, static words included — `PITCH DEV ·`, `WOW`, `FLUT`, `GEN`, `FAIL` and `500 ms / DIV` are gone along with the numerals. Draw the whole row at runtime per §6: Share Tech Mono 12 px, +1.3 px tracking, `#E3A65A`.
+The chevron's 16 × 16 box now sits at x 857–873, i.e. 14 px in from the frame's inner edge at 887 — the v1.0.1 description applied to the right edge, as intended.
 
-Baselines for the drawn text sit at **y 151** (top row) and **y 244** (bottom row), 1×. Top row: left-aligned from x 43, right-aligned to x 1293. Bottom row: rate string left-aligned from x 43; `GEN n`, then an 18 px gap, then the FAIL LED and its label, right-aligned to x 1293.
+**Root cause, for the record.** Both marks are laid out in flow between the bank chip and the program name. The bake pass blanked the chip's and name's text outright, so those two boxes collapsed to zero width and the divider and chevron slid left with them. The bake now hides that text while preserving each box's width, so every mark bakes at the position the runtime lays out. This was a plate-generation bug, not a design coordinate — which is why the runtime and the plate disagreed by exactly the width of the collapsed text.
 
-The FAIL LED sprite at (1241.9, 230.3) is unchanged and was never part of the plate.
-
-### Reference build paths
-
-`Handoff Assembly.dc.html` now references `assets/…` rather than `export/assets/…`, so it renders straight from the bundle folder. Keep `support.js` beside it.
+No code change on receipt.
