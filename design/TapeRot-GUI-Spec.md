@@ -35,24 +35,27 @@ Empty frames included in the plate (contents drawn at runtime, see §6):
 
 Vertical strips, frame 0 = minimum, last frame = maximum. Frame height = strip width. Sprite is the **cap only** — ticks, numerals, unit and control name are in the panel bitmap.
 
-Large knobs: cap ⌀78, frame **90 × 90**, 128 frames → strip **90 × 11520**.
-Small knobs: cap ⌀40, frame **52 × 52**, 128 frames → strip **52 × 6656**.
+Two strips cover all ten continuous knobs — the cap art is identical, only the panel legend differs.
+
+- `knob_large.png` — cap ⌀78, frame **90 × 90**, 128 frames → strip **90 × 11520**
+- `knob_small.png` — cap ⌀40, frame **52 × 52**, 128 frames → strip **52 × 6656**
+- `knob_model.png` — cap ⌀78, frame **90 × 90**, 9 frames → strip **90 × 810**
 
 Frame index = `round(value01 * 127)`. Pointer sweeps −135° → +135°.
 
-| Control | File (1x / 2x) | Frames | Frame | Sprite x | Sprite y | Cap centre |
+| Control | Strip | Frames | Frame | Sprite x | Sprite y | Cap centre |
 |---|---|---|---|---|---|---|
-| DRIVE | `knob_drive.png` / `knob_drive_2x.png` | 128 | 90 | 50.5 | 348.3 | 95.5, 393.3 |
-| WOW | `knob_wow.png` | 128 | 90 | 205.8 | 348.3 | 250.8, 393.3 |
-| FLUTTER | `knob_flutter.png` | 128 | 90 | 353.8 | 348.3 | 398.8, 393.3 |
-| MODEL | `knob_model.png` | **9** | 90 | 530.5 | 348.3 | 575.5, 393.3 |
-| NOISE | `knob_noise.png` | 128 | 90 | 678.5 | 348.3 | 723.5, 393.3 |
-| FAILURE | `knob_failure.png` | 128 | 90 | 864.3 | 348.3 | 909.3, 393.3 |
-| MIX | `knob_mix.png` | 128 | 90 | 1038 | 348.3 | 1083, 393.3 |
-| OUTPUT | `knob_output.png` | 128 | 90 | 1186 | 348.3 | 1231, 393.3 |
-| LP | `knob_lp.png` | 128 | 52 | 1031 | 512.8 | 1057, 538.8 |
-| RAMP | `knob_ramp.png` | 128 | 52 | 1131 | 512.8 | 1157, 538.8 |
-| HP | `knob_hp.png` | 128 | 52 | 1231 | 512.8 | 1257, 538.8 |
+| DRIVE | `knob_large` | 128 | 90 | 50.5 | 348.3 | 95.5, 393.3 |
+| WOW | `knob_large` | 128 | 90 | 205.8 | 348.3 | 250.8, 393.3 |
+| FLUTTER | `knob_large` | 128 | 90 | 353.8 | 348.3 | 398.8, 393.3 |
+| MODEL | `knob_model` | **9** | 90 | 530.5 | 348.3 | 575.5, 393.3 |
+| NOISE | `knob_large` | 128 | 90 | 678.5 | 348.3 | 723.5, 393.3 |
+| FAILURE | `knob_large` | 128 | 90 | 864.3 | 348.3 | 909.3, 393.3 |
+| MIX | `knob_large` | 128 | 90 | 1038 | 348.3 | 1083, 393.3 |
+| OUTPUT | `knob_large` | 128 | 90 | 1186 | 348.3 | 1231, 393.3 |
+| LP | `knob_small` | 128 | 52 | 1031 | 512.8 | 1057, 538.8 |
+| RAMP | `knob_small` | 128 | 52 | 1131 | 512.8 | 1157, 538.8 |
+| HP | `knob_small` | 128 | 52 | 1231 | 512.8 | 1257, 538.8 |
 
 > **MODEL is 9 frames, not 8.** The shipped tuning has nine machine positions — NONE, REVOX B77, VCR HIFI, VCR LP, CAMCORDER, CASSETTE I, CASSETTE II, DICTAPHONE, TOY. Frame index = model index (0–8), no interpolation. Say the word if the build wants eight and one gets dropped.
 
@@ -100,26 +103,26 @@ Segments 1…GEN are lit; the rest unlit. The 1–8 numerals underneath are prin
 
 ### FAULT ACTIVITY dots
 
-Lamp ⌀22, 6 px bleed → sprite **34 × 34**. Sprite y **567.5**.
+Lamp ⌀22, 6 px bleed → sprite **34 × 34**. Sprite y **567.5**. All four dots use the shared `lamp_on.png` / `lamp_off.png`.
 
-| Dot | Files | Sprite x |
-|---|---|---|
-| DRP | `dot_drp_on.png` / `dot_drp_off.png` | 839.4 |
-| SNG | `dot_sng_on.png` / `_off.png` | 874.4 |
-| CRK | `dot_crk_on.png` / `_off.png` | 909.4 |
-| WBL | `dot_wbl_on.png` / `_off.png` | 944.8 |
+| Dot | Sprite x |
+|---|---|
+| DRP | 839.4 |
+| SNG | 874.4 |
+| CRK | 909.4 |
+| WBL | 944.8 |
 
 Flash duration in the design is 260 ms.
 
 ### FAIL buttons
 
-Same ⌀22 lamp, sprite **34 × 34**, sprite y **490.5**. Momentary: `_press` is held while the pointer is down, `_on` is the lit-but-released frame, `_off` is rest.
+Same shared lamp sprite, **34 × 34**, sprite y **490.5** — `lamp_off.png` / `lamp_on.png` / `lamp_press.png`. Momentary: `lamp_press` while the pointer is down, `lamp_on` lit-but-released, `lamp_off` at rest.
 
-| Button | Files | Sprite x |
-|---|---|---|
-| STP | `fail_stp_off.png` / `_on.png` / `_press.png` | 44.5 |
-| FLT | `fail_flt_off.png` / `_on.png` / `_press.png` | 78.8 |
-| FAI | `fail_fai_off.png` / `_on.png` / `_press.png` | 112.8 |
+| Button | Sprite x |
+|---|---|
+| STP | 44.5 |
+| FLT | 78.8 |
+| FAI | 112.8 |
 
 ### FAIL indicator (scope strip)
 
@@ -190,12 +193,18 @@ LCD behaviour: while a knob is dragged the LCD shows `PARAMETER: value unit` and
 
 ```
 export/
-  assets/1x/   panel_background.png, knob_*.png (11), btn_*_on|off.png (18),
-               gen_seg_on|off.png, dot_*_on|off.png (8), fail_*_off|on|press.png (9),
+  assets/1x/   panel_background.png
+               knob_large.png, knob_small.png, knob_model.png
+               btn_*_on|off.png (18)
+               gen_seg_on|off.png
+               lamp_on|off|press.png
                led_fail_on|off.png
   assets/2x/   same set, _2x suffix, all dimensions doubled
   icon/        taperot_icon_1024.png, _256.png, _32.png, taperot_icon.svg
+  Handoff Assembly.dc.html + support.js
   TapeRot-GUI-Spec.md
 ```
 
-`Handoff Assembly.dc.html` in the project root composites these bitmaps at the coordinates above — use it as the reference build.
+Sprites whose art is identical across controls are shipped once and shared — the two knob strips, the ⌀22 lamp, and the ⌀8 LED. The panel bitmap is what distinguishes one control from another.
+
+Open `Handoff Assembly.dc.html` (in the bundle, beside `support.js`) in any browser: it composites these bitmaps at the coordinates above and is the reference build.

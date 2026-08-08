@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>html,body{margin:0;padding:0;background:#141210;}</style>
+</helmet>
+<div style="min-height:100vh; padding:28px; display:flex; flex-direction:column; gap:24px; font-family:Helvetica,Arial,sans-serif; color:#CCC1A6;">
+
+  <div style="display:flex; flex-direction:column; gap:6px;">
+    <div style="font:700 13px/1 Helvetica,Arial,sans-serif; letter-spacing:3.4px; color:#EFE7D3;">HANDOFF ASSEMBLY CHECK</div>
+    <div style="font:400 12px/1.5 Helvetica,Arial,sans-serif; color:#9A8F79; max-width:900px;">Exported bitmaps composited over the exported panel background at the coordinates in the GUI spec. Nothing here is live — the LCD, MODEL readout, IN/OUT numerals and scope trace are blank because they are drawn at runtime.</div>
+  </div>
+
+  <div style="position:relative; width:1336px; height:679px; flex:none;">
+    <img src="export/assets/1x/panel_background.png" style="position:absolute; left:0; top:0; width:1336px; height:679px;" />
+    <sc-for list="{{ layers }}" as="l" hint-placeholder-count="30">
+      <div style="{{ l.style }}"></div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="font:700 12px/1 Helvetica,Arial,sans-serif; letter-spacing:3px; color:#EFE7D3;">ICON · 32 px CHECK</div>
+    <div style="display:flex; align-items:center; gap:0;">
+      <div style="display:flex; align-items:center; gap:16px; padding:18px 22px; background:#F2EFE8;">
+        <img src="icon/taperot_icon_32.png" style="width:32px; height:32px;" />
+        <img src="icon/taperot_icon_256.png" style="width:64px; height:64px;" />
+        <div style="font:400 11px/1.4 Helvetica,Arial,sans-serif; color:#5F5749;">light browser</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; padding:18px 22px; background:#1B1A18;">
+        <img src="icon/taperot_icon_32.png" style="width:32px; height:32px;" />
+        <img src="icon/taperot_icon_256.png" style="width:64px; height:64px;" />
+        <div style="font:400 11px/1.4 Helvetica,Arial,sans-serif; color:#9A8F79;">dark browser</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:16px; padding:18px 22px; background:#8A8578;">
+        <img src="icon/taperot_icon_32.png" style="width:32px; height:32px;" />
+        <img src="icon/taperot_icon_256.png" style="width:64px; height:64px;" />
+        <div style="font:400 11px/1.4 Helvetica,Arial,sans-serif; color:#F2EFE8;">mid grey</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const P = 'assets/1x/';
+const KNOBS = [
+  ['drive', 95.5, 393.3, 78, 0.52], ['wow', 250.8, 393.3, 78, 0.34],
+  ['flutter', 398.8, 393.3, 78, 0.28], ['noise', 723.5, 393.3, 78, 0.30],
+  ['failure', 909.3, 393.3, 78, 0.26], ['mix', 1083, 393.3, 78, 0.78],
+  ['output', 1231, 393.3, 78, 0.5],
+  ['lp', 1057, 538.8, 40, 0.62], ['ramp', 1157, 538.8, 40, 0.38], ['hp', 1257, 538.8, 40, 0.18]
+];
+const BUTTONS = [
+  ['fade', 484.5, 536.5, true], ['clunk', 484.5, 568, false],
+  ['tape', 600.5, 536.5, true], ['vcr', 600.5, 568, false], ['dust', 600.5, 599.5, false],
+  ['off', 716.5, 536.5, true], ['on', 716.5, 568, false],
+  ['linked', 860.3, 501.5, true], ['stereo', 860.3, 533, false]
+];
+const FAIL = [['stp', 50.5], ['flt', 84.8], ['fai', 118.8]];
+const DOTS = [['drp', 845.4], ['sng', 880.4], ['crk', 915.4], ['wbl', 950.8]];
+
+class Component extends DCLogic {
+  renderVals() {
+    const L = [];
+    const img = (src, x, y, w, h, extra) =>
+      L.push({ style: 'position:absolute; left:' + x + 'px; top:' + y + 'px; width:' + w + 'px; height:' + h + 'px; background-image:url(' + src + '); background-repeat:no-repeat; ' + (extra || '') });
+
+    KNOBS.forEach(([k, cx, cy, D, v]) => {
+      const F = D + 12, i = Math.round(v * 127);
+      img(P + (D === 78 ? 'knob_large.png' : 'knob_small.png'), cx - F / 2, cy - F / 2, F, F, 'background-position:0 -' + (i * F) + 'px;');
+    });
+    // MODEL — 9-frame stepped strip, position 1 (REVOX B77)
+    img(P + 'knob_model.png', 575.5 - 45, 393.3 - 45, 90, 90, 'background-position:0 -90px;');
+
+    BUTTONS.forEach(([n, x, y, on]) => img(P + 'btn_' + n + '_' + (on ? 'on' : 'off') + '.png', x - 2, y - 2, 102, 29));
+    for (let i = 0; i < 8; i++) img(P + 'gen_seg_' + (i < 4 ? 'on' : 'off') + '.png', 227.3 + i * 25 - 3, 496.5 - 3, 26, 23);
+    FAIL.forEach(([n, x]) => img(P + 'lamp_off.png', x - 6, 496.5 - 6, 34, 34));
+    DOTS.forEach(([n, x]) => img(P + 'lamp_off.png', x - 6, 573.5 - 6, 34, 34));
+    img(P + 'led_fail_off.png', 1246.9 - 5, 235.3 - 5, 18, 18);
+    return { layers: L };
+  }
+}
+</script>
+</body>
+</html>

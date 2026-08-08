@@ -25,21 +25,21 @@ FetchContent_Declare(JUCE
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
-# The 2x asset set, DEDUPLICATED: 29 unique sprites, not the 51 files the handoff ships.
+# The 2x asset set - 29 sprites, role-named rather than per-control.
 #
-# All seven large knob strips are byte-identical (the cap is the same; ticks, numerals and the
-# control name live in the plate), as are the three small ones, and the same diameter-22 lamp serves
-# both the FAULT ACTIVITY dots and the FAIL buttons. Embedding every file would cost 41 MB for 10 MB
-# of distinct pixels. Source/GUI/TapeRotTheme.h maps each control to its shared sprite - if a strip
-# here looks "missing", check that map before adding a file.
+# Several controls deliberately share one sprite: knob_large serves all seven large knobs (the cap
+# is identical; ticks, numerals and the control name live in the plate), knob_small serves all
+# three small ones, and one diameter-22 lamp serves both the FAULT ACTIVITY dots and the FAIL
+# buttons. Source/GUI/TapeRotTheme.h maps each control to its sprite - if a strip looks "missing",
+# check that map before adding a file.
 #
 # 2x only, scaled down for smaller windows: the fascia texture is fine enough that a 1:1 blit to a
 # Retina display resolves it to a flat wash.
 juce_add_binary_data(TapeRotBinaryData
     SOURCES
         design/assets/2x/panel_background_2x.png
-        design/assets/2x/knob_drive_2x.png      # large cap, shared by DRIVE/WOW/FLUTTER/NOISE/FAILURE/MIX/OUTPUT
-        design/assets/2x/knob_hp_2x.png         # small cap, shared by LP/RAMP/HP
+        design/assets/2x/knob_large_2x.png      # DRIVE/WOW/FLUTTER/NOISE/FAILURE/MIX/OUTPUT
+        design/assets/2x/knob_small_2x.png      # LP/RAMP/HP
         design/assets/2x/knob_model_2x.png      # 9 frames, one per tape model
         design/assets/2x/btn_fade_on_2x.png     design/assets/2x/btn_fade_off_2x.png
         design/assets/2x/btn_clunk_on_2x.png    design/assets/2x/btn_clunk_off_2x.png
@@ -51,9 +51,9 @@ juce_add_binary_data(TapeRotBinaryData
         design/assets/2x/btn_linked_on_2x.png   design/assets/2x/btn_linked_off_2x.png
         design/assets/2x/btn_stereo_on_2x.png   design/assets/2x/btn_stereo_off_2x.png
         design/assets/2x/gen_seg_on_2x.png      design/assets/2x/gen_seg_off_2x.png
-        design/assets/2x/dot_crk_on_2x.png      # the shared lamp: 4 fault dots + 3 FAIL buttons
-        design/assets/2x/dot_crk_off_2x.png
-        design/assets/2x/fail_fai_press_2x.png  # lamp, held state
+        design/assets/2x/lamp_on_2x.png         # shared: 4 fault dots + 3 FAIL buttons
+        design/assets/2x/lamp_off_2x.png
+        design/assets/2x/lamp_press_2x.png
         design/assets/2x/led_fail_on_2x.png     design/assets/2x/led_fail_off_2x.png
         design/fonts/share-tech-mono/ShareTechMono-Regular.ttf)
 
@@ -107,6 +107,11 @@ target_sources(TapeRot PRIVATE
     Source/DSP/TapeStop.cpp
     Source/DSP/FilterSweep.cpp
     Source/DSP/OutputStage.cpp
+    Source/GUI/KnobFilmstrip.cpp
+    Source/GUI/SpriteButton.cpp
+    Source/GUI/LampStrip.cpp
+    Source/GUI/PitchScope.cpp
+    Source/GUI/ProgramHeader.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC

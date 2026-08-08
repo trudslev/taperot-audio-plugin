@@ -138,7 +138,18 @@ namespace Layout
 
     // --- frames the plate leaves empty, filled at runtime (spec section 1) ------------------
     inline const juce::Rectangle<float> programLcd  { 417.0f,  47.0f, 470.0f, 40.0f };
+    /** The dropdown chevron, baked into the plate (delta v1.0.1 replaced a solid triangle with a
+        stroked one). Nothing draws it, but the program name has to stop short of it or a long User
+        Program name runs underneath. */
+    inline const juce::Rectangle<float> lcdChevron  { 857.0f,  59.0f,  16.0f, 16.0f };
     inline const juce::Rectangle<float> scopeWell   {  43.0f, 158.5f, 1250.0f, 70.0f };
+    /** The two legend rows above and below the well, measured off the plate. They carry live values
+        - deviation range, wow and flutter rates, GEN - and spec section 6 lists them as runtime
+        drawn, so they are drawn here. NOTE: the current plate also has them BAKED IN with the design
+        mock's sample values, so they currently double up. That is an asset defect, not a layout one;
+        these coordinates are where they belong once the plate's legend rows are cleared. */
+    inline const juce::Rectangle<float> scopeLegendTop    { 44.0f, 141.0f, 1246.0f, 12.0f };
+    inline const juce::Rectangle<float> scopeLegendBottom { 44.0f, 234.0f, 1246.0f, 12.0f };
     inline const juce::Rectangle<float> modelReadout{ 508.5f, 476.5f, 134.0f, 27.0f };
     inline const juce::Rectangle<float> inMeter     { 1134.0f, 47.0f,  80.0f, 42.0f };
     inline const juce::Rectangle<float> outMeter    { 1226.0f, 47.0f,  80.0f, 42.0f };
@@ -199,11 +210,25 @@ namespace Layout
     struct ButtonSpec
     {
         const char* paramId;
-        int choiceIndex;
+        int choiceIndex;             // the value this member selects
+        bool isBoolParam;            // bool params take 0/1; noiseCharacter is a 3-way choice
         juce::Point<float> spriteTopLeft;
-        const char* onResource;
-        const char* offResource;
     };
+
+    inline constexpr std::array<ButtonSpec, 9> buttons { {
+        // SWITCHING - switchMode is a bool: false FADE, true CLUNK
+        { "switchMode",     0, true,  { 482.5f, 534.5f } },
+        { "switchMode",     1, true,  { 482.5f, 566.0f } },
+        // NOISE BED - noiseCharacter is a 3-way choice, TAPE/VCR/DUST
+        { "noiseCharacter", 0, false, { 598.5f, 534.5f } },
+        { "noiseCharacter", 1, false, { 598.5f, 566.0f } },
+        { "noiseCharacter", 2, false, { 598.5f, 597.5f } },
+        // HUM - bool: false OFF, true ON
+        { "hum",            0, true,  { 714.5f, 534.5f } },
+        { "hum",            1, true,  { 714.5f, 566.0f } },
+        // SPREAD - bool: false LINKED, true STEREO
+        { "spread",         0, true,  { 858.3f, 499.5f } },
+        { "spread",         1, true,  { 858.3f, 531.0f } } } };
 
     //==========================================================================
     /** GENERATION: 8 segments, 20 x 17 with a 3 px glow bleed, so the sprite is 26 x 23. Two files
@@ -254,6 +279,8 @@ namespace Layout
         guarded on the control's own drag state or the display latches and flickers. */
     inline constexpr int lcdRevertMs = 1100;
 
+    inline constexpr int animationHz = 60;
+
     // --- scope ------------------------------------------------------------------------------
     inline constexpr float scopeTraceThickness = 1.7f;
     inline constexpr float scopeHaloThickness  = 5.0f;
@@ -292,10 +319,10 @@ namespace Asset
 
     inline const juce::Image& capStrip (Layout::Cap c)
     {
-        static const juce::Image large = load (BinaryData::knob_drive_2x_png,
-                                               BinaryData::knob_drive_2x_pngSize);
-        static const juce::Image small = load (BinaryData::knob_hp_2x_png,
-                                               BinaryData::knob_hp_2x_pngSize);
+        static const juce::Image large = load (BinaryData::knob_large_2x_png,
+                                               BinaryData::knob_large_2x_pngSize);
+        static const juce::Image small = load (BinaryData::knob_small_2x_png,
+                                               BinaryData::knob_small_2x_pngSize);
         static const juce::Image model = load (BinaryData::knob_model_2x_png,
                                                BinaryData::knob_model_2x_pngSize);
 
@@ -310,17 +337,17 @@ namespace Asset
 
     inline const juce::Image& lamp (bool lit)
     {
-        static const juce::Image on  = load (BinaryData::dot_crk_on_2x_png,
-                                             BinaryData::dot_crk_on_2x_pngSize);
-        static const juce::Image off = load (BinaryData::dot_crk_off_2x_png,
-                                             BinaryData::dot_crk_off_2x_pngSize);
+        static const juce::Image on  = load (BinaryData::lamp_on_2x_png,
+                                             BinaryData::lamp_on_2x_pngSize);
+        static const juce::Image off = load (BinaryData::lamp_off_2x_png,
+                                             BinaryData::lamp_off_2x_pngSize);
         return lit ? on : off;
     }
 
     inline const juce::Image& lampPressed()
     {
-        static const juce::Image i = load (BinaryData::fail_fai_press_2x_png,
-                                           BinaryData::fail_fai_press_2x_pngSize);
+        static const juce::Image i = load (BinaryData::lamp_press_2x_png,
+                                           BinaryData::lamp_press_2x_pngSize);
         return i;
     }
 
