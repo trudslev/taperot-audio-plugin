@@ -61,11 +61,46 @@ public:
             expectEquals(panel.getHeight(), (int) Layout::canvasHeight * Layout::assetScale);
         }
 
+        beginTest("The scope legend rows are blank on the plate");
+        {
+            // These rows carry live values - the deviation range, the wow and flutter rates, GEN -
+            // so spec section 6 draws them at runtime. The v1.0.1 plate had them baked in as well,
+            // frozen at the mock's sample values, and the two overprinted: "GEN 2 GEN 4" on screen.
+            // Delta v1.0.2 cleared them. Amber ink reappearing in either row means a re-exported
+            // plate has re-baked them and the doubling is back.
+            const auto& panel = Asset::panel();
+            const int s = Layout::assetScale;
+
+            const auto amberPixels = [&] (juce::Rectangle<float> row)
+            {
+                const auto r = (row * (float) s).getSmallestIntegerContainer()
+                                   .getIntersection(panel.getBounds());
+                int count = 0;
+
+                for (int y = r.getY(); y < r.getBottom(); ++y)
+                    for (int x = r.getX(); x < r.getRight(); ++x)
+                    {
+                        const auto p = panel.getPixelAt(x, y);
+                        // #E3A65A against the near-black strip: strongly red-dominant and not dim.
+                        if (p.getRed() > 120 && p.getRed() > p.getBlue() + 40 && p.getGreen() > 60)
+                            ++count;
+                    }
+
+                return count;
+            };
+
+            expectEquals(amberPixels(Layout::scopeLegendTopRow), 0,
+                         "the top legend row is baked into the plate and will double up");
+            expectEquals(amberPixels(Layout::scopeLegendBottomRow), 0,
+                         "the bottom legend row is baked into the plate and will double up");
+        }
+
         beginTest("Every runtime frame sits inside the plate");
         // A frame placed off the edge would simply not draw, with no error anywhere.
         const juce::Rectangle<float> canvas { Layout::canvasWidth, Layout::canvasHeight };
         for (auto r : { Layout::programLcd, Layout::scopeWell, Layout::modelReadout,
-                        Layout::inMeter, Layout::outMeter })
+                        Layout::inMeter, Layout::outMeter,
+                        Layout::scopeLegendTopRow, Layout::scopeLegendBottomRow })
             expect(canvas.contains(r), "a runtime frame falls outside the panel");
 
         beginTest("Every knob sprite sits inside the plate");

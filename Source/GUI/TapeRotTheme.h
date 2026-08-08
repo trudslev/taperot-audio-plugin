@@ -99,6 +99,17 @@ namespace Text
         return w;
     }
 
+    /** Delta v1.0.2 quotes the scope legends by *baseline*, not by box, and juce::Graphics has no
+        baseline-anchored drawText. A box running exactly one ascent above the baseline to one
+        descent below it puts the baseline where it was specified once drawTracked centres the
+        glyphs in it - derived from the font rather than eyeballed against the plate. */
+    inline juce::Rectangle<float> rowAtBaseline (const juce::Font& font, float left, float right,
+                                                 float baselineY)
+    {
+        const float ascent = font.getAscent(), descent = font.getDescent();
+        return { left, baselineY - ascent, right - left, ascent + descent };
+    }
+
     /** juce::Font carries no absolute-pixel letter-spacing, so tracked text is drawn glyph by
         glyph. Every tracking figure in this spec is quoted in px. */
     inline void drawTracked (juce::Graphics& g, const juce::String& text, const juce::Font& font,
@@ -139,17 +150,36 @@ namespace Layout
     // --- frames the plate leaves empty, filled at runtime (spec section 1) ------------------
     inline const juce::Rectangle<float> programLcd  { 417.0f,  47.0f, 470.0f, 40.0f };
     /** The dropdown chevron, baked into the plate (delta v1.0.1 replaced a solid triangle with a
-        stroked one). Nothing draws it, but the program name has to stop short of it or a long User
-        Program name runs underneath. */
+        stroked one, "16x16 box, 14px in from the frame's inner edge"). Nothing draws it, but the
+        program name has to stop short of it or a long User Program name runs underneath.
+
+        This is the RIGHT-hand inner edge: 887 - 14 - 16. The v1.0.2 plate has both the chevron and
+        the bank-chip divider baked at the LEFT instead - chevron ink at x 457.5-468.0, rule at
+        x 444 - where they land on top of the FACT/USER chip (which renders at x 425-466). Confirmed
+        with the designers as an asset defect, so these coordinates stay as the spec describes them
+        and the plate moves to meet them. Do not "correct" this to 457. */
     inline const juce::Rectangle<float> lcdChevron  { 857.0f,  59.0f,  16.0f, 16.0f };
     inline const juce::Rectangle<float> scopeWell   {  43.0f, 158.5f, 1250.0f, 70.0f };
-    /** The two legend rows above and below the well, measured off the plate. They carry live values
-        - deviation range, wow and flutter rates, GEN - and spec section 6 lists them as runtime
-        drawn, so they are drawn here. NOTE: the current plate also has them BAKED IN with the design
-        mock's sample values, so they currently double up. That is an asset defect, not a layout one;
-        these coordinates are where they belong once the plate's legend rows are cleared. */
-    inline const juce::Rectangle<float> scopeLegendTop    { 44.0f, 141.0f, 1246.0f, 12.0f };
-    inline const juce::Rectangle<float> scopeLegendBottom { 44.0f, 234.0f, 1246.0f, 12.0f };
+    /** The two legend rows above and below the well. They carry live values - deviation range, wow
+        and flutter rates, GEN - so spec section 6 lists them as runtime drawn. The v1.0.1 plate had
+        them baked in as well, with the mock's sample values, and the two doubled up; delta v1.0.2
+        cleared both rows from the plate, static words included, and quotes the runtime geometry by
+        BASELINE rather than by box (see Text::rowAtBaseline). */
+    inline constexpr float scopeLegendLeft           =   43.0f;
+    inline constexpr float scopeLegendRight          = 1293.0f;
+    inline constexpr float scopeLegendBaselineTop    =  151.0f;
+    inline constexpr float scopeLegendBaselineBottom =  244.0f;
+
+    /** GEN sits this far left of the FAIL LED sprite; the LED and its label close the row out on
+        the right. Spec: "GEN n, then an 18 px gap, then the FAIL LED and its label". */
+    inline constexpr float scopeGenToLedGap = 18.0f;
+
+    /** The regions v1.0.2 cleared, verbatim. Only used to size the scope component - the text
+        inside them is placed off the baselines above, not off these boxes. */
+    inline const juce::Rectangle<float> scopeLegendTopRow
+        { scopeLegendLeft, 140.0f, scopeLegendRight - scopeLegendLeft, 14.0f };
+    inline const juce::Rectangle<float> scopeLegendBottomRow
+        { scopeLegendLeft, 233.0f, scopeLegendRight - scopeLegendLeft, 14.0f };
     inline const juce::Rectangle<float> modelReadout{ 508.5f, 476.5f, 134.0f, 27.0f };
     inline const juce::Rectangle<float> inMeter     { 1134.0f, 47.0f,  80.0f, 42.0f };
     inline const juce::Rectangle<float> outMeter    { 1226.0f, 47.0f,  80.0f, 42.0f };

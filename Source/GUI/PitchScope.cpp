@@ -15,8 +15,8 @@ PitchScope::PitchScope(TapeRotAudioProcessor& p, const LampStrip& l)
 {
     setInterceptsMouseClicks(false, false);
     // Covers the well AND both legend rows, which sit outside the drawable area on the plate.
-    setBounds(Layout::scopeWell.getUnion(Layout::scopeLegendTop)
-                               .getUnion(Layout::scopeLegendBottom)
+    setBounds(Layout::scopeWell.getUnion(Layout::scopeLegendTopRow)
+                               .getUnion(Layout::scopeLegendBottomRow)
                                .getSmallestIntegerContainer());
     startTimerHz(Layout::animationHz);
 }
@@ -117,13 +117,22 @@ void PitchScope::paint(juce::Graphics& g)
                                             juce::PathStrokeType::curved,
                                             juce::PathStrokeType::rounded));
 
-    // --- margin readouts, in the well's own segment face ----------------------------------------
+    // --- legend rows ----------------------------------------------------------------------------
+    // Both rows are blank on the plate as of delta v1.0.2 - static words included - so the whole
+    // line is drawn here, off the baselines the delta quotes.
     const auto font = Font::of(Layout::scopeLegendSize);
-    const float inset = 6.0f;
-    juce::ignoreUnused(inset);
-    const auto topRow = Layout::scopeLegendTop.translated(-origin.x, -origin.y);
-    const auto bottomRow = Layout::scopeLegendBottom.translated(-origin.x, -origin.y);
     const auto dot = Text::middleDot();
+
+    const auto row = [&] (float baselineY, float left, float right)
+    {
+        return Text::rowAtBaseline(font, left, right, baselineY)
+                   .translated(-origin.x, -origin.y);
+    };
+
+    const auto topRow = row(Layout::scopeLegendBaselineTop,
+                            Layout::scopeLegendLeft, Layout::scopeLegendRight);
+    const auto bottomRow = row(Layout::scopeLegendBaselineBottom,
+                               Layout::scopeLegendLeft, Layout::scopeLegendRight);
 
     Text::drawTracked(g, "PITCH DEV " + dot + " " + juce::String::charToString((juce::juce_wchar) 0x00B1)
                           + juce::String(juce::roundToInt(displayedRangeCents)) + " cents",
@@ -139,9 +148,15 @@ void PitchScope::paint(juce::Graphics& g)
                       font, Layout::scopeLegendTracking, bottomRow,
                       juce::Justification::left, Colour::scopeLegend);
 
-    // GEN sits left of the FAIL lamp, which LampStrip draws over the plate.
-    Text::drawTracked(g, "GEN " + juce::String(juce::roundToInt(processorRef.getGenDisplay()))
-                          + "        FAIL",
-                      font, Layout::scopeLegendTracking, bottomRow,
+    // The row closes with GEN, an 18 px gap, then the FAIL LED and its label. The LED itself is a
+    // sprite LampStrip blits over the plate, so the text is drawn either side of the gap it leaves
+    // rather than as one string with a guessed run of spaces in it.
+    Text::drawTracked(g, "FAIL", font, Layout::scopeLegendTracking, bottomRow,
+                      juce::Justification::right, Colour::scopeLegend);
+
+    Text::drawTracked(g, "GEN " + juce::String(juce::roundToInt(processorRef.getGenDisplay())),
+                      font, Layout::scopeLegendTracking,
+                      row(Layout::scopeLegendBaselineBottom, Layout::scopeLegendLeft,
+                          Layout::failLedTopLeft.x - Layout::scopeGenToLedGap),
                       juce::Justification::right, Colour::scopeLegend);
 }
