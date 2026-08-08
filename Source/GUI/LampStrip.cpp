@@ -32,6 +32,11 @@ int LampStrip::failButtonAt(juce::Point<float> p) const
     return -1;
 }
 
+bool LampStrip::hitTest(int x, int y)
+{
+    return failButtonAt(juce::Point<float>((float) x, (float) y)) >= 0;
+}
+
 void LampStrip::mouseDown(const juce::MouseEvent& e)
 {
     const int hit = failButtonAt(e.position);

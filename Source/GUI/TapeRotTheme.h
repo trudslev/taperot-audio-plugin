@@ -159,6 +159,13 @@ namespace Layout
         with the designers as an asset defect, so these coordinates stay as the spec describes them
         and the plate moves to meet them. Do not "correct" this to 457. */
     inline const juce::Rectangle<float> lcdChevron  { 857.0f,  59.0f,  16.0f, 16.0f };
+
+    /** The baked rule separating the bank chip from the program name, measured off the v1.0.3
+        plate at x 491.0. The chip centres in the glass's left edge to here; the name starts a
+        fixed gap past it. Both were guessed before this rule existed, which left FACT sitting
+        8.5px left of centre in its own field. */
+    inline constexpr float lcdDivider    = 491.0f;
+    inline constexpr float lcdNameInset  =  19.0f;
     inline const juce::Rectangle<float> scopeWell   {  43.0f, 158.5f, 1250.0f, 70.0f };
     /** The two legend rows above and below the well. They carry live values - deviation range, wow
         and flutter rates, GEN - so spec section 6 lists them as runtime drawn. The v1.0.1 plate had

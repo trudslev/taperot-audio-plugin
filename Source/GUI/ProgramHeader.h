@@ -1,6 +1,7 @@
 #pragma once
 
 #include "TapeRotTheme.h"
+#include "ProgramMenuLookAndFeel.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
 class TapeRotAudioProcessor;
@@ -26,6 +27,10 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
 
+    /** Spans the canvas to draw the LCD, MODEL readout and IN/OUT numerals, but owns only the
+        three clickable header cells. See LampStrip::hitTest for why this matters. */
+    bool hitTest(int x, int y) override;
+
     void showParameter(const juce::String& paramId);
     void releaseParameter();
     void refresh() { repaint(); }
@@ -38,6 +43,8 @@ private:
 
     TapeRotAudioProcessor& processorRef;
     juce::String editingParam;
+    /** Outlives showMenuAsync's callback, so it must be a member rather than a local. */
+    ProgramMenuLookAndFeel menuLookAndFeel;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProgramHeader)
 };

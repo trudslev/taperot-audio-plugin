@@ -5,16 +5,23 @@ using namespace TapeRotTheme;
 
 namespace
 {
-    // SAVE and DELETE are printed on the plate; these are their hit areas, taken from the spec's
-    // header layout. The plate draws both states of DELETE, so only the enable test lives here.
-    const juce::Rectangle<float> saveBounds   { 905.0f, 47.0f, 66.0f, 40.0f };
-    const juce::Rectangle<float> deleteBounds { 981.0f, 47.0f, 76.0f, 40.0f };
+    // SAVE and DELETE are printed on the plate; these are their hit areas, measured off
+    // panel_background_2x.png rather than taken from the spec's prose - the earlier figures were
+    // 5-6px out. The plate draws both states of DELETE, so only the enable test lives here.
+    const juce::Rectangle<float> saveBounds   { 899.0f, 47.0f, 71.5f, 39.5f };
+    const juce::Rectangle<float> deleteBounds { 985.5f, 47.0f, 70.5f, 39.5f };
 }
 
 ProgramHeader::ProgramHeader(TapeRotAudioProcessor& p) : processorRef(p)
 {
     setBounds(0, 0, (int) Layout::canvasWidth, (int) Layout::canvasHeight);
     setInterceptsMouseClicks(true, false);
+}
+
+bool ProgramHeader::hitTest(int x, int y)
+{
+    const juce::Point<float> p((float) x, (float) y);
+    return Layout::programLcd.contains(p) || saveBounds.contains(p) || deleteBounds.contains(p);
 }
 
 void ProgramHeader::mouseDown(const juce::MouseEvent& e)
@@ -63,6 +70,7 @@ void ProgramHeader::showProgramMenu()
 
     // Item IDs are index + 1 because PopupMenu reserves 0 for "dismissed without choosing".
     juce::PopupMenu menu;
+    menu.setLookAndFeel(&menuLookAndFeel);
     bool hasUserPrograms = false;
 
     menu.addSectionHeader("Factory");
@@ -85,10 +93,16 @@ void ProgramHeader::showProgramMenu()
                 menu.addItem(i + 1, processorRef.getProgramName(i), true, i == currentIndex);
     }
 
+    // The menu hangs off the LCD and reads as an extension of it, so it takes the glass's width
+    // rather than sizing itself to the longest Program name. localAreaToGlobal already carries the
+    // editor's scale transform, so this stays right at every window size.
+    const auto glassOnScreen = localAreaToGlobal(Layout::programLcd.getSmallestIntegerContainer());
+
     menu.showMenuAsync(juce::PopupMenu::Options()
                            .withTargetComponent(this)
-                           .withTargetScreenArea(
-                               localAreaToGlobal(Layout::programLcd.getSmallestIntegerContainer())),
+                           .withTargetScreenArea(glassOnScreen)
+                           .withMinimumWidth(glassOnScreen.getWidth())
+                           .withMaximumNumColumns(1),
                        [safeThis = juce::Component::SafePointer<ProgramHeader>(this)](int result)
                        {
                            if (safeThis == nullptr || result == 0)
@@ -153,15 +167,15 @@ void ProgramHeader::paint(juce::Graphics& g)
 
     // --- PROGRAM: one glass, with the bank chip as a single field that switches its text --------
     const auto glass = Layout::programLcd;
-    const auto bankArea = glass.withWidth(72.0f).reduced(6.0f, 0.0f);
+    // Both fields are measured off the plate's own divider rather than guessed insets.
+    const auto bankArea = glass.withRight(Layout::lcdDivider);
     // Stops short of the baked dropdown chevron - a long User Program name would otherwise run
     // straight under it.
-    const auto nameArea = glass.withTrimmedLeft(84.0f)
-                               .withRight(Layout::lcdChevron.getX() - 8.0f)
-                               .reduced(8.0f, 0.0f);
+    const auto nameArea = glass.withLeft(Layout::lcdDivider + Layout::lcdNameInset)
+                               .withRight(Layout::lcdChevron.getX() - 8.0f);
 
     Text::drawTracked(g, processorRef.isFactoryProgram(index) ? "FACT" : "USER", lcdFont,
-                      Layout::lcdTracking, bankArea, juce::Justification::left, Colour::lcdText);
+                      Layout::lcdTracking, bankArea, juce::Justification::centred, Colour::lcdText);
 
     Text::drawTracked(g, lcdText(), lcdFont, Layout::lcdTracking, nameArea,
                       juce::Justification::left, Colour::lcdText);

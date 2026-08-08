@@ -29,6 +29,12 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseUp(const juce::MouseEvent&) override;
 
+    /** This component spans the whole canvas so it can draw lamps anywhere on it, but the only
+        thing it OWNS is the three FAIL buttons. Without this it claims every click on the panel -
+        and since it sits in front of ProgramHeader, that silently killed the Program dropdown,
+        SAVE and DELETE. A full-canvas component must only claim the pixels it actually handles. */
+    bool hitTest(int x, int y) override;
+
     bool isAnyFailHeld() const noexcept;
 
 private:
