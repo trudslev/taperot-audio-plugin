@@ -26,6 +26,30 @@ This builds AU, VST3, and a Standalone app, and installs the AU/VST3 bundles to:
 ~/Library/Audio/Plug-Ins/VST3/TapeRot.vst3
 ```
 
+**Build every format, not one target.** `cmake --build build --target TapeRot_Standalone` is tempting
+while iterating on the GUI, but `COPY_PLUGIN_AFTER_BUILD` only fires for targets you actually build —
+so the AU and VST3 in the folders above keep whatever they had, with nothing to say they are old. A
+DAW then shows you a stale plugin while the Standalone shows the new one, which is a genuinely
+confusing thing to debug. If you have been building a single target, build all of them before
+testing in a host, and rescan.
+
+To confirm what a host will actually load rather than trusting a timestamp:
+
+```sh
+# does the installed AU carry the current panel bitmap?
+python3 - <<'EOF'
+au = open('/Users/you/Library/Audio/Plug-Ins/Components/TapeRot.component/Contents/MacOS/TapeRot','rb').read()
+png = open('design/assets/2x/panel_background_2x.png','rb').read()
+print('current assets embedded:', png[len(png)//2:len(png)//2+64] in au)
+EOF
+```
+
+**Icons are generated at *configure* time.** JUCE builds the `.icns`/`.ico` from `ICON_BIG`/`ICON_SMALL`
+when CMake configures, and those PNGs are not configure dependencies — so after changing icon artwork,
+a plain `cmake --build` ships the *previous* icon, byte-identically and silently. Re-run
+`cmake -B build -G Xcode` after any icon change. (BinaryData is different: it *is* a build-time
+dependency, so changing a sprite and rebuilding picks it up correctly.)
+
 ### Validate
 
 ```sh
