@@ -13,7 +13,24 @@ public:
 
     void prepare(const juce::dsp::ProcessSpec& spec);
     void reset();
-    void process(juce::AudioBuffer<float>& buffer, float wowDepth01, float flutterDepth01);
+    // deviationCentsAccum, when non-null, receives this instance's realised pitch deviation in
+    // cents, ADDED to whatever is already there (numSamples floats, caller-owned). Passing null
+    // costs nothing and is what every non-metered call does.
+    //
+    // Pitch deviation is not the modulation value - it is its rate of change. For a delay line the
+    // instantaneous pitch ratio is 1 - d(delay)/dn, so cents = -1200/ln2 * d(delay)/dn. Reading the
+    // modulation itself would just redraw the WOW knob; this measures what the audio actually does.
+    //
+    // Channel 0 only: channel 1 carries channelPhaseOffsetRad, and averaging the two partially
+    // cancels the very deviation a scope exists to show.
+    void process(juce::AudioBuffer<float>& buffer, float wowDepth01, float flutterDepth01,
+                 float* deviationCentsAccum = nullptr);
+
+    // Metering, GUI-thread readable: the rates this instance is actually running at. Both are fixed
+    // per instance (flutter is randomised at construction, wow is scaled by rateMultiplier), so a
+    // plain read is safe - there is nothing to tear.
+    float getWowRateHz() const noexcept { return wowRateHz * wowFlutterRateMultiplier; }
+    float getFlutterRateHz() const noexcept { return channels.empty() ? 0.0f : (float) channels[0].flutterRateHz; }
 
     static constexpr float nominalDelayMs = 25.0f;
 
@@ -38,6 +55,9 @@ private:
         float flutterNoiseLpfState = 0.0f;
         float flutterNoiseHpfState = 0.0f;
         float flutterNoisePrevInput = 0.0f;
+        // Metering only: last block's final delay, so the derivative is continuous across
+        // block boundaries instead of showing a spurious spike on the first sample.
+        float previousDelaySamples = 0.0f;
         juce::Random random;
     };
 

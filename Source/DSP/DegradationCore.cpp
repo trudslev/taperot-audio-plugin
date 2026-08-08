@@ -31,9 +31,9 @@ void DegradationCore::reset()
 }
 
 void DegradationCore::process(juce::AudioBuffer<float>& buffer, float wow01, float flutter01, int model, bool clunkMode,
-                               float noiseAmount01, int noiseCharacter)
+                               float noiseAmount01, int noiseCharacter, float* deviationCentsAccum)
 {
-    wowFlutter.process(buffer, wow01, flutter01);
+    wowFlutter.process(buffer, wow01, flutter01, deviationCentsAccum);
     tapeModelEQ.process(buffer, model, clunkMode);
 
     if (applySaturation)

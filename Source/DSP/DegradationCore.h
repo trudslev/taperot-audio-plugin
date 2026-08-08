@@ -20,8 +20,10 @@ public:
 
     void prepare(const juce::dsp::ProcessSpec& spec);
     void reset();
+    // deviationCentsAccum is passed straight through to WowFlutter - see its comment. Null for any
+    // stage whose modulation should not reach the scope.
     void process(juce::AudioBuffer<float>& buffer, float wow01, float flutter01, int model, bool clunkMode,
-                 float noiseAmount01, int noiseCharacter);
+                 float noiseAmount01, int noiseCharacter, float* deviationCentsAccum = nullptr);
 
 private:
     static constexpr float wowFlutterDetunePerStage = 0.013f;
@@ -29,6 +31,13 @@ private:
 
     bool applySaturation;
     WowFlutter wowFlutter;
+
+public:
+    // Metering passthrough for the scope's rate readouts. Fixed per instance, so a plain read.
+    float getWowRateHz() const noexcept { return wowFlutter.getWowRateHz(); }
+    float getFlutterRateHz() const noexcept { return wowFlutter.getFlutterRateHz(); }
+
+private:
     TapeModelEQ tapeModelEQ;
     NoiseSource noiseSource;
 };

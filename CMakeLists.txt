@@ -25,11 +25,37 @@ FetchContent_Declare(JUCE
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
+# The 2x asset set, DEDUPLICATED: 29 unique sprites, not the 51 files the handoff ships.
+#
+# All seven large knob strips are byte-identical (the cap is the same; ticks, numerals and the
+# control name live in the plate), as are the three small ones, and the same diameter-22 lamp serves
+# both the FAULT ACTIVITY dots and the FAIL buttons. Embedding every file would cost 41 MB for 10 MB
+# of distinct pixels. Source/GUI/TapeRotTheme.h maps each control to its shared sprite - if a strip
+# here looks "missing", check that map before adding a file.
+#
+# 2x only, scaled down for smaller windows: the fascia texture is fine enough that a 1:1 blit to a
+# Retina display resolves it to a flat wash.
 juce_add_binary_data(TapeRotBinaryData
     SOURCES
-        design/dymo/taperot-dymo@3x.png
-        design/inter/Inter-Regular.ttf
-        design/inter/Inter-Bold.ttf)
+        design/assets/2x/panel_background_2x.png
+        design/assets/2x/knob_drive_2x.png      # large cap, shared by DRIVE/WOW/FLUTTER/NOISE/FAILURE/MIX/OUTPUT
+        design/assets/2x/knob_hp_2x.png         # small cap, shared by LP/RAMP/HP
+        design/assets/2x/knob_model_2x.png      # 9 frames, one per tape model
+        design/assets/2x/btn_fade_on_2x.png     design/assets/2x/btn_fade_off_2x.png
+        design/assets/2x/btn_clunk_on_2x.png    design/assets/2x/btn_clunk_off_2x.png
+        design/assets/2x/btn_tape_on_2x.png     design/assets/2x/btn_tape_off_2x.png
+        design/assets/2x/btn_vcr_on_2x.png      design/assets/2x/btn_vcr_off_2x.png
+        design/assets/2x/btn_dust_on_2x.png     design/assets/2x/btn_dust_off_2x.png
+        design/assets/2x/btn_off_on_2x.png      design/assets/2x/btn_off_off_2x.png
+        design/assets/2x/btn_on_on_2x.png       design/assets/2x/btn_on_off_2x.png
+        design/assets/2x/btn_linked_on_2x.png   design/assets/2x/btn_linked_off_2x.png
+        design/assets/2x/btn_stereo_on_2x.png   design/assets/2x/btn_stereo_off_2x.png
+        design/assets/2x/gen_seg_on_2x.png      design/assets/2x/gen_seg_off_2x.png
+        design/assets/2x/dot_crk_on_2x.png      # the shared lamp: 4 fault dots + 3 FAIL buttons
+        design/assets/2x/dot_crk_off_2x.png
+        design/assets/2x/fail_fai_press_2x.png  # lamp, held state
+        design/assets/2x/led_fail_on_2x.png     design/assets/2x/led_fail_off_2x.png
+        design/fonts/share-tech-mono/ShareTechMono-Regular.ttf)
 
 # AU is Apple-only; Windows only ever builds VST3 + Standalone. VST3_COPY_DIR/AU_COPY_DIR are only
 # set on Apple - leaving them unset on Windows lets JUCE apply its own correct default
@@ -48,8 +74,12 @@ juce_add_plugin(TapeRot
     PRODUCT_NAME "TapeRot"
     COMPANY_NAME "Neon Foundry"
     BUNDLE_ID "com.neonfoundry.taperot"
-    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-1024.png"
-    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot-256.png"
+    # Direction D2. Both are exactly square at a size the .icns accepts, so the generated icon gets
+    # clean 1024 and 256 entries. JUCE builds the .icns and .ico at CONFIGURE time and these PNGs are
+    # not configure dependencies - after changing the artwork, re-run cmake -B build or the previous
+    # icon ships silently.
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot_icon_1024.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot_icon_256.png"
     PLUGIN_MANUFACTURER_CODE Nfdy
     PLUGIN_CODE Rota
     FORMATS ${TAPEROT_FORMATS}
@@ -77,23 +107,6 @@ target_sources(TapeRot PRIVATE
     Source/DSP/TapeStop.cpp
     Source/DSP/FilterSweep.cpp
     Source/DSP/OutputStage.cpp
-    Source/GUI/TapeRotLookAndFeel.cpp
-    Source/GUI/DymoLabel.cpp
-    Source/GUI/SectionPanel.cpp
-    Source/GUI/ToggleSwitch.cpp
-    Source/GUI/FailureDotToggle.cpp
-    Source/GUI/NoiseCharacterSwitch.cpp
-    Source/GUI/SmallKnob.cpp
-    Source/GUI/GenSelector.cpp
-    Source/GUI/AuxButton.cpp
-    Source/GUI/FailLamp.cpp
-    Source/GUI/Scope.cpp
-    Source/GUI/GenDigitDisplay.cpp
-    Source/GUI/ModelReadout.cpp
-    Source/GUI/PresetArrowButton.cpp
-    Source/GUI/PresetSaveButton.cpp
-    Source/GUI/PresetDeleteButton.cpp
-    Source/GUI/PresetStrip.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC

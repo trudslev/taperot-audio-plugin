@@ -250,6 +250,15 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
 
     displaySampleRate = sampleRate;
 
+    pitchMeter.prepare(samplesPerBlock);
+    // Stage 0's rates stand for the cascade in the readout - the stages are deliberately detuned
+    // from one another, so there is no single "the" rate, and stage 0 is the one always running.
+    wowRateDisplay.store(generationStages[0]->getWowRateHz(), std::memory_order_relaxed);
+    flutterRateDisplay.store(generationStages[0]->getFlutterRateHz(), std::memory_order_relaxed);
+    levelSmoothingCoeff = 1.0f - std::exp(-1.0f / (0.15f * (float) sampleRate));
+    inLevelSmoothed = 0.0f;
+    outLevelSmoothed = 0.0f;
+
     setLatencySamples(saturator.getLatencySamples());
 }
 
@@ -266,6 +275,19 @@ bool TapeRotAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) c
 void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    // IN is measured before the chain, OUT after it. Both are display-only.
+    {
+        const int n = buffer.getNumSamples();
+        const int ch = buffer.getNumChannels();
+        for (int i = 0; i < n; ++i)
+        {
+            float peak = 0.0f;
+            for (int c = 0; c < ch; ++c)
+                peak = juce::jmax(peak, std::abs(buffer.getReadPointer(c)[i]));
+            inLevelSmoothed += (peak - inLevelSmoothed) * levelSmoothingCoeff;
+        }
+    }
 
     const float drive01 = driveParam->load() / 100.0f;
     const float wow01 = wowParam->load() / 100.0f;
@@ -311,9 +333,14 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const float genFraction = genValue - (float) floorGen;
     const bool genTransitioning = floorGen != ceilGen;
 
+    // Every active stage adds its realised deviation into one buffer, so the trace shows the whole
+    // cascade rather than one stage - which is what the GEN readout sitting beside it implies.
+    float* const deviationAccum = pitchMeter.getScratch(numSamples);
+
     for (int stage = 0; stage < ceilGen; ++stage)
     {
-        generationStages[(size_t) stage]->process(buffer, wow01, flutter01, model, clunkMode, noise01, noiseCharacter);
+        generationStages[(size_t) stage]->process(buffer, wow01, flutter01, model, clunkMode, noise01,
+                                                  noiseCharacter, deviationAccum);
 
         if (genTransitioning && stage == floorGen - 1)
             genFloorSnapshot.makeCopyOf(buffer, true);
@@ -379,16 +406,26 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     smoothDisplay(failAuxDisplay, failAuxValue);
 
-    float peak = 0.0f;
-    for (int ch = 0; ch < numChannels; ++ch)
+    // OUT, measured on the finished buffer.
+    for (int i = 0; i < numSamples; ++i)
     {
-        const auto* data = buffer.getReadPointer(ch);
-        for (int i = 0; i < numSamples; ++i)
-            peak = juce::jmax(peak, std::abs(data[i]));
+        float peak = 0.0f;
+        for (int ch = 0; ch < numChannels; ++ch)
+            peak = juce::jmax(peak, std::abs(buffer.getReadPointer(ch)[i]));
+        outLevelSmoothed += (peak - outLevelSmoothed) * levelSmoothingCoeff;
     }
-    const int writeIdx = scopeWriteIndex.load(std::memory_order_relaxed);
-    scopeLevels[(size_t) writeIdx].store(peak, std::memory_order_relaxed);
-    scopeWriteIndex.store((writeIdx + 1) % scopeHistorySize, std::memory_order_relaxed);
+
+    const auto toDb = [](float linear)
+    {
+        return linear > 1.0e-5f ? 20.0f * std::log10(linear) : -99.9f;
+    };
+
+    inputLevelDb.store(toDb(inLevelSmoothed), std::memory_order_relaxed);
+    outputLevelDb.store(toDb(outLevelSmoothed), std::memory_order_relaxed);
+
+    // Hand the block's realised pitch deviation to the scope. Decimates and drops if the GUI is not
+    // draining; never blocks.
+    pitchMeter.pushBlock(deviationAccum, numSamples);
 }
 
 juce::AudioProcessorEditor* TapeRotAudioProcessor::createEditor()

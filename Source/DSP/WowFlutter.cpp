@@ -33,10 +33,14 @@ void WowFlutter::reset()
         c.flutterNoiseLpfState = 0.0f;
         c.flutterNoiseHpfState = 0.0f;
         c.flutterNoisePrevInput = 0.0f;
+        // Seeded at the centre, not zero: the first sample's derivative is then 0 rather than a
+        // full centre-delay step, which would otherwise draw a spike into the scope on every reset.
+        c.previousDelaySamples = centerDelaySamples;
     }
 }
 
-void WowFlutter::process(juce::AudioBuffer<float>& buffer, float wowDepth01, float flutterDepth01)
+void WowFlutter::process(juce::AudioBuffer<float>& buffer, float wowDepth01, float flutterDepth01,
+                         float* deviationCentsAccum)
 {
     const int numSamples = buffer.getNumSamples();
     const int numCh = juce::jmin(buffer.getNumChannels(), (int) channels.size());
@@ -75,6 +79,23 @@ void WowFlutter::process(juce::AudioBuffer<float>& buffer, float wowDepth01, flo
 
             float delaySamples = centerDelaySamples + wowMod + flutterMod;
             delaySamples = juce::jlimit(lowerBound, upperBound, delaySamples);
+
+            if (ch == 0)
+            {
+                // cents = -1200/ln2 * d(delay)/dn. The delay is in samples and dn is one sample, so
+                // the derivative is just the difference against the previous value. Negative
+                // because a lengthening delay slows playback and pitch falls.
+                //
+                // previousDelaySamples is updated whether or not anyone is metering, so a stage
+                // that starts contributing part-way through (GEN being raised) compares against a
+                // current value rather than a stale one and does not emit a spurious spike.
+                constexpr float centsPerSampleSlope = -1200.0f / 0.6931472f;   // -1200/ln2
+
+                if (deviationCentsAccum != nullptr)
+                    deviationCentsAccum[i] += centsPerSampleSlope * (delaySamples - c.previousDelaySamples);
+
+                c.previousDelaySamples = delaySamples;
+            }
 
             delayLine.pushSample(ch, data[i]);
             delayLine.setDelay(delaySamples);

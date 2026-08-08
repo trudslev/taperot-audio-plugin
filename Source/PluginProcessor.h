@@ -4,6 +4,7 @@
 #include "DSP/FactoryPresets.h"
 #include "DSP/Saturator.h"
 #include "DSP/DegradationCore.h"
+#include "DSP/PitchDeviationMeter.h"
 #include "DSP/WowFlutter.h"
 #include "DSP/Hum.h"
 #include "DSP/FailureEngine.h"
@@ -61,15 +62,18 @@ public:
     float getStopSpeedDisplay() const noexcept { return tapeStop.getSpeedDisplay(); }
     float getGenDisplay() const noexcept { return genSmoothed.getCurrentValue(); }
 
-    static constexpr int scopeHistorySize = 96;
-    // Copies a snapshot of recent block-peak levels for the GUI scope; safe enough for a purely
-    // cosmetic meter (worst case a torn read of one element on a rare repaint, no audio impact).
-    void copyScopeLevels(std::array<float, scopeHistorySize>& dest, int& outWriteIndex) const noexcept
+    // --- scope and header metering -------------------------------------------------------------
+    // All read-only taps. None of them changes how anything processes audio.
+    PitchDeviationMeter& getPitchDeviationMeter() noexcept { return pitchMeter; }
+    double getPitchDeviationRate() const noexcept
     {
-        for (int i = 0; i < scopeHistorySize; ++i)
-            dest[(size_t) i] = scopeLevels[(size_t) i].load(std::memory_order_relaxed);
-        outWriteIndex = scopeWriteIndex.load(std::memory_order_relaxed);
+        return PitchDeviationMeter::outputRate(displaySampleRate);
     }
+    float getWowRateHz() const noexcept { return wowRateDisplay.load(std::memory_order_relaxed); }
+    float getFlutterRateHz() const noexcept { return flutterRateDisplay.load(std::memory_order_relaxed); }
+    float getInputLevelDb() const noexcept { return inputLevelDb.load(std::memory_order_relaxed); }
+    float getOutputLevelDb() const noexcept { return outputLevelDb.load(std::memory_order_relaxed); }
+
 
 private:
     // Applying a factory/user preset (see setCurrentProgram) sets every parameter via
@@ -120,6 +124,15 @@ private:
 
     Saturator saturator;
     std::array<std::unique_ptr<DegradationCore>, maxGenerations> generationStages;
+
+    PitchDeviationMeter pitchMeter;
+    std::atomic<float> wowRateDisplay{0.0f};
+    std::atomic<float> flutterRateDisplay{0.0f};
+    std::atomic<float> inputLevelDb{-99.9f};
+    std::atomic<float> outputLevelDb{-99.9f};
+    float inLevelSmoothed = 0.0f;
+    float outLevelSmoothed = 0.0f;
+    float levelSmoothingCoeff = 0.0f;
     juce::SmoothedValue<float> genSmoothed{1.0f};
     juce::AudioBuffer<float> genFloorSnapshot;
 
@@ -143,8 +156,6 @@ private:
     std::atomic<float> failAuxDisplay{0.0f};
     double displaySampleRate = 44100.0;
 
-    std::array<std::atomic<float>, scopeHistorySize> scopeLevels{};
-    std::atomic<int> scopeWriteIndex{0};
 
     juce::AudioBuffer<float> dryBuffer;
 

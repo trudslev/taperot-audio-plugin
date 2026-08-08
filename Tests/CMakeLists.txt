@@ -12,7 +12,8 @@ target_sources(TapeRotTests PRIVATE
     AuxEffectsTests.cpp
     ParametersStateTests.cpp
     GenerationCascadeTests.cpp
-    TapeRotLookAndFeelTests.cpp
+    FilmstripConformanceTests.cpp
+    MeteringTests.cpp
     TapeModelCalibrationTests.cpp
     TapeModelFrequencyResponseTests.cpp
     ModelSwitchAutomationTests.cpp
@@ -25,7 +26,7 @@ target_sources(TapeRotTests PRIVATE
     ../Source/DSP/ToneFilters.cpp
     ../Source/DSP/TapeStop.cpp
     ../Source/DSP/FilterSweep.cpp
-    ../Source/GUI/TapeRotLookAndFeel.cpp)
+)
 
 target_compile_definitions(TapeRotTests PRIVATE
     JUCE_WEB_BROWSER=0
