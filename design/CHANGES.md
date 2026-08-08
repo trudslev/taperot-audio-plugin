@@ -1,54 +1,55 @@
-# TapeRot GUI — delta v1.0.4
+# TapeRot GUI — delta v1.0.5
 
-Supersedes the corresponding files in v1.0.3. Knob sweep and tick placement, shipped together. No coordinate, frame count, sprite size, sheet layout or icon changes. The v1.0.3 LCD divider/chevron placement and the v1.0.2 cleared legend rows are carried through untouched.
+**No bitmaps changed.** The plate and all three filmstrips in v1.0.4 are correct as shipped — do not re-export them. This delta corrects two numbers in the spec.
 
 ## Changed
 
-| File | Size |
+| File |
+|---|
+| `TapeRot-GUI-Spec.md` — §2 table |
+| `Handoff Assembly.dc.html` (+ `support.js`) — reference build |
+
+## The scales are at ±120°. The centre I gave you was wrong.
+
+The mismatch is real, but it is not in the plate. The "Cap centre" column in §2 has been 7.27 px too low for every knob since the original handoff, and the sprite y derived from it is 7.27 px too low as well. Measuring tick angles about that point compresses them symmetrically toward vertical — which is exactly the ±106° you measured, and the ±111° I measured before I found this.
+
+The arithmetic, for a large knob (tick radius 46, offset 7.27):
+
+```
+apparent = atan2(46·sin 120°, 46·cos 120° + 7.27) = 111.5°
+```
+
+and for a small knob (radius 27):
+
+```
+apparent = atan2(27·sin 120°, 27·cos 120° + 7.27) = 105.1°
+```
+
+Those are the two figures in your report, reproduced from the offset alone. Re-measuring the v1.0.4 export about the corrected centres gives every major mark within 0.6° of the required table — residual is pixel-centroid noise at that radius, not geometry:
+
+| Knob | Measured on the v1.0.4 export |
 |---|---|
-| `assets/1x/knob_large.png` / `assets/2x/knob_large_2x.png` | 90 × 11520 / 180 × 23040 |
-| `assets/1x/knob_small.png` / `assets/2x/knob_small_2x.png` | 52 × 6656 / 104 × 13312 |
-| `assets/1x/knob_model.png` / `assets/2x/knob_model_2x.png` | 90 × 810 / 180 × 1620 |
-| `assets/1x/panel_background.png` / `assets/2x/panel_background_2x.png` | 1336 × 679 / 2672 × 1358 |
-| `TapeRot-GUI-Spec.md` | §3 corrected |
+| WOW | −119.3 / −59.6 / −0.3 / +59.4 / +119.8 |
+| MIX, OUTPUT | −119.0 / −59.7 / −0.7 / +59.2 / +119.9 |
+| DRIVE, FLUTTER | −119.4 / −24.1 / +11.8 / +53.4 / +88.2 / +119.6 |
+| MODEL | −118.8 / −89.4 / −59.9 / −30.6 / −1.2 / +28.8 / +59.0 / +89.4 / +120.2 |
+| LP | −119.0 / −21.6 / +29.5 / +71.5 / +120.7 |
+| HP | −119.0 / −52.1 / −3.2 / +61.0 / +120.7 |
+| RAMP | −119.0 / −55.2 / −20.0 / +15.1 / +120.7 |
 
-### 1. Sweep is now ±120°
+### Root cause
 
-Both continuous strips re-exported at −120° → +120°, still 128 frames, frame 0 = minimum. Frame size, cap artwork, bleed and frame order are unchanged; only the needle angle differs. You were right that the strips were baked to the spec line rather than the artwork.
+The knob is a two-part element: a square dial box with the control name beneath it. I measured the centre of the whole element instead of the dial box, and the name below pulled it down by half its height — 7.27 px. The v1.0.3 → v1.0.4 shift you saw (±60.0° → ±52.8°) is the numeral ring change from §3 of that delta making the element taller still, moving that same wrong centre further down. The ticks themselves never moved.
 
-**`knob_model` is included, and this is deliberate.** Its nine tick marks are drawn by the same routine that draws every other scale, so they moved from a 33.75° grid to a 30° grid when the sweep changed. Leaving the model strip at ±135° would have introduced exactly the misalignment being fixed elsewhere. Frame count, frame size and order are unchanged — the nine needle angles are now −120, −90, −60, −30, 0, 30, 60, 90, 120.
+### Corrected §2
 
-### 2. Non-linear ticks repositioned
+Sprite **x** was always right; only **y** changes, by −7.27 px, for all eleven knobs. The column is renamed **Dial centre** to make clear it is the tick-arc centre and the needle pivot.
 
-Ticks moved on DRIVE, FLUTTER, LP, HP and RAMP; WOW, NOISE, FAILURE, MIX and OUTPUT are untouched. Minor ticks sit halfway in **rotation** between neighbouring majors, as specified.
+| Control | Sprite y was | Sprite y now | Dial centre now |
+|---|---|---|---|
+| DRIVE, WOW, FLUTTER, MODEL, NOISE, FAILURE, MIX, OUTPUT | 348.3 | **341.0** | y **386.0** |
+| LP, RAMP, HP | 512.8 | **505.6** | y **531.6** |
 
-DRIVE and FLUTTER take the 0 / 1 / 5 / 20 / 50 / 100 set — the spread reads as a proper log-tapered control, and the crowding of the 0/25/50/75/100 alternative was not worth keeping round numbers for.
+This is worth acting on beyond the measurement: at the old y the build blits every knob cap 7.27 px below the centre of its own tick arc. Tick arc radius is 46 (large) / 27 (small) from the dial centre, now stated in §2.
 
-| Knob | Marks at |
-|---|---|
-| DRIVE, FLUTTER | 0 → −120.0°, 1 → −24.5°, 5 → +11.8°, 20 → +53.9°, 50 → +88.9°, 100 → +120.0° |
-| LP | 1 → −120.0°, 2 → −20.8°, 5 → +30.4°, 10 → +71.8°, 20 → +120.0° |
-| HP | 20 → −120.0°, 50 → −51.7°, 200 → −3.1°, 800 → +61.5°, 2000 → +120.0° |
-| RAMP | 0.05 → −120.0°, 0.2 → −55.1°, 0.5 → −19.3°, 1 → +15.7°, 4 → +120.0° |
-
-Measured off the rendered plate before export: all eleven scales land within 0.05° of the table above.
-
-### 3. Scale numerals moved off their ticks
-
-The printed numerals sat tight against their tick marks on nearly every scale. The numeral ring radius goes from `D/2 + 17` to `D/2 + 20`, with a few marks pushed further where the glyph width still crowded the tick:
-
-| Scale | Numeral ring |
-|---|---|
-| All knobs, default | D/2 + 20 |
-| Large knobs, last mark (`100`, `+24`) | D/2 + 22 |
-| HP `800` | D/2 + 22 |
-| RAMP `0.05` | D/2 + 23 |
-| HP `2000` | D/2 + 24 |
-
-Tick marks themselves did not move — angles are exactly the table in §2.
-
-The knob's bounding box is now pinned to the old radius rather than derived from the numeral ring, so the extra pixels do not grow the plate: it is still 1336 × 679 / 2672 × 1358 and all eleven knob centres are where v1.0.3 put them. Verified after re-bake.
-
-### 4. Spec §3
-
-Corrected to ±120°, with the skew curve and its five affected parameters written in beside it, so a future re-export can't reintroduce the ±135° figure.
+Unchanged: plate size, all three filmstrips, every x coordinate, the LCD divider and chevron, the cleared legend rows, frame counts, sprite sizes, sheet layout, icons.

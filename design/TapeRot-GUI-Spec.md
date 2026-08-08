@@ -45,19 +45,23 @@ Frame index = `round(value01 * 127)`. Pointer sweeps **−120° → +120°** (me
 
 Rotation is not proportional to value on every control. Five parameters use `rotation01 = ((value − min) / (max − min)) ^ skew`: DRIVE and FLUTTER (skew 0.2), LP and HP (skew 0.3), RAMP (skew 0.4). The remaining continuous controls are linear. The printed ticks are placed under those curves, so the frame index must be derived from `rotation01`, not from the raw value.
 
-| Control | Strip | Frames | Frame | Sprite x | Sprite y | Cap centre |
+Placement is the sprite's top-left. **Dial centre** is the centre of the printed tick arc — the point the needle pivots about, and the point to measure tick angles from.
+
+| Control | Strip | Frames | Frame | Sprite x | Sprite y | Dial centre |
 |---|---|---|---|---|---|---|
-| DRIVE | `knob_large` | 128 | 90 | 50.5 | 348.3 | 95.5, 393.3 |
-| WOW | `knob_large` | 128 | 90 | 205.8 | 348.3 | 250.8, 393.3 |
-| FLUTTER | `knob_large` | 128 | 90 | 353.8 | 348.3 | 398.8, 393.3 |
-| MODEL | `knob_model` | **9** | 90 | 530.5 | 348.3 | 575.5, 393.3 |
-| NOISE | `knob_large` | 128 | 90 | 678.5 | 348.3 | 723.5, 393.3 |
-| FAILURE | `knob_large` | 128 | 90 | 864.3 | 348.3 | 909.3, 393.3 |
-| MIX | `knob_large` | 128 | 90 | 1038 | 348.3 | 1083, 393.3 |
-| OUTPUT | `knob_large` | 128 | 90 | 1186 | 348.3 | 1231, 393.3 |
-| LP | `knob_small` | 128 | 52 | 1031 | 512.8 | 1057, 538.8 |
-| RAMP | `knob_small` | 128 | 52 | 1131 | 512.8 | 1157, 538.8 |
-| HP | `knob_small` | 128 | 52 | 1231 | 512.8 | 1257, 538.8 |
+| DRIVE | `knob_large` | 128 | 90 | 50.5 | 341.0 | 95.5, 386.0 |
+| WOW | `knob_large` | 128 | 90 | 205.8 | 341.0 | 250.8, 386.0 |
+| FLUTTER | `knob_large` | 128 | 90 | 353.8 | 341.0 | 398.8, 386.0 |
+| MODEL | `knob_model` | **9** | 90 | 530.5 | 341.0 | 575.5, 386.0 |
+| NOISE | `knob_large` | 128 | 90 | 678.5 | 341.0 | 723.5, 386.0 |
+| FAILURE | `knob_large` | 128 | 90 | 864.3 | 341.0 | 909.3, 386.0 |
+| MIX | `knob_large` | 128 | 90 | 1038.0 | 341.0 | 1083.0, 386.0 |
+| OUTPUT | `knob_large` | 128 | 90 | 1186.0 | 341.0 | 1231.0, 386.0 |
+| LP | `knob_small` | 128 | 52 | 1031.0 | 505.6 | 1057.0, 531.6 |
+| RAMP | `knob_small` | 128 | 52 | 1131.0 | 505.6 | 1157.0, 531.6 |
+| HP | `knob_small` | 128 | 52 | 1231.0 | 505.6 | 1257.0, 531.6 |
+
+Tick arc radius is 46 (large) / 27 (small) from the dial centre.
 
 > **MODEL is 9 frames, not 8.** The shipped tuning has nine machine positions — NONE, REVOX B77, VCR HIFI, VCR LP, CAMCORDER, CASSETTE I, CASSETTE II, DICTAPHONE, TOY. Frame index = model index (0–8), no interpolation. Say the word if the build wants eight and one gets dropped.
 

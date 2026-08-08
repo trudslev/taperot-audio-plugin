@@ -207,18 +207,30 @@ namespace Layout
         Cap cap;
     };
 
+    /** Sprite top-left. The y values here are 7.27px HIGHER than every handoff before delta
+        v1.0.5 stated, and that correction is the fix for the whole "needle doesn't line up"
+        investigation - not the sweep angle, which was a red herring.
+
+        The spec's old "cap centre" column measured the centre of the whole knob ELEMENT (dial box
+        plus the control name printed beneath it), so the name dragged it 7.27px below the actual
+        tick-arc centre. Blitting the cap there put the needle's pivot below the arc it sweeps, and
+        the tip then landed ~7 degrees past the printed end mark - which reads as the knob showing a
+        small negative value at minimum.
+
+        Dial centre = this point + frameSize/2, i.e. y 386.0 (large row) and y 531.6 (small row).
+        Tick arc radius is 46 (large) and 27 (small) from that centre. */
     inline constexpr std::array<KnobSpec, 11> knobs { {
-        { "drive",   {   50.5f, 348.3f }, Cap::large },
-        { "wow",     {  205.8f, 348.3f }, Cap::large },
-        { "flutter", {  353.8f, 348.3f }, Cap::large },
-        { "model",   {  530.5f, 348.3f }, Cap::model },
-        { "noise",   {  678.5f, 348.3f }, Cap::large },
-        { "failure", {  864.3f, 348.3f }, Cap::large },
-        { "mix",     { 1038.0f, 348.3f }, Cap::large },
-        { "output",  { 1186.0f, 348.3f }, Cap::large },
-        { "lp",      { 1031.0f, 512.8f }, Cap::small },
-        { "ramp",    { 1131.0f, 512.8f }, Cap::small },
-        { "hp",      { 1231.0f, 512.8f }, Cap::small } } };
+        { "drive",   {   50.5f, 341.0f }, Cap::large },
+        { "wow",     {  205.8f, 341.0f }, Cap::large },
+        { "flutter", {  353.8f, 341.0f }, Cap::large },
+        { "model",   {  530.5f, 341.0f }, Cap::model },
+        { "noise",   {  678.5f, 341.0f }, Cap::large },
+        { "failure", {  864.3f, 341.0f }, Cap::large },
+        { "mix",     { 1038.0f, 341.0f }, Cap::large },
+        { "output",  { 1186.0f, 341.0f }, Cap::large },
+        { "lp",      { 1031.0f, 505.6f }, Cap::small },
+        { "ramp",    { 1131.0f, 505.6f }, Cap::small },
+        { "hp",      { 1231.0f, 505.6f }, Cap::small } } };
 
     inline constexpr float frameSizeFor (Cap c) noexcept
     {

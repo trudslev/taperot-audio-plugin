@@ -50,11 +50,11 @@
 <script type="text/x-dc" data-dc-script>
 const P = 'assets/1x/';
 const KNOBS = [
-  ['drive', 95.5, 393.3, 78, 0.52], ['wow', 250.8, 393.3, 78, 0.34],
-  ['flutter', 398.8, 393.3, 78, 0.28], ['noise', 723.5, 393.3, 78, 0.30],
-  ['failure', 909.3, 393.3, 78, 0.26], ['mix', 1083, 393.3, 78, 0.78],
-  ['output', 1231, 393.3, 78, 0.5],
-  ['lp', 1057, 538.8, 40, 0.62], ['ramp', 1157, 538.8, 40, 0.38], ['hp', 1257, 538.8, 40, 0.18]
+  ['drive', 95.5, 386.0, 78, 0.52], ['wow', 250.8, 386.0, 78, 0.34],
+  ['flutter', 398.8, 386.0, 78, 0.28], ['noise', 723.5, 386.0, 78, 0.30],
+  ['failure', 909.3, 386.0, 78, 0.26], ['mix', 1083, 386.0, 78, 0.78],
+  ['output', 1231, 386.0, 78, 0.5],
+  ['lp', 1057, 531.6, 40, 0.62], ['ramp', 1157, 531.6, 40, 0.38], ['hp', 1257, 531.6, 40, 0.18]
 ];
 const BUTTONS = [
   ['fade', 484.5, 536.5, true], ['clunk', 484.5, 568, false],
@@ -76,7 +76,7 @@ class Component extends DCLogic {
       img(P + (D === 78 ? 'knob_large.png' : 'knob_small.png'), cx - F / 2, cy - F / 2, F, F, 'background-position:0 -' + (i * F) + 'px;');
     });
     // MODEL — 9-frame stepped strip, position 1 (REVOX B77)
-    img(P + 'knob_model.png', 575.5 - 45, 393.3 - 45, 90, 90, 'background-position:0 -90px;');
+    img(P + 'knob_model.png', 575.5 - 45, 386.0 - 45, 90, 90, 'background-position:0 -90px;');
 
     BUTTONS.forEach(([n, x, y, on]) => img(P + 'btn_' + n + '_' + (on ? 'on' : 'off') + '.png', x - 2, y - 2, 102, 29));
     for (let i = 0; i < 8; i++) img(P + 'gen_seg_' + (i < 4 ? 'on' : 'off') + '.png', 227.3 + i * 25 - 3, 496.5 - 3, 26, 23);
