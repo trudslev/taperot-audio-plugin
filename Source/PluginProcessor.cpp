@@ -445,10 +445,25 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     outputStage.process(buffer, dryBuffer, mix01, outputDb);
 
+    // The gate exists because this plugin generates sound of its own - hiss, hum, dropouts - which
+    // would otherwise run forever in a session that is simply parked. Muting the output when the
+    // transport stops is the right instinct for that.
+    //
+    // It must NOT apply in the Standalone. JUCE's standalone wrapper supplies a play head whose
+    // getIsPlaying() is permanently false, so the `= true` fallback below never fires there and the
+    // whole output was gated to silence for good: input metering read live while OUT sat at the
+    // -99.9 floor, which looks exactly like a plugin that does not work. There is no transport to
+    // park in a standalone, so there is nothing for the gate to mean.
+    //
+    // Live monitoring through a STOPPED DAW is still silenced, which is the same behaviour as
+    // before and arguably still wrong - but changing it means gating the generated hiss rather than
+    // the finished buffer, which is a DSP change rather than a wrapper check. Flagged, not smuggled
+    // in here.
     bool hostIsPlaying = true;
-    if (auto* playHead = getPlayHead())
-        if (auto position = playHead->getPosition())
-            hostIsPlaying = position->getIsPlaying();
+    if (wrapperType != wrapperType_Standalone)
+        if (auto* playHead = getPlayHead())
+            if (auto position = playHead->getPosition())
+                hostIsPlaying = position->getIsPlaying();
 
     transportGateSmoothed.setTargetValue(hostIsPlaying ? 1.0f : 0.0f);
     transportGateSmoothed.skip(numSamples);
