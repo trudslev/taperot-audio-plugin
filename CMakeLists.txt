@@ -85,6 +85,16 @@ juce_add_plugin(TapeRot
     # icon ships silently.
     ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot_icon_1024.png"
     ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot_icon_256.png"
+    # Without this the Standalone cannot get audio INPUT on macOS, and fails silently doing it.
+    # An app with no NSMicrophoneUsageDescription is never granted capture access - the OS does not
+    # prompt and does not error, the input stream simply delivers zeros. On an effect that reads as
+    # dead metering: IN sits at the -99.9 floor and OUT follows it, because there is nothing to
+    # process. The meters were wired correctly the whole time; the host had no signal to give them.
+    #
+    # Plugin formats are unaffected - the host owns the input there - so this only ever showed up
+    # when someone opened the Standalone to listen.
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT "TapeRot needs audio input so the Standalone can process what you play into it."
     PLUGIN_MANUFACTURER_CODE Nfdy
     PLUGIN_CODE Rota
     FORMATS ${TAPEROT_FORMATS}
