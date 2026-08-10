@@ -172,8 +172,21 @@ Unlike the icon, BinaryData **is** a build-time dependency and tracks correctly 
 
 No exotic macOS APIs exist anywhere in `Source/DSP/` (confirmed by audit — no Objective-C++, no CoreAudio/CoreMIDI/AudioToolbox/Accelerate, no SIMD intrinsics), so the DSP side ports unmodified to both Windows and Linux. The only platform branches anywhere in the codebase are:
 
-- `Source/PluginProcessor.cpp`'s `getUserProgramDirectory()` — `#if JUCE_WINDOWS || JUCE_LINUX` → `<AppData>/<Manufacturer>/<Plugin>/Programs` (JUCE's `userApplicationDataDirectory` resolves this to `%APPDATA%` on Windows and `~/.config` on Linux), else macOS's `~/Library/Audio/Presets/<Manufacturer>/<Plugin>`. That trailing `Presets` on macOS is Apple's shared convention directory, not our naming — the Preset→Program rename stops at our own leaf, and renaming it would put saved Programs where nothing else looks. Gatecrasher resolves it the same way.
 - the `CMakeLists.txt` items above (`if(APPLE)` gating `FORMATS`/copy dirs/deployment target).
+
+`getUserProgramDirectory()` **used to** be a platform branch here and no longer is. User Programs now
+live at `<AppData>/<Manufacturer>/<Plugin>/Programs` on all three platforms, via JUCE's
+`userApplicationDataDirectory` — `~/Library/Application Support` on macOS, `%APPDATA%` on Windows,
+`~/.config` on Linux. That segment is JUCE's and must never be hard-coded; a shared literal would be
+wrong on two of the three.
+
+The macOS branch used to point at `~/Library/Audio/Presets/<Manufacturer>/<Plugin>`, justified as
+Apple's shared convention directory. **That reasoning was wrong**, and is worth recording so it
+isn't reinstated: `~/Library/Audio/Presets` is where the **AU preset format** lives — `.aupreset`
+files the AU system itself scans, reads and writes. A `.taperotprogram` sitting there was never
+going to be discovered by anything, so the path bought no interoperability while asking Apple's
+folder to hold a format it does not understand. All six castings now agree; Elmer had it right
+first.
 
 Everything else was already cross-platform-correct (icon generation, `createLegalFileName`, JUCE's own MSVC-aware recommended-flags targets) or has no Windows/Linux equivalent by nature (AU).
 
