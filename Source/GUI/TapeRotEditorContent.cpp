@@ -83,6 +83,21 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
     header.toBack();
     scope.toBack();
 
+    // The Program list opens inside this, so it can neither move its top edge nor grow past the
+    // panel. Added after the toBack() calls and pushed to the FRONT, which is the opposite of what
+    // the header itself wants: the header paints sparsely across the whole canvas and must sit
+    // behind the controls, but the list it opens has to cover them.
+    //
+    // A SIBLING of header, never a child: header narrows its hitTest to the glass and the two
+    // buttons, and JUCE stops searching a component's children once its own hitTest rejects the
+    // point, so a list parented there would be dead everywhere except the cell it drops from.
+    const int hostTop = ProgramHeader::menuHostTop();
+    menuHost.setBounds(0, hostTop, getWidth(), getHeight() - hostTop);
+    menuHost.setInterceptsMouseClicks(false, true);
+    addAndMakeVisible(menuHost);
+    menuHost.toFront(false);
+    header.setMenuParent(&menuHost);
+
     startTimerHz(Layout::animationHz);
 }
 
