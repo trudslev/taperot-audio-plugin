@@ -77,26 +77,26 @@ const juce::String TapeRotAudioProcessor::getProgramName(int index)
 
 juce::File TapeRotAudioProcessor::getUserProgramDirectory()
 {
-   #if JUCE_WINDOWS || JUCE_LINUX
-    // Windows: %APPDATA%\<Manufacturer>\<Plugin>\Programs. Linux: ~/.config/<Manufacturer>/<Plugin>/Programs
-    // (JUCE's userApplicationDataDirectory resolves to the right per-OS location on each). Neither
-    // platform has an equivalent of macOS's ~/Library/Audio/Presets convention, so both share this
-    // common per-vendor AppData/XDG-config layout instead.
+    // **Application data on every platform - no macOS special case.** This used to branch, putting
+    // macOS Programs under ~/Library/Audio/Presets. That is Apple's location for the AU PRESET
+    // FORMAT: .aupreset files the AU system itself scans, reads and writes. Our user Programs are
+    // not those - they are application-owned data in our own XML format - so they belong where an
+    // application keeps its data, and the AU folder should hold only what AU understands.
+    //
+    // The old comment argued that renaming the leaf "would move saved Programs somewhere no other
+    // tool looks". That was true and beside the point: no other tool was ever going to read a
+    // .taperotprogram out of Apple's preset folder either. Nothing was being made discoverable.
+    //
+    // The "Application Support" segment is JUCE's and must never be hard-coded:
+    // userApplicationDataDirectory resolves to ~/Library/Application Support on macOS, %APPDATA% on
+    // Windows and ~/.config on Linux. A shared literal would be wrong on two of the three.
+    //
+    // No migration from the old location - nothing has shipped, so nothing is there to migrate.
+    // See Elmer's ProgramManager for why that is a decision rather than an oversight.
     return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
         .getChildFile(JucePlugin_Manufacturer)
         .getChildFile(JucePlugin_Name)
         .getChildFile("Programs");
-   #else
-    // The trailing "Presets" here is Apple's shared convention directory, not our own naming - the
-    // Preset->Program rename stops at our leaf. Renaming it would move saved Programs somewhere no
-    // other tool looks. Gatecrasher resolves this the same way.
-    return juce::File::getSpecialLocation(juce::File::userHomeDirectory)
-        .getChildFile("Library")
-        .getChildFile("Audio")
-        .getChildFile("Presets")
-        .getChildFile(JucePlugin_Manufacturer)
-        .getChildFile(JucePlugin_Name);
-   #endif
 }
 
 void TapeRotAudioProcessor::refreshUserProgramList()
