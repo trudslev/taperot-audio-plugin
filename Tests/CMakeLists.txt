@@ -19,6 +19,22 @@ target_sources(TapeRotTests PRIVATE
     ModelSwitchAutomationTests.cpp
     FactoryProgramsTests.cpp
     SessionCompatibilityTests.cpp
+    ProgramIdentityTests.cpp
+    # The REAL processor, not a stand-in. ProgramIdentityTests drives setStateInformation and
+    # setCurrentProgram in the order a host uses them, and a harness that reimplemented that
+    # ordering would be asserting against a copy of the code rather than the code.
+    ../Source/PluginProcessor.cpp
+    ../Source/PluginEditor.cpp
+    ../Source/GUI/KnobFilmstrip.cpp
+    ../Source/GUI/SpriteButton.cpp
+    ../Source/GUI/LampStrip.cpp
+    ../Source/GUI/PitchScope.cpp
+    ../Source/GUI/ProgramHeader.cpp
+    ../Source/GUI/TapeRotEditorContent.cpp
+    ../Source/DSP/Hum.cpp
+    ../Source/DSP/FailureEngine.cpp
+    ../Source/DSP/StereoSpread.cpp
+    ../Source/DSP/OutputStage.cpp
     ../Source/DSP/Saturator.cpp
     ../Source/DSP/WowFlutter.cpp
     ../Source/DSP/TapeModelEQ.cpp
@@ -29,9 +45,13 @@ target_sources(TapeRotTests PRIVATE
     ../Source/DSP/FilterSweep.cpp
 )
 
+# The plugin target gets these from its generated JuceHeader; a console app does not, and
+# PluginProcessor.cpp needs them for the user-Program directory.
 target_compile_definitions(TapeRotTests PRIVATE
     JUCE_WEB_BROWSER=0
-    JUCE_USE_CURL=0)
+    JUCE_USE_CURL=0
+    JucePlugin_Name="TapeRot"
+    JucePlugin_Manufacturer="Neon Foundry")
 
 target_link_libraries(TapeRotTests PRIVATE
     juce::juce_dsp

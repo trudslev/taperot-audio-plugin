@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DSP/FactoryPrograms.h"
 #include "DSP/TapeModelData.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -48,7 +49,44 @@ namespace LegacyMigration
     // setStateInformation XML, which is keyed by the plain ID string regardless of versionHint -
     // that path needs this explicit marker instead.
     constexpr auto stateSchemaVersionAttribute = "taperotStateSchemaVersion";
-    constexpr int currentStateSchemaVersion = 4;
+    constexpr int currentStateSchemaVersion = 5;
+
+    /** **The identity attributes, and they are a contract.** Rename one and the session still
+        parses while the Program silently reverts to the default, with no error anywhere - which is
+        exactly the failure mode the schema version exists to catch. Spelled as literals in
+        Tests/SessionCompatibilityTests.cpp, not through these constants, or the test would rename
+        itself alongside the code and assert nothing.
+
+        `...ProgramName` is DISPLAY ONLY. It exists so an unresolved identifier can still be named
+        on the panel - a factory slug is not presentable - and it never takes part in resolving. */
+    constexpr auto programBankAttribute = "taperotProgramBank";
+    constexpr auto programIdAttribute   = "taperotProgramId";
+    constexpr auto programNameAttribute = "taperotProgramName";
+
+    /** v4 -> v5: the session stored a positional index; it now stores bank + identifier. A v4
+        session's index is mapped through the CURRENT bank, which is correct because nothing has
+        shipped and the bank has not moved since v4. */
+    inline juce::String bankAttributeValue (ProgramBank bank)
+    {
+        switch (bank)
+        {
+            case ProgramBank::init:       return "init";
+            case ProgramBank::factory:    return "factory";
+            case ProgramBank::user:       return "user";
+            case ProgramBank::unresolved: return "unresolved";
+        }
+
+        return "factory";
+    }
+
+    inline ProgramBank bankFromAttribute (const juce::String& value)
+    {
+        if (value == "init")       return ProgramBank::init;
+        if (value == "user")       return ProgramBank::user;
+        if (value == "unresolved") return ProgramBank::unresolved;
+
+        return ProgramBank::factory;
+    }
 
     /** v3 -> v4: **Init left the numbered Factory bank**, so every Factory index shifted down by
         one and Warm Cassette became 01 instead of 02.

@@ -42,54 +42,163 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     // pendingProgramIndex/AsyncUpdater path used by setCurrentProgram) is safe.
     refreshUserProgramList();
     applyFactoryProgram(kFactoryPrograms[warmCassetteProgramIndex]);
-    currentProgramIndex.store((int) warmCassetteProgramIndex, std::memory_order_relaxed);
+    setCurrentId(factoryIdAt((int) warmCassetteProgramIndex));
     captureProgramSnapshot();
+}
+
+//==============================================================================
+// Identity. Nothing below this line addresses a Program by position except the four host overrides,
+// which are grouped together and commented in the header.
+
+ProgramId TapeRotAudioProcessor::factoryIdAt(int factoryPosition)
+{
+    const auto& p = kFactoryPrograms[(size_t) factoryPosition];
+    return { ProgramBank::factory, p.slug, p.name };
+}
+
+ProgramId TapeRotAudioProcessor::initId()
+{
+    return { ProgramBank::init, kInitProgram.slug, kInitProgram.name };
+}
+
+ProgramId TapeRotAudioProcessor::getCurrentProgramId() const
+{
+    const juce::SpinLock::ScopedLockType lock(currentIdLock);
+    return currentId;
+}
+
+void TapeRotAudioProcessor::setCurrentId(const ProgramId& id)
+{
+    const juce::SpinLock::ScopedLockType lock(currentIdLock);
+    currentId = id;
+}
+
+int TapeRotAudioProcessor::factoryPositionOf(const juce::String& slug)
+{
+    for (size_t i = 0; i < kFactoryPrograms.size(); ++i)
+        if (slug == kFactoryPrograms[i].slug)
+            return (int) i;
+
+    return -1;
+}
+
+ProgramId TapeRotAudioProcessor::resolve(ProgramBank bank, const juce::String& id,
+                                          const juce::String& displayName) const
+{
+    if (bank == ProgramBank::init && id == kInitProgram.slug)
+        return initId();
+
+    if (bank == ProgramBank::factory)
+        if (const int pos = factoryPositionOf(id); pos >= 0)
+            return factoryIdAt(pos);
+
+    if (bank == ProgramBank::user)
+        for (const auto& f : userProgramFiles)
+            if (f.getFileNameWithoutExtension() == id)
+                return { ProgramBank::user, id, id };
+
+    // **Degrade honestly.** The parameter values restored from the session are correct and stay
+    // put; only the NAME is unknown, so the panel says so rather than silently landing on whichever
+    // Program now occupies some position. displayName is what gets painted - a factory slug is not
+    // presentable, and "warm-cassette?" would read as a rendering fault.
+    return { ProgramBank::unresolved, id, displayName.isNotEmpty() ? displayName : id };
+}
+
+std::vector<ProgramId> TapeRotAudioProcessor::listPrograms() const
+{
+    std::vector<ProgramId> out;
+    out.reserve(1 + kFactoryPrograms.size() + (size_t) userProgramFiles.size());
+
+    out.push_back(initId());
+
+    for (size_t i = 0; i < kFactoryPrograms.size(); ++i)
+        out.push_back(factoryIdAt((int) i));
+
+    for (const auto& f : userProgramFiles)
+    {
+        const auto stem = f.getFileNameWithoutExtension();
+        out.push_back({ ProgramBank::user, stem, stem });
+    }
+
+    return out;
+}
+
+juce::String TapeRotAudioProcessor::displayLabelFor(const ProgramId& id) const
+{
+    // The number is computed here, at paint time, from the Program's position in the bank. It is a
+    // label: nothing stores it and nothing resolves by it. Only Factory Programs get one - User
+    // Programs sort alphabetically, so a number would change whenever one was saved.
+    if (id.bank == ProgramBank::factory)
+        if (const int pos = factoryPositionOf(id.id); pos >= 0)
+            return juce::String(pos + 1).paddedLeft('0', 2) + " " + id.displayName;
+
+    return id.displayName;
+}
+
+void TapeRotAudioProcessor::requestProgramChange(const ProgramId& id)
+{
+    {
+        const juce::SpinLock::ScopedLockType lock(pendingLock);
+        pendingProgram = id;
+        hasPendingProgram = true;
+    }
+
+    triggerAsyncUpdate();
 }
 
 void TapeRotAudioProcessor::handleAsyncUpdate()
 {
-    const int index = pendingProgramIndex.exchange(noPendingProgram, std::memory_order_relaxed);
-    if (index != noPendingProgram)
-        applyProgramByIndex(index);
+    ProgramId id;
+
+    {
+        const juce::SpinLock::ScopedLockType lock(pendingLock);
+
+        if (! hasPendingProgram)
+            return;
+
+        id = pendingProgram;
+        hasPendingProgram = false;
+    }
+
+    applyProgram(id);
 }
 
-int TapeRotAudioProcessor::getNumPrograms()
+//==============================================================================
+// The host adapter. See the header for why the list is Factory-only and what that costs.
+
+int TapeRotAudioProcessor::getCurrentProgram()
 {
-    return (int) kNumFactoryPrograms + userProgramFiles.size();
+    const auto id = getCurrentProgramId();
+
+    if (id.bank == ProgramBank::factory)
+        if (const int pos = factoryPositionOf(id.id); pos >= 0)
+            return pos;
+
+    // INIT, a User Program or an unresolved id - none of which the host's list contains. 0 is the
+    // accepted lossy answer; see the header.
+    return 0;
 }
 
 void TapeRotAudioProcessor::setCurrentProgram(int index)
 {
-    // INIT is a legal target and is NOT in [0, getNumPrograms()), so it is admitted explicitly
-    // rather than by widening the range check - which would also admit every other negative index.
-    if (! isInitProgram(index) && (index < 0 || index >= getNumPrograms()))
+    if (! juce::isPositiveAndBelow(index, (int) kNumFactoryPrograms))
         return;
-    pendingProgramIndex.store(index, std::memory_order_relaxed);
-    triggerAsyncUpdate();
+
+    // The stale-replay guard, disarmed by this call whether or not it is honoured. A replay carries
+    // the position we last reported, so a matching index immediately after a restore is ignored;
+    // anything else, and every later call, applies normally.
+    if (justRestoredState.exchange(false, std::memory_order_relaxed) && index == getCurrentProgram())
+        return;
+
+    requestProgramChange(factoryIdAt(index));
 }
 
 const juce::String TapeRotAudioProcessor::getProgramName(int index)
 {
-    if (isInitProgram(index))
-        return kInitProgram.name;
-
-    if (isFactoryProgram(index))
-        return kFactoryPrograms[(size_t) index].name;
-
-    const int userIndex = index - (int) kNumFactoryPrograms;
-    if (userIndex >= 0 && userIndex < userProgramFiles.size())
-        return userProgramFiles.getReference(userIndex).getFileNameWithoutExtension();
-    return {};
-}
-
-juce::String TapeRotAudioProcessor::getProgramDisplayName(int index)
-{
-    const auto name = getProgramName(index);
-
-    if (isInitProgram(index) || name.isEmpty())
-        return name;
-
-    return juce::String(index + 1).paddedLeft('0', 2) + " " + name;
+    // Raw, with no number: a host renders its own numbering and would otherwise print "01" twice.
+    return juce::isPositiveAndBelow(index, (int) kNumFactoryPrograms)
+               ? juce::String(kFactoryPrograms[(size_t) index].name)
+               : juce::String();
 }
 
 juce::File TapeRotAudioProcessor::getUserProgramDirectory()
@@ -140,8 +249,21 @@ void TapeRotAudioProcessor::refreshUserProgramList()
     for (const auto& entry : juce::RangedDirectoryIterator(dir, false, "*.taperotprogram"))
         userProgramFiles.add(entry.getFile());
 
+    // **The displayed name, case-insensitively.** Two deliberate details:
+    //
+    // The STEM, not getFileName() - comparing with the extension attached sorts "AB C" before "AB",
+    // because a space (0x20) precedes the dot (0x2E). Every casting had that bug.
+    //
+    // compareIgnoreCase, not operator< - which is a codepoint compare, so every lowercase name
+    // sorted after every uppercase one and "Zebra" preceded "apple". The GUI forces uppercase as
+    // you type, which masked it for anything created here; a file hand-renamed on disk, copied
+    // between machines or restored from a backup keeps its own case and unmasks it.
     std::sort(userProgramFiles.begin(), userProgramFiles.end(),
-               [](const juce::File& a, const juce::File& b) { return a.getFileName() < b.getFileName(); });
+               [](const juce::File& a, const juce::File& b)
+               {
+                   return a.getFileNameWithoutExtension()
+                           .compareIgnoreCase(b.getFileNameWithoutExtension()) < 0;
+               });
 }
 
 const juce::StringArray& TapeRotAudioProcessor::snapshotParamIds()
@@ -194,23 +316,29 @@ bool TapeRotAudioProcessor::isProgramModified() const
     return false;
 }
 
-void TapeRotAudioProcessor::applyProgramByIndex(int index)
+void TapeRotAudioProcessor::applyProgram(const ProgramId& id)
 {
-    if (isInitProgram(index))
+    if (id.bank == ProgramBank::init)
     {
         applyFactoryProgram(kInitProgram);
     }
-    else if (isFactoryProgram(index))
+    else if (id.bank == ProgramBank::factory)
     {
-        applyFactoryProgram(kFactoryPrograms[(size_t) index]);
-    }
-    else
-    {
-        const int userIndex = index - (int) kNumFactoryPrograms;
-        if (userIndex < 0 || userIndex >= userProgramFiles.size())
+        const int pos = factoryPositionOf(id.id);
+
+        if (pos < 0)
             return;
 
-        std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(userProgramFiles.getReference(userIndex)));
+        applyFactoryProgram(kFactoryPrograms[(size_t) pos]);
+    }
+    else if (id.bank == ProgramBank::user)
+    {
+        const auto file = userProgramFile(id.id);
+
+        if (file == juce::File())
+            return;
+
+        std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(file));
         if (xml == nullptr || !xml->hasTagName(apvts.state.getType()))
             return;
 
@@ -224,10 +352,28 @@ void TapeRotAudioProcessor::applyProgramByIndex(int index)
         *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::filterAux)) = false;
         *dynamic_cast<juce::AudioParameterBool*>(apvts.getParameter(ParamIDs::failAux)) = false;
     }
+    else
+    {
+        // Unresolved. The values are whatever the session restored and stay exactly as they are -
+        // landing on some other Program would be the silent wrong answer this whole model exists to
+        // prevent. Only the identity is recorded, so the panel can say it does not know the name.
+        setCurrentId(id);
+        captureProgramSnapshot();
+        return;
+    }
 
-    currentProgramIndex.store(index, std::memory_order_relaxed);
+    setCurrentId(id);
     captureProgramSnapshot();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
+}
+
+juce::File TapeRotAudioProcessor::userProgramFile(const juce::String& stem) const
+{
+    for (const auto& f : userProgramFiles)
+        if (f.getFileNameWithoutExtension() == stem)
+            return f;
+
+    return {};
 }
 
 void TapeRotAudioProcessor::applyFactoryProgram(const FactoryProgram& program)
@@ -286,31 +432,42 @@ void TapeRotAudioProcessor::saveUserProgram(const juce::String& rawName)
                 xml->removeChildElement(child, true);
         }
 
-    const juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + ".taperotprogram");
+    juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + ".taperotprogram");
+
+    // **SAVE never overwrites**, which BRAND.md states as a guarantee and this used to break: a
+    // second save under the same name replaced the first Program's contents silently. It matters
+    // more now that the filename IS the identity - two Programs cannot share one.
+    if (file.existsAsFile())
+        file = file.getNonexistentSibling();
+
     xml->writeTo(file);
 
     refreshUserProgramList();
-    const int newIndex = (int) kNumFactoryPrograms + userProgramFiles.indexOf(file);
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
-    setCurrentProgram(newIndex);
+
+    const auto stem = file.getFileNameWithoutExtension();
+    requestProgramChange({ ProgramBank::user, stem, stem });
 }
 
-void TapeRotAudioProcessor::deleteUserProgram(int index)
+void TapeRotAudioProcessor::deleteUserProgram(const ProgramId& id)
 {
-    if (isFactoryProgram(index))
+    if (id.bank != ProgramBank::user)
         return;
 
-    const int userIndex = index - (int) kNumFactoryPrograms;
-    if (userIndex < 0 || userIndex >= userProgramFiles.size())
+    const auto file = userProgramFile(id.id);
+
+    if (file == juce::File())
         return;
 
-    const bool wasCurrent = currentProgramIndex.load(std::memory_order_relaxed) == index;
-    userProgramFiles.getReference(userIndex).deleteFile();
+    const bool wasCurrent = getCurrentProgramId() == id;
+    file.deleteFile();
     refreshUserProgramList();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 
+    // Deliberately NOT the unresolved state: deleting from the panel is an unambiguous intent, so
+    // it falls back to the default Program. Unresolved is for a session naming something gone.
     if (wasCurrent)
-        setCurrentProgram((int) warmCassetteProgramIndex);
+        requestProgramChange(factoryIdAt((int) warmCassetteProgramIndex));
 }
 
 void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -548,10 +705,16 @@ void TapeRotAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     xml->setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
-    // Sticky display metadata only - restored clamped/defaulted below, never re-validated against
-    // the session's actual knob values (a session saved after manually tweaking a loaded program
-    // still remembers which program name it was tweaked from).
-    xml->setAttribute("taperotCurrentProgramIndex", currentProgramIndex.load(std::memory_order_relaxed));
+
+    // **The bank, the identifier, and the full parameter state.** The values above are what makes
+    // the session sound right; the identity below only decides what the panel CALLS them. That
+    // split is the point: whatever happens to the bank between versions, a session restores the
+    // sound it was saved with, and at worst loses the name.
+    const auto id = getCurrentProgramId();
+    xml->setAttribute(LegacyMigration::programBankAttribute, LegacyMigration::bankAttributeValue(id.bank));
+    xml->setAttribute(LegacyMigration::programIdAttribute, id.id);
+    xml->setAttribute(LegacyMigration::programNameAttribute, id.displayName);
+
     copyXmlToBinary(*xml, destData);
 }
 
@@ -560,38 +723,61 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
     if (std::unique_ptr<juce::XmlElement> xml(getXmlFromBinary(data, sizeInBytes)); xml != nullptr)
         if (xml->hasTagName(apvts.state.getType()))
         {
-            // Cancels any not-yet-applied setCurrentProgram call: without this, a program change
-            // requested just before a session/state restore could still be sitting in
-            // pendingProgramIndex, waiting for the message thread's next AsyncUpdater dispatch -
-            // and if that dispatch lands *after* this restore returns, it would silently
-            // overwrite the just-restored parameter values with the stale pending program. A full
-            // state restore is always authoritative, so any such pending program change is
-            // dropped rather than left to fire later.
-            pendingProgramIndex.store(noPendingProgram, std::memory_order_relaxed);
+            // Cancels any not-yet-applied program change: one requested just before a restore
+            // could still be pending, and if the AsyncUpdater dispatched it AFTER this returned it
+            // would overwrite everything just restored. A full state restore is authoritative.
+            {
+                const juce::SpinLock::ScopedLockType lock(pendingLock);
+                hasPendingProgram = false;
+            }
 
             LegacyMigration::remapLegacyModelIndexIfNeeded(*xml);
             apvts.replaceState(juce::ValueTree::fromXml(*xml));
 
-            // **Read the schema BEFORE using the index.** Init left the numbered bank in v4, so
-            // every index in a v3-or-older session is one too high; restoring one unmapped would
-            // name the Program AFTER the one the session was saved with, while the restored knob
-            // values stayed correct - a panel naming a sound it is not making, with nothing to
-            // signal it.
             const int savedSchema = xml->getIntAttribute(LegacyMigration::stateSchemaVersionAttribute, 1);
-            int savedProgramIndex = xml->getIntAttribute("taperotCurrentProgramIndex", (int) warmCassetteProgramIndex);
+            ProgramId restored;
 
-            if (savedSchema < 4)
-                savedProgramIndex = LegacyMigration::remapProgramIndexV3ToV4(savedProgramIndex);
+            if (savedSchema >= 5)
+            {
+                restored = resolve(LegacyMigration::bankFromAttribute(
+                                       xml->getStringAttribute(LegacyMigration::programBankAttribute)),
+                                   xml->getStringAttribute(LegacyMigration::programIdAttribute),
+                                   xml->getStringAttribute(LegacyMigration::programNameAttribute));
+            }
+            else
+            {
+                // v4 and older stored a position. Map it through the CURRENT bank - correct here
+                // because nothing has shipped and the bank has not moved since v4 - and through the
+                // v3->v4 hop first if this predates Init leaving the numbered bank.
+                int savedIndex = xml->getIntAttribute("taperotCurrentProgramIndex",
+                                                       (int) warmCassetteProgramIndex);
 
-            const bool valid = isInitProgram(savedProgramIndex)
-                               || juce::isPositiveAndBelow(savedProgramIndex, getNumPrograms());
+                if (savedSchema < 4)
+                    savedIndex = LegacyMigration::remapProgramIndexV3ToV4(savedIndex);
 
-            currentProgramIndex.store(valid ? savedProgramIndex : (int) warmCassetteProgramIndex,
-                                       std::memory_order_relaxed);
+                if (savedIndex == -1)
+                    restored = initId();
+                else if (juce::isPositiveAndBelow(savedIndex, (int) kNumFactoryPrograms))
+                    restored = factoryIdAt(savedIndex);
+                else if (const int u = savedIndex - (int) kNumFactoryPrograms;
+                         u >= 0 && u < userProgramFiles.size())
+                {
+                    const auto stem = userProgramFiles.getReference(u).getFileNameWithoutExtension();
+                    restored = { ProgramBank::user, stem, stem };
+                }
+                else
+                    restored = factoryIdAt((int) warmCassetteProgramIndex);
+            }
+
+            setCurrentId(restored);
 
             // Snapshot the restored state, not the named Program's definition: reopening a session
             // should not present as "modified" before the user has touched anything.
             captureProgramSnapshot();
+
+            // **Armed AFTER replaceState**, or the restore's own parameter writes would be mistaken
+            // for activity and disarm it immediately. See the member's comment for what it guards.
+            justRestoredState.store(true, std::memory_order_relaxed);
         }
 }
 

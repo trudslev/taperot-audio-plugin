@@ -1,6 +1,8 @@
 #include "TestUtils.h"
 #include "../Source/DSP/FactoryPrograms.h"
 #include "../Source/Parameters.h"
+
+#include <set>
 #include <juce_audio_processors/juce_audio_processors.h>
 
 /**
@@ -139,13 +141,58 @@ public:
                          "the schema-version attribute must still be found under this exact name");
         }
 
-        beginTest("The schema version is 4, and the bump is the Init promotion - nothing else");
-        // This asserted 3 until Init left the numbered bank, on the reasoning that the
-        // Preset->Program RENAME altered no state format and so must not arm a migration with
-        // nothing to migrate. That reasoning still stands and is why the number is checked at all:
-        // a bump has to be justified by an actual format change. v4 is one - every Factory index
-        // shifted by one - so the guard now pins the new number rather than the old.
-        expectEquals(LegacyMigration::currentStateSchemaVersion, 4,
+        beginTest("The identity attributes are spelled exactly as the shipping format has them");
+        {
+            // **Literals, not the constants.** Through LegacyMigration:: these would rename
+            // themselves alongside the code and assert nothing; the whole point is that a rename
+            // breaks this test rather than everyone's sessions.
+            expect(juce::String(LegacyMigration::programBankAttribute) == "taperotProgramBank");
+            expect(juce::String(LegacyMigration::programIdAttribute)   == "taperotProgramId");
+            expect(juce::String(LegacyMigration::programNameAttribute) == "taperotProgramName");
+            expect(juce::String(LegacyMigration::stateSchemaVersionAttribute) == "taperotStateSchemaVersion");
+        }
+
+        beginTest("Bank values round-trip through their attribute spelling");
+        {
+            for (const auto bank : { ProgramBank::init, ProgramBank::factory,
+                                     ProgramBank::user, ProgramBank::unresolved })
+                expect(LegacyMigration::bankFromAttribute(
+                           LegacyMigration::bankAttributeValue(bank)) == bank);
+
+            // An unreadable or absent bank must not silently become INIT or unresolved - the
+            // factory bank is the only safe default, because it is the one that always exists.
+            expect(LegacyMigration::bankFromAttribute("") == ProgramBank::factory);
+            expect(LegacyMigration::bankFromAttribute("nonsense") == ProgramBank::factory);
+        }
+
+        beginTest("Factory slugs are unique, non-empty, and pinned as literals");
+        {
+            std::set<juce::String> slugs;
+
+            for (const auto& fp : kFactoryPrograms)
+            {
+                const juce::String slug { fp.slug };
+                expect(slug.isNotEmpty(), juce::String(fp.name) + " has no slug");
+                expect(slugs.insert(slug).second, "duplicate slug: " + slug);
+                expect(! slug.containsChar(' '), "slug must be filename- and XML-safe: " + slug);
+            }
+
+            expectEquals((int) slugs.size(), (int) kFactoryPrograms.size());
+
+            // **Literals on purpose.** A slug is the permanent identity: the display name above it
+            // may be revised freely, but changing one of these orphans every session that stored
+            // it. Asserted through kFactoryPrograms[n].slug this would follow the rename silently.
+            expect(juce::String(kFactoryPrograms[0].slug) == "warm-cassette");
+            expect(juce::String(kFactoryPrograms[12].slug) == "total-meltdown");
+            expect(juce::String(kInitProgram.slug) == "init");
+        }
+
+        beginTest("The schema version is 5, and the bump is the move to identity - nothing else");
+        // The reasoning this guard was written for still stands: a bump must be justified by an
+        // actual format change, not by a rename. It has now been justified twice - v4 when Init
+        // left the numbered bank and every index shifted, and v5 when the session stopped storing
+        // a position at all and started storing bank + identifier.
+        expectEquals(LegacyMigration::currentStateSchemaVersion, 5,
                      "only a real state-format change may bump this");
 
         beginTest("A v3 session's program index is remapped across the Init promotion");

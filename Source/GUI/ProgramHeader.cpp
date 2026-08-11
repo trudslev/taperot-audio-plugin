@@ -111,7 +111,7 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
         if (namingMode)
             cancelNaming();
         else if (deleteEnabled())
-            processorRef.deleteUserProgram(processorRef.getCurrentProgram());
+            processorRef.deleteUserProgram(processorRef.getCurrentProgramId());
 
         repaint();
     }
@@ -134,47 +134,47 @@ void ProgramHeader::mouseMove(const juce::MouseEvent& e)
 
 bool ProgramHeader::deleteEnabled() const
 {
-    const int index = processorRef.getCurrentProgram();
-    return ! TapeRotAudioProcessor::isInitProgram(index) && ! processorRef.isFactoryProgram(index);
+    // Only a User Program can be deleted. INIT and an unresolved id are not stored things, and a
+    // Factory Program is read-only.
+    return processorRef.getCurrentProgramId().bank == ProgramBank::user;
 }
 
 void ProgramHeader::showProgramMenu()
 {
-    const int numPrograms = processorRef.getNumPrograms();
-    const int currentIndex = processorRef.getCurrentProgram();
+    const auto current = processorRef.getCurrentProgramId();
 
-    // Item IDs are index + 1 because PopupMenu reserves 0 for "dismissed without choosing".
-    constexpr int initMenuId = 9999;
+    // **Row IDs are positions in THIS menu, not Program indices.** PopupMenu needs an int per row
+    // and reserves 0 for "dismissed"; the callback maps the row straight back to the ProgramId it
+    // was built from, so no Program is ever addressed by a bank position here.
+    menuRows = processorRef.listPrograms();
 
     juce::PopupMenu menu;
     menu.setLookAndFeel(&menuLookAndFeel);
-    bool hasUserPrograms = false;
 
-    // INIT first, unnumbered and above the Factory group, with a divider beneath it. Its item ID
-    // cannot be index + 1 like the rest - that would be 0, which PopupMenu reserves for "dismissed"
-    // - so it carries its own sentinel and is translated back on selection.
-    menu.addItem(initMenuId, "INIT", true,
-                 TapeRotAudioProcessor::isInitProgram(currentIndex));
-    menu.addSeparator();
+    const auto rowId = [](size_t i) { return (int) i + 1; };
 
-    menu.addSectionHeader("Factory");
-    for (int i = 0; i < numPrograms; ++i)
+    bool factoryHeaderDone = false;
+    bool userHeaderDone = false;
+
+    for (size_t i = 0; i < menuRows.size(); ++i)
     {
-        if (processorRef.isFactoryProgram(i))
-            menu.addItem(i + 1, processorRef.getProgramDisplayName(i), true, i == currentIndex);
-        else
-            hasUserPrograms = true;
-    }
+        const auto& id = menuRows[i];
 
-    // Second pass rather than one loop building two menus: user Programs always sort after the
-    // factory bank by index, so this keeps the menu in index order with no intermediate submenu.
-    if (hasUserPrograms)
-    {
-        menu.addSeparator();
-        menu.addSectionHeader("User");
-        for (int i = 0; i < numPrograms; ++i)
-            if (! processorRef.isFactoryProgram(i))
-                menu.addItem(i + 1, processorRef.getProgramDisplayName(i), true, i == currentIndex);
+        // INIT first, unnumbered, above the Factory group with a divider beneath it.
+        if (id.bank == ProgramBank::factory && ! std::exchange(factoryHeaderDone, true))
+        {
+            menu.addSeparator();
+            menu.addSectionHeader("Factory");
+        }
+
+        // The User group is absent entirely when empty, header included, rather than shown blank.
+        if (id.bank == ProgramBank::user && ! std::exchange(userHeaderDone, true))
+        {
+            menu.addSeparator();
+            menu.addSectionHeader("User");
+        }
+
+        menu.addItem(rowId(i), processorRef.displayLabelFor(id), true, id == current);
     }
 
     // The menu hangs off the LCD and reads as an extension of it, so it takes the glass's width
@@ -217,11 +217,12 @@ void ProgramHeader::showProgramMenu()
                            if (safeThis == nullptr || result == 0)
                                return;
 
-                           // setCurrentProgram defers through the processor's AsyncUpdater (a host
-                           // can call it off the message thread), so the repaint has to wait for
-                           // the apply rather than happen here.
-                           safeThis->processorRef.setCurrentProgram(
-                               result == initMenuId ? initProgramIndex : result - 1);
+                           // requestProgramChange defers through the processor's AsyncUpdater, so
+                           // the repaint waits for the apply rather than happening here.
+                           const auto row = (size_t) (result - 1);
+
+                           if (row < safeThis->menuRows.size())
+                               safeThis->processorRef.requestProgramChange(safeThis->menuRows[row]);
                        });
 }
 
@@ -270,12 +271,20 @@ juce::String ProgramHeader::lcdText() const
             return d;
     }
 
-    return processorRef.getProgramDisplayName(processorRef.getCurrentProgram()).toUpperCase();
+    const auto id = processorRef.getCurrentProgramId();
+
+    // An identifier the session named but the bank no longer has - a Factory Program dropped in a
+    // later version, or a user file deleted. The VALUES are correct and untouched; only the name is
+    // unknown, so the panel says so with a "?" rather than pretending to be some other Program.
+    if (id.bank == ProgramBank::unresolved)
+        return id.displayName.toUpperCase() + "?";
+
+    return processorRef.displayLabelFor(id).toUpperCase();
 }
 
 void ProgramHeader::paint(juce::Graphics& g)
 {
-    const int index = processorRef.getCurrentProgram();
+    const auto currentId = processorRef.getCurrentProgramId();
     const auto lcdFont = Font::of(Layout::lcdTextSize);
 
     // --- PROGRAM: one glass, with the bank chip as a single field that switches its text --------
@@ -288,12 +297,12 @@ void ProgramHeader::paint(juce::Graphics& g)
                                .withRight(Layout::lcdChevron.getX() - 8.0f);
 
     // Naming always produces a User Program, so the chip says so from the first keystroke.
-    const bool onInit   = TapeRotAudioProcessor::isInitProgram(index) && ! namingMode;
-    const bool userBank = namingMode || ! processorRef.isFactoryProgram(index);
+    // **An em-dash where the Program is in neither bank** - INIT, or an unresolved identifier.
+    // Printing FACT or USER there would name a bank the Program is not in.
+    const bool onInit   = ! namingMode && (currentId.bank == ProgramBank::init
+                                            || currentId.bank == ProgramBank::unresolved);
+    const bool userBank = namingMode || currentId.bank == ProgramBank::user;
 
-    // **On INIT the chip reads an em-dash at 42% ink, not FACT and not USER.** INIT sits outside
-    // both banks, so naming one here would print the wrong bank rather than no bank - and leaving
-    // the chip on FACT would put INIT in the numbered bank it was deliberately taken out of.
     Text::drawTracked(g, onInit ? Text::emDash() : (userBank ? "USER" : "FACT"), lcdFont,
                       Layout::lcdTracking, bankArea, juce::Justification::centred,
                       onInit ? Colour::lcdText.withAlpha(0.42f) : Colour::lcdText);

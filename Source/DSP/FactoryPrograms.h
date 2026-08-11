@@ -1,7 +1,51 @@
 #pragma once
 
 #include "TapeModelData.h"
+
+#include <juce_core/juce_core.h>
+
 #include <array>
+
+/** Which list a Program belongs to. INIT is its own bank rather than a magic index, because it is
+    in neither of the other two: the dropdown prints it unnumbered above FACTORY, the bank tag shows
+    an em-dash rather than naming a bank it is not in, and DELETE is disabled on it. */
+enum class ProgramBank
+{
+    init,
+    factory,
+    user,
+    unresolved      ///< A stored identifier that no longer names anything. See ProgramId::id.
+};
+
+/** **How a Program is identified everywhere except the host adapter.**
+
+    Not a position. Positions change when the bank is reordered or extended, and - while User
+    Programs were on the host list - whenever the user saved or deleted one of their own. A stored
+    position is a name that stops meaning the same thing.
+
+    - `factory`    - `id` is the entry's permanent `FactoryProgram::slug`.
+    - `user`       - `id` is the file's stem, which is also its displayed name.
+    - `init`       - `id` is `"init"`.
+    - `unresolved` - `id` is the identifier that failed to resolve, kept only so the panel can say
+                     which Program the session meant. `displayName` is what actually gets painted;
+                     see PluginProcessor::setStateInformation.
+
+    `displayName` is carried alongside because a factory slug is not presentable - `warm-cassette?`
+    in the LCD would read as a rendering fault rather than an unresolved Program. It is display only
+    and never resolves anything. */
+struct ProgramId
+{
+    ProgramBank bank = ProgramBank::factory;
+    juce::String id;
+    juce::String displayName;
+
+    bool operator== (const ProgramId& other) const noexcept
+    {
+        return bank == other.bank && id == other.id;    // displayName is not identity
+    }
+
+    bool operator!= (const ProgramId& other) const noexcept { return ! operator== (other); }
+};
 
 // A full parameter-state snapshot, one field per APVTS parameter except the three momentary aux
 // triggers (STOP/FILTER/FAIL) - those are deliberately not part of a program's own state at all;
@@ -9,6 +53,18 @@
 // state (see PluginProcessor's applyProgramSnapshot).
 struct FactoryProgram
 {
+    /** **The permanent identity, fixed at creation and never changed again.**
+
+        A Program is identified by this, never by its position in the bank. `name` is a label the
+        designers may revise; `slug` may not be revised, even if the name is, because it is what a
+        saved session stores and what resolves back to this entry. Renaming "Warm Cassette" is free;
+        renaming `warm-cassette` silently orphans every session that referenced it.
+
+        Positions used to serve this purpose, and lifting Init out of the numbered bank showed what
+        that costs: every index shifted by one, and without a hand-written remap every session would
+        have reopened naming the Program AFTER the one it was saved with, values still correct. */
+    const char* slug;
+
     const char* name;
     const char* description;
 
@@ -35,55 +91,55 @@ struct FactoryProgram
 // description, not yet tuned by ear (that's a deliberate later pass - build, load, listen,
 // adjust - not something to guess precisely up front).
 inline constexpr std::array<FactoryProgram, 13> kFactoryPrograms{{
-    {"Warm Cassette", "Just a little warmth",
+    {"warm-cassette", "Warm Cassette", "Just a little warmth",
      5 /* CASSETTE I */, 15.0f, 20.0f, 6.7f, 10.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Revox Reference", "The cleanest model, barely-there tape warmth",
+    {"revox-reference", "Revox Reference", "The cleanest model, barely-there tape warmth",
      1 /* REVOX B77 */, 8.0f, 8.0f, 3.0f, 5.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
-    {"VHS Memory", "Camcorder character, light occasional dropout",
+    {"vhs-memory", "VHS Memory", "Camcorder character, light occasional dropout",
      4 /* CAMCORDER */, 20.0f, 15.0f, 5.0f, 20.0f, 1 /* VCR */, false, 15.0f,
      true, false, false, false, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Home Movie Night", "Camcorder pushed further: more failure, hum",
+    {"home-movie-night", "Home Movie Night", "Camcorder pushed further: more failure, hum",
      4 /* CAMCORDER */, 25.0f, 20.0f, 6.5f, 23.1f, 1 /* VCR */, true, 40.0f,
      true, false, false, true, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Answering Machine", "Dictaphone, narrowed band, occasional snag",
+    {"answering-machine", "Answering Machine", "Dictaphone, narrowed band, occasional snag",
      7 /* DICTAPHONE */, 15.0f, 10.0f, 4.0f, 10.0f, 0 /* TAPE */, false, 30.0f,
      false, true, false, false, 100.0f, 0.0f, false, 1, 4000.0f, 300.0f, 0.3f, false},
 
-    {"Bedroom 4-Track", "Cassette II, moderate drive and wow/flutter",
+    {"bedroom-4-track", "Bedroom 4-Track", "Cassette II, moderate drive and wow/flutter",
      6 /* CASSETTE II */, 35.0f, 30.0f, 9.2f, 13.4f, 0 /* TAPE */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Third Generation Dub", "Cassette I, GEN3, decorrelated stereo",
+    {"third-generation-dub", "Third Generation Dub", "Cassette I, GEN3, decorrelated stereo",
      5 /* CASSETTE I */, 8.8f, 25.0f, 4.5f, 20.0f, 0 /* TAPE */, false, 35.0f,
      true, true, true, true, 100.0f, 0.0f, true, 3, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Lo-Fi Beat Tape", "Toy model, dust noise, boxy LP-shaped tone",
+    {"lo-fi-beat-tape", "Lo-Fi Beat Tape", "Toy model, dust noise, boxy LP-shaped tone",
      8 /* TOY */, 5.8f, 8.2f, 5.7f, 30.0f, 2 /* DUST */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 2, 6000.0f, 20.0f, 0.3f, false},
 
-    {"Radio Drift", "Toy model, prominent wow, thinned low end",
+    {"radio-drift", "Radio Drift", "Toy model, prominent wow, thinned low end",
      8 /* TOY */, 25.0f, 55.0f, 10.0f, 15.0f, 0 /* TAPE */, true, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 1, 20000.0f, 250.0f, 0.3f, false},
 
-    {"Fifth Gen Fade", "Cassette II, GEN5 - degraded but still musical",
+    {"fifth-gen-fade", "Fifth Gen Fade", "Cassette II, GEN5 - degraded but still musical",
      6 /* CASSETTE II */, 3.5f, 15.1f, 5.8f, 25.0f, 0 /* TAPE */, false, 15.0f,
      true, true, false, false, 100.0f, -5.1f, false, 5, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Dust and Crackle", "Revox B77, dust noise as the featured element",
+    {"dust-and-crackle", "Dust and Crackle", "Revox B77, dust noise as the featured element",
      1 /* REVOX B77 */, 10.0f, 10.0f, 4.0f, 25.0f, 2 /* DUST */, false, 5.0f,
      true, false, false, false, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Tape Stop Ready", "Near-clean base, short ramp for a snappy stop",
+    {"tape-stop-ready", "Tape Stop Ready", "Near-clean base, short ramp for a snappy stop",
      5 /* CASSETTE I */, 10.0f, 10.0f, 4.0f, 5.0f, 0 /* TAPE */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
-    {"Total Meltdown", "As far as it goes - the one deliberate extreme",
+    {"total-meltdown", "Total Meltdown", "As far as it goes - the one deliberate extreme",
      8 /* TOY */, 70.0f, 60.0f, 27.5f, 60.0f, 2 /* DUST */, true, 85.0f,
      true, true, true, true, 100.0f, 0.0f, true, 8, 20000.0f, 20.0f, 0.3f, false},
 }};
@@ -125,6 +181,6 @@ constexpr int initProgramIndex = -1;
     them, and switching the modes off as well would mean the first thing a user did with the Failure
     knob produced nothing. */
 inline constexpr FactoryProgram kInitProgram
-    {"INIT", "Clean pass-through starting point",
+    {"init", "INIT", "Clean pass-through starting point",
      (int) noneModelIndex, 0.0f, 0.0f, 0.0f, 0.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false};

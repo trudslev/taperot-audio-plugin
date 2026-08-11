@@ -51,10 +51,18 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
 
         // Guarded on the drag state: a SliderAttachment fires this on Program apply and on every
         // host automation step too, and without the guard the LCD latches and flickers.
+        //
+        // The same guard now disarms the processor's stale-replay flag, because this is the only
+        // place that knows a change came from a PERSON. It deliberately does not fire for
+        // automation: a host may write automation on session load before replaying its remembered
+        // program index, and disarming there would let that replay land on the restored state.
         knob->onValueChange = [this, paramId, raw]
         {
             if (raw->isMouseButtonDown())
+            {
+                processorRef.noteUserEdit();
                 header.showParameter(paramId);
+            }
         };
 
         addAndMakeVisible(*knob);
@@ -68,8 +76,11 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
         const auto& a = buttonAssets[i];
         auto b = std::make_unique<SpriteButton>(processorRef.apvts, Layout::buttons[i],
                                                 a.on, a.onSize, a.off, a.offSize);
+        // onInteraction fires only on a real click, so it is user-originated by construction and
+        // disarms the stale-replay guard for the same reason the knobs' guarded callback does.
         b->onInteraction = [this](const juce::String& id)
         {
+            processorRef.noteUserEdit();
             header.showParameter(id);
             header.releaseParameter();
         };

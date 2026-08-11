@@ -38,33 +38,90 @@ public:
     bool producesMidi() const override { return false; }
     double getTailLengthSeconds() const override { return 0.0; }
 
-    int getNumPrograms() override;
-    int getCurrentProgram() override { return currentProgramIndex.load(std::memory_order_relaxed); }
+    //==============================================================================
+    /** **The host adapter - the ONLY place a Program is addressed by position.**
+
+        Everything else in this plugin identifies a Program by ProgramId. These four exist because
+        the JUCE API is positional, and they translate at the boundary.
+
+        **The list is the Factory bank and nothing else.** Not INIT, not User Programs. That is a
+        conformance requirement, not a preference - juce_AudioProcessor.h documents getNumPrograms
+        as: "The value returned must be valid as soon as this object is created, and must not change
+        over its lifetime." A count including User Programs changes the moment one is saved, which is
+        what this plugin used to do.
+
+        The consequences of that non-conformance are worth knowing before anyone "fixes" this by
+        making the count dynamic again. JUCE's VST3 wrapper builds the automatable Program parameter
+        ONCE in its constructor with range 0..getNumPrograms()-1, so a Program saved afterwards was
+        simply unreachable from the host and a deleted one left the range overrunning the list. The
+        frozen range was the API keeping its documented promise, not a bug to work around.
+
+        Excluding INIT as well buys exact alignment: host index n IS Factory Program n+1, so
+        automating "Program 3" selects the Program the panel prints as 03.
+
+        **Accepted divergence.** With User Programs off the list, getCurrentProgram has to answer
+        with SOME factory position while a User Program is loaded, and it answers 0. A host's own
+        menu will then show a Factory name while the panel shows the user's Program. The sound and
+        the panel are both correct; only the host's menu is wrong, and that is the format's
+        limitation rather than something to paper over. */
+    int getNumPrograms() override { return (int) kNumFactoryPrograms; }
+    int getCurrentProgram() override;
     void setCurrentProgram(int index) override;
     const juce::String getProgramName(int index) override;
+
+    /** Deliberately a no-op, and this comment is the point of it.
+
+        With Factory-only exposure there is nothing on the host's list that can be renamed: Factory
+        names are fixed at authoring time and User Programs are not exposed. Implementing this would
+        be a back door into the Factory bank, which is exactly what the permanent slugs exist to
+        prevent. Renaming a User Program is a panel operation on a file. */
     void changeProgramName(int, const juce::String&) override {}
 
     void getStateInformation(juce::MemoryBlock& destData) override;
     void setStateInformation(const void* data, int sizeInBytes) override;
 
-    // Factory programs (indices [0, kNumFactoryPrograms)) are the read-only, always-present entries
-    // in kFactoryPrograms; user programs (indices [kNumFactoryPrograms, getNumPrograms())) are files
-    // in getUserProgramDirectory(), sorted alphabetically by filename. "Save" is never in-place for
-    // a factory program - the GUI's Save always calls saveUserProgram, which creates a new file.
-    bool isFactoryProgram(int index) const noexcept { return index >= 0 && index < (int) kNumFactoryPrograms; }
+    //==============================================================================
+    /** The current Program's identity. Everything on the panel reads this. */
+    ProgramId getCurrentProgramId() const;
 
-    /** INIT sits outside both banks at index -1, so it is neither factory nor user. */
-    static bool isInitProgram(int index) noexcept { return index == initProgramIndex; }
+    /** The identity of a Factory Program at a bank position, and INIT's. Position is an argument
+        here and nowhere else - these are how the host adapter and the dropdown cross the boundary
+        from "which entry" to "which Program". */
+    static ProgramId factoryIdAt(int factoryPosition);
+    static ProgramId initId();
 
-    /** What the LCD and the dropdown show: a two-digit 1-based index, a space, then the name.
-        getProgramName stays raw, because that is what the HOST's program list wants - a host
-        renders its own numbering and would print "01" twice.
+    /** The Factory bank position of a slug, or -1 if no entry carries it. */
+    static int factoryPositionOf(const juce::String& slug);
 
-        INIT is unnumbered. It is outside the bank, so a number would place it in a running order it
-        is not part of. */
-    juce::String getProgramDisplayName(int index);
+    /** Applies a Program by identity. Safe from any thread - defers through the AsyncUpdater. */
+    void requestProgramChange(const ProgramId& id);
+
+    /** Resolves an identifier, or returns an `unresolved` ProgramId carrying the name to show. */
+    ProgramId resolve(ProgramBank bank, const juce::String& id, const juce::String& displayName) const;
+
+    /** The list the dropdown paints, in display order: INIT, then Factory, then User. */
+    std::vector<ProgramId> listPrograms() const;
+
+    /** **What the LCD and the dropdown print - a label, not a key.**
+
+        The two-digit number is computed from the Program's position in the Factory bank at paint
+        time. It is not stored and nothing looks anything up by it. User Programs carry no number at
+        all: they sort alphabetically, so any number would change whenever one was saved. INIT is
+        unnumbered because it is outside the bank. */
+    juce::String displayLabelFor(const ProgramId& id) const;
+
     void saveUserProgram(const juce::String& name);
-    void deleteUserProgram(int index);
+    void deleteUserProgram(const ProgramId& id);
+
+    /** Applies a deferred change right now instead of waiting for the message loop. Only the tests
+        need this: the console app they run in has no message loop to deliver the async callback, so
+        without it every requestProgramChange would silently never arrive. Matches the siblings'
+        ProgramManager::flushPendingChange. */
+    void flushPendingProgramChange() { handleUpdateNowIfNeeded(); }
+
+    /** Clears the stale-replay guard. Called from the editor when a change is USER-originated -
+        see the comment on justRestoredState. */
+    void noteUserEdit() noexcept { justRestoredState.store(false, std::memory_order_relaxed); }
 
     /** True once any stored parameter differs from the Program that is currently showing, so the
         GUI can keep SAVE disabled until there is actually something worth saving. The snapshot is
@@ -102,12 +159,15 @@ private:
     // program is pending and triggers an async update; handleAsyncUpdate (guaranteed message
     // thread) does the real work.
     void handleAsyncUpdate() override;
-    // **-2, not -1.** -1 is INIT's index now, so it can no longer double as "nothing pending" -
-    // using it would make selecting INIT indistinguishable from having nothing queued.
-    static constexpr int noPendingProgram = -2;
-    std::atomic<int> pendingProgramIndex{noPendingProgram};
+    // A ProgramId is not trivially copyable, so "nothing pending" is its own flag rather than a
+    // sentinel value - which also removes the last reason to reserve magic negative numbers.
+    bool hasPendingProgram = false;
+    ProgramId pendingProgram;
+    juce::SpinLock pendingLock;
 
-    void applyProgramByIndex(int index);
+    void applyProgram(const ProgramId& id);
+    void setCurrentId(const ProgramId& id);
+    juce::File userProgramFile(const juce::String& stem) const;
     void applyFactoryProgram(const FactoryProgram& program);
     void refreshUserProgramList();
     static juce::File getUserProgramDirectory();
@@ -123,7 +183,30 @@ private:
     // nothing and never allocates.
     mutable juce::SpinLock snapshotLock;
 
-    std::atomic<int> currentProgramIndex{(int) warmCassetteProgramIndex};
+    // Guarded rather than atomic: a ProgramId holds two juce::Strings. Contention is near-zero -
+    // writes happen on a Program change only - so the spin lock costs nothing and never allocates.
+    mutable juce::SpinLock currentIdLock;
+    ProgramId currentId;
+
+    /** **Guards against a host replaying a stale program index over a just-restored session.**
+
+        Hosts have been observed calling setCurrentProgram AFTER setStateInformation, echoing back
+        the presetNumber they remembered - which would apply a Factory Program over the state that
+        was just restored, silently, with the panel then naming a sound the session never had.
+
+        Armed by setStateInformation and disarmed by the FIRST of either: a setCurrentProgram call
+        (which is itself ignored only if it matches what getCurrentProgram already reports - the
+        exact shape of a replay), or a user-originated parameter change via noteUserEdit.
+
+        **Automation must not disarm it.** A host may start writing automation on session load
+        before it replays the index; if that disarmed the guard the replay would land unguarded,
+        which is the whole failure being prevented. That is why this is driven from the editor's
+        isMouseButtonDown-guarded callback rather than from a ValueTree listener, which cannot tell
+        a person from an automation lane.
+
+        Bounded on purpose: left armed indefinitely it would swallow a genuine matching call much
+        later - the user editing a Program and re-selecting it from the host to revert. */
+    std::atomic<bool> justRestoredState{false};
     // Sorted alphabetically by filename (stable across relaunches, unlike mtime-sort). Index i in
     // this array is program index kNumFactoryPrograms + i.
     juce::Array<juce::File> userProgramFiles;

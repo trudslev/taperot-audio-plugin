@@ -2,7 +2,10 @@
 
 #include "TapeRotTheme.h"
 #include "ProgramMenuLookAndFeel.h"
+#include "../DSP/FactoryPrograms.h"      // ProgramId / ProgramBank
 #include <juce_audio_processors/juce_audio_processors.h>
+
+#include <vector>
 
 class TapeRotAudioProcessor;
 
@@ -82,7 +85,12 @@ private:
     juce::String typedName;
     /** The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits about
         27 characters; this leaves room for the caret without the text reaching the chevron. */
-    static constexpr int maxProgramNameLength = 24;
+    // **26, recomputed now that the "NN " prefix is gone from the displayed string.** The name
+    // field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits 27 characters;
+    // the naming field draws a block cursor after the text, so the cap is 27 - 1. It was 24 when
+    // the display carried a two-digit index and a space, and User Programs no longer carry one:
+    // they sort alphabetically, so any number would change whenever one was saved.
+    static constexpr int maxProgramNameLength = 26;
 
     TapeRotAudioProcessor& processorRef;
 
@@ -94,6 +102,11 @@ private:
     juce::String editingParam;
     /** Outlives showMenuAsync's callback, so it must be a member rather than a local. */
     ProgramMenuLookAndFeel menuLookAndFeel;
+
+    /** The Programs the open menu was built from, in row order. The callback indexes this rather
+        than reconstructing a Program from a number, so a bank that changed while the menu was open
+        cannot select the wrong sound. */
+    std::vector<ProgramId> menuRows;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ProgramHeader)
 };
