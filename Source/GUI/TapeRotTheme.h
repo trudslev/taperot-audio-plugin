@@ -155,7 +155,16 @@ namespace Layout
     inline constexpr int assetScale = 2;
 
     // --- frames the plate leaves empty, filled at runtime (spec section 1) ------------------
-    inline const juce::Rectangle<float> programLcd  { 417.0f,  47.0f, 470.0f, 40.0f };
+    /** **The header band: y 63, height 34, shared by all five parts.** The LCD, both Program
+        buttons and both meter wells stand the same height on the same Y, which is BRAND.md's
+        suite-wide header figure rather than this panel's - the castings are differently-sized
+        units, not scales of one design.
+
+        TapeRot is the only casting where the header got SMALLER: it was 40 (and its meters 42, two
+        pixels taller than their own row-mates). Verified against the v1.0.8 plate rather than the
+        spec table: the LCD glass, the IN well and the OUT well all measure 64..96 there, which is
+        the 32px content box, so the border-box is 63..97 for all three. */
+    inline const juce::Rectangle<float> programLcd  { 416.2f,  63.0f, 470.0f, 34.0f };
     /** The dropdown chevron, baked into the plate (delta v1.0.1 replaced a solid triangle with a
         stroked one, "16x16 box, 14px in from the frame's inner edge"). Nothing draws it, but the
         program name has to stop short of it or a long User Program name runs underneath.
@@ -165,7 +174,7 @@ namespace Layout
         x 444 - where they land on top of the FACT/USER chip (which renders at x 425-466). Confirmed
         with the designers as an asset defect, so these coordinates stay as the spec describes them
         and the plate moves to meet them. Do not "correct" this to 457. */
-    inline const juce::Rectangle<float> lcdChevron  { 857.0f,  59.0f,  16.0f, 16.0f };
+    inline const juce::Rectangle<float> lcdChevron  { 857.0f,  72.0f,  16.0f, 16.0f };
 
     /** The baked rule separating the bank chip from the program name, measured off the v1.0.3
         plate at x 491.0. The chip centres in the glass's left edge to here; the name starts a
@@ -179,12 +188,12 @@ namespace Layout
         with a 3px shadow bleed, hence an 82 x 46 sprite whose top-left is 3px up and left of the
         plate's - the same convention as the two-state buttons in spec section 3. */
     inline constexpr float headerButtonW = 82.0f;
-    inline constexpr float headerButtonH = 46.0f;
-    inline constexpr juce::Point<float> saveSpriteTopLeft   { 894.0f, 44.0f };
-    inline constexpr juce::Point<float> deleteSpriteTopLeft { 980.0f, 44.0f };
+    inline constexpr float headerButtonH = 40.0f;
+    inline constexpr juce::Point<float> saveSpriteTopLeft   { 893.2f, 60.0f };
+    inline constexpr juce::Point<float> deleteSpriteTopLeft { 979.2f, 60.0f };
     /** The plate rects, which are the hit areas - the sprite's bleed must not be clickable. */
-    inline const juce::Rectangle<float> saveHitArea   { 897.0f, 47.0f, 76.0f, 40.0f };
-    inline const juce::Rectangle<float> deleteHitArea { 983.0f, 47.0f, 76.0f, 40.0f };
+    inline const juce::Rectangle<float> saveHitArea   { 896.2f, 63.0f, 76.0f, 34.0f };
+    inline const juce::Rectangle<float> deleteHitArea { 982.2f, 63.0f, 76.0f, 34.0f };
     inline const juce::Rectangle<float> scopeWell   {  43.0f, 158.5f, 1250.0f, 70.0f };
     /** The two legend rows above and below the well. They carry live values - deviation range, wow
         and flutter rates, GEN - so spec section 6 lists them as runtime drawn. The v1.0.1 plate had
@@ -207,8 +216,11 @@ namespace Layout
     inline const juce::Rectangle<float> scopeLegendBottomRow
         { scopeLegendLeft, 233.0f, scopeLegendRight - scopeLegendLeft, 14.0f };
     inline const juce::Rectangle<float> modelReadout{ 508.5f, 476.5f, 134.0f, 27.0f };
-    inline const juce::Rectangle<float> inMeter     { 1134.0f, 47.0f,  80.0f, 42.0f };
-    inline const juce::Rectangle<float> outMeter    { 1226.0f, 47.0f,  80.0f, 42.0f };
+    /** 34 tall on y 63, like every other part of the band. These were 42 at y 47 - two pixels
+        taller than the LCD and the buttons they sit beside, which is the drift the suite audit
+        found in four castings and nobody had noticed by eye. */
+    inline const juce::Rectangle<float> inMeter     { 1132.4f, 63.0f,  80.8f, 34.0f };
+    inline const juce::Rectangle<float> outMeter    { 1225.2f, 63.0f,  80.8f, 34.0f };
 
     //==========================================================================
     /** Knob filmstrips. Frame index = round(value01 * 127); the pointer sweeps -135 to +135
@@ -428,34 +440,42 @@ namespace Asset
         return lit ? on : off;
     }
 
-    inline const juce::Image& saveButton (bool enabled)
+    /** **Each Program button is one three-frame strip, and the order is fixed.**
+
+        Both buttons carry two permanently printed legends - SAVE above STORE, DELETE above CANCEL -
+        and never change their face. Only which legend is backlit changes, so the three frames are
+        lighting states rather than labels:
+
+        | Frame | Backlight  | SAVE means                | DELETE means                    |
+        |-------|------------|---------------------------|---------------------------------|
+        | 0     | both dark  | nothing to do             | nothing to do (Factory or INIT) |
+        | 1     | top lit    | SAVE live                 | DELETE live (a User Program)    |
+        | 2     | bottom lit | STORE live (commit name)  | CANCEL live (abandon name)      |
+
+        Both legends lit is not a state and is deliberately not exported: the two functions are
+        mutually exclusive, so a fourth face could only ever indicate a bug.
+
+        **Frame 0 is inert in code as well as in appearance.** A button showing both legends dark
+        must not act when clicked, or the backlight is claiming something the control contradicts.
+
+        This replaces `saveButton(bool)` and a `DeleteFace` enum whose third value was a *relabel* -
+        the sprite that said CANCEL where the other said DELETE. A printed panel legend cannot
+        rewrite itself, which is what the second legend exists to solve. The old two-face SAVE also
+        had no STORE at all, so naming left it reading SAVE while acting as STORE. */
+    enum class ProgramButtonFrame { bothDark = 0, topLit = 1, bottomLit = 2 };
+
+    inline const juce::Image& saveButtonStrip()
     {
-        static const juce::Image on  = load (BinaryData::btn_save_on_2x_png,
-                                             BinaryData::btn_save_on_2x_pngSize);
-        static const juce::Image off = load (BinaryData::btn_save_off_2x_png,
-                                             BinaryData::btn_save_off_2x_pngSize);
-        return enabled ? on : off;
+        static const juce::Image strip = load (BinaryData::btn_save_strip_2x_png,
+                                               BinaryData::btn_save_strip_2x_pngSize);
+        return strip;
     }
 
-    /** DELETE has three faces: live, dead, and CANCEL while a Program name is being typed. */
-    enum class DeleteFace { enabled, disabled, cancel };
-
-    inline const juce::Image& deleteButton (DeleteFace face)
+    inline const juce::Image& deleteButtonStrip()
     {
-        static const juce::Image on     = load (BinaryData::btn_delete_on_2x_png,
-                                                BinaryData::btn_delete_on_2x_pngSize);
-        static const juce::Image off    = load (BinaryData::btn_delete_off_2x_png,
-                                                BinaryData::btn_delete_off_2x_pngSize);
-        static const juce::Image cancel = load (BinaryData::btn_cancel_2x_png,
-                                                BinaryData::btn_cancel_2x_pngSize);
-
-        switch (face)
-        {
-            case DeleteFace::enabled:  return on;
-            case DeleteFace::cancel:   return cancel;
-            case DeleteFace::disabled:
-            default:                   return off;
-        }
+        static const juce::Image strip = load (BinaryData::btn_delete_strip_2x_png,
+                                               BinaryData::btn_delete_strip_2x_pngSize);
+        return strip;
     }
 
     inline const juce::Image& failLed (bool lit)

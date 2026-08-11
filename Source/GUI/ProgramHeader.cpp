@@ -359,20 +359,44 @@ void ProgramHeader::paint(juce::Graphics& g)
     // dark until a parameter differs from the Program on display, so it never invites a save that
     // would do nothing; DELETE is live only on a User Program, and becomes CANCEL while a name is
     // being typed.
-    const auto blitButton = [&g](const juce::Image& img, juce::Point<float> topLeft)
+    const auto blitButton = [&g](const juce::Image& strip, juce::Point<float> topLeft,
+                                 Asset::ProgramButtonFrame frame)
     {
+        // The strip is three frames stacked at 2x; the destination is 1x, so the source rect is
+        // taken in the strip's own pixels rather than by scaling the destination.
+        const int frameH = strip.getHeight() / 3;
+        const int srcY = (int) frame * frameH;
+
         g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImage(img, juce::Rectangle<float>(topLeft.x, topLeft.y,
-                                                Layout::headerButtonW, Layout::headerButtonH));
+        g.drawImage(strip,
+                    topLeft.x, topLeft.y, Layout::headerButtonW, Layout::headerButtonH,
+                    0, srcY, strip.getWidth(), frameH);
     };
 
-    blitButton(Asset::saveButton(namingMode || processorRef.isProgramModified()),
-               Layout::saveSpriteTopLeft);
+    /*  GUI-SPEC's state matrix. Read the ROW, not the buttons - they are not independent, and two
+        of the five rows are only correct when read together:
 
-    blitButton(Asset::deleteButton(namingMode ? Asset::DeleteFace::cancel
-                                   : (deleteEnabled() ? Asset::DeleteFace::enabled
-                                                      : Asset::DeleteFace::disabled)),
-               Layout::deleteSpriteTopLeft);
+        | Panel state                 | SAVE frame | DELETE frame |
+        | Factory Program, unmodified | 0          | 0            |
+        | Factory Program, edited     | 1          | 0            |
+        | User Program, unmodified    | 0          | 1            |
+        | User Program, edited        | 1          | 1            |
+        | Naming a Program            | 2          | 2            |
+
+        **Naming overrides both resting legends**: while a name is being typed, SAVE and DELETE are
+        dark even on an edited User Program, because nothing can be saved or deleted until the name
+        is committed or abandoned. That is why namingMode is tested first rather than folded in. */
+    using Frame = Asset::ProgramButtonFrame;
+
+    blitButton(Asset::saveButtonStrip(), Layout::saveSpriteTopLeft,
+               namingMode                        ? Frame::bottomLit
+               : processorRef.isProgramModified() ? Frame::topLit
+                                                  : Frame::bothDark);
+
+    blitButton(Asset::deleteButtonStrip(), Layout::deleteSpriteTopLeft,
+               namingMode        ? Frame::bottomLit
+               : deleteEnabled() ? Frame::topLit
+                                 : Frame::bothDark);
 
     // --- MODEL readout --------------------------------------------------------------------------
     if (auto* modelParam = processorRef.apvts.getParameter("model"))

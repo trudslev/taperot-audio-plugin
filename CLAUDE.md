@@ -139,6 +139,34 @@ The nameplate is baked rather than drawn live, deliberately. It used to be drawn
 
 ### The Program header
 
+**The header band is 34px at y 63, and TapeRot is the only casting where it got smaller.** The LCD,
+both Program buttons and both meter wells share that row — the meters used to be 42 tall at y 47,
+two pixels taller than their own row-mates, which is the drift the suite audit found in four
+castings and which nobody had ever caught by eye. 34 is BRAND.md's suite figure rather than this
+panel's: the castings are differently-sized units, not scales of one design.
+
+Verified against the v1.0.8 plate rather than the spec's table — the LCD glass, the IN well and the
+OUT well all measure **64..96** there, which is the 32px content box, so the border-box is 63..97
+for all three. The SAVE and DELETE positions are empty in the plate, as they have been since delta
+v1.0.7, so both buttons are entirely sprite.
+
+**Each button is one three-frame strip and the frame order is fixed.** Frame 0 both legends dark,
+1 top lit, 2 bottom lit. Both legends lit is not a state and is deliberately not exported: the two
+functions are mutually exclusive, so a fourth face could only ever indicate a bug. **Frame 0 is
+inert in code as well as in appearance** — a button showing both legends dark must not act when
+clicked, or the backlight is claiming something the control contradicts.
+
+That replaced `saveButton(bool)` plus a `DeleteFace` enum whose third value was a *relabel*: the
+sprite reading CANCEL where its neighbour read DELETE. A printed panel legend cannot rewrite itself,
+which is exactly what the second legend exists to solve — and the old two-face SAVE had no STORE at
+all, so naming left it reading SAVE while acting as STORE.
+
+**Read the state matrix by row, not by button.** Naming overrides both resting legends: while a name
+is being typed SAVE and DELETE are dark even on an edited User Program, because nothing can be saved
+or deleted until the name is committed or abandoned.
+
+
+
 Four behaviours share the one LCD, which is why `ProgramHeader` is the busiest component here.
 
 **Selecting.** Clicking the glass opens the Program menu — Factory section, then User if any exist, current one marked with a lit amber pip. Selection goes through `setCurrentProgram`, which defers via the processor's `AsyncUpdater` because a host can call it off the message thread, so the repaint waits for the apply rather than happening in the callback.

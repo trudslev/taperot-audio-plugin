@@ -52,9 +52,12 @@ juce_add_binary_data(TapeRotBinaryData
         design/assets/2x/btn_stereo_on_2x.png   design/assets/2x/btn_stereo_off_2x.png
         # Program header. The plate leaves both frames empty (delta v1.0.7); these carry every
         # state, including CANCEL, which replaces DELETE while a Program name is being typed.
-        design/assets/2x/btn_save_on_2x.png     design/assets/2x/btn_save_off_2x.png
-        design/assets/2x/btn_delete_on_2x.png   design/assets/2x/btn_delete_off_2x.png
-        design/assets/2x/btn_cancel_2x.png
+        # One three-frame strip per Program button: both-dark / top-lit / bottom-lit. The five
+        # single-face sprites these replace (btn_save_on|off, btn_delete_on|off, btn_cancel) are
+        # still shipped in design/assets but are no longer build inputs - btn_cancel in particular
+        # was a RELABEL, the face that said CANCEL where its neighbour said DELETE, which the
+        # two-legend rule forbids.
+        design/assets/2x/btn_save_strip_2x.png  design/assets/2x/btn_delete_strip_2x.png
         design/assets/2x/gen_seg_on_2x.png      design/assets/2x/gen_seg_off_2x.png
         design/assets/2x/lamp_on_2x.png         # shared: 4 fault dots + 3 FAIL buttons
         design/assets/2x/lamp_off_2x.png
