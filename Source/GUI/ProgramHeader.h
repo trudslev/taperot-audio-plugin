@@ -85,12 +85,14 @@ private:
     juce::String typedName;
     /** The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits about
         27 characters; this leaves room for the caret without the text reaching the chevron. */
-    // **26, recomputed now that the "NN " prefix is gone from the displayed string.** The name
-    // field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits 27 characters;
-    // the naming field draws a block cursor after the text, so the cap is 27 - 1. It was 24 when
-    // the display carried a two-digit index and a space, and User Programs no longer carry one:
-    // they sort alphabetically, so any number would change whenever one was saved.
-    static constexpr int maxProgramNameLength = 26;
+    // **25 = 27 - 2.** The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking,
+    // which fits 27 characters; the dirty marker " *" takes 2 and the naming cursor takes 1, so the
+    // cap is the budget less the larger of the two.
+    //
+    // It was 24 when the display carried a two-digit index and a space. User Programs no longer
+    // carry one - they sort alphabetically, so any number would change whenever one was saved -
+    // which is what freed the character the marker now costs.
+    static constexpr int maxProgramNameLength = 25;
 
     TapeRotAudioProcessor& processorRef;
 

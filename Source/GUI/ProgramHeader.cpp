@@ -279,7 +279,12 @@ juce::String ProgramHeader::lcdText() const
     if (id.bank == ProgramBank::unresolved)
         return id.displayName.toUpperCase() + "?";
 
-    return processorRef.displayLabelFor(id).toUpperCase();
+    // **A trailing " *" while the loaded Program has been edited**, matching Gatecrasher,
+    // Chorus-60, Fifth Member and Elmer. TapeRot signalled dirty only through SAVE's enabled
+    // sprite, which has to be looked for; the marker is seen at a glance, and the two read the
+    // same predicate so they cannot disagree.
+    return processorRef.displayLabelFor(id).toUpperCase()
+         + (processorRef.isProgramModified() ? " *" : "");
 }
 
 void ProgramHeader::paint(juce::Graphics& g)
