@@ -257,8 +257,24 @@ juce::String ProgramHeader::describe(const juce::String& paramId) const
 
     // Text goes through the parameter's own getText(), so units and precision match what the host
     // shows for the same parameter - there is no second formatting convention to keep in sync.
+    //
+    // **The unit comes from getLabel() and is NOT upper-cased.** getText() carries the number
+    // alone for every parameter whose unit is fixed, so without this the panel showed a bare
+    // `DRIVE: 20` against the `PARAMETER: value unit` that ProgramHeader.h and TapeRotTheme.h both
+    // promise. Case matters in a unit: "s" and "S" are different units, and "kHz" upper-cased is
+    // not a unit at all.
+    //
+    // The VALUE is upper-cased only when it is a choice name rather than a number - MODEL and
+    // SWITCH read as panel labels, while a numeric reading has no case to change and any letters
+    // in it belong to the unit.
     const auto name = p->getName(24).toUpperCase();
-    return name + ": " + p->getText(p->getValue(), 0).toUpperCase();
+    const auto unit = p->getLabel();
+    auto value = p->getText(p->getValue(), 0);
+
+    if (unit.isEmpty() && ! value.containsAnyOf("0123456789"))
+        value = value.toUpperCase();
+
+    return name + ": " + value + (unit.isEmpty() ? juce::String() : " " + unit);
 }
 
 juce::String ProgramHeader::lcdText() const

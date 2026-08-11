@@ -175,8 +175,25 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    auto percentAttrs = juce::AudioParameterFloatAttributes().withLabel("%");
-    auto dbAttrs = juce::AudioParameterFloatAttributes().withLabel("dB");
+    // **Every float parameter needs an explicit stringFromValueFunction.** withLabel() only feeds
+    // getLabel(); it does not touch getText(). An AudioParameterFloat with no formatter of its own
+    // builds one from the range's interval, and when that interval is 0 - as it is for every float
+    // here - `numDecimalPlaces` is left at its initial 7
+    // (juce_AudioParameterFloat.cpp:53-70). The panel printed `DRIVE: 20.0000000`, and so did the
+    // host's automation lane and any generic editor.
+    //
+    // roundToInt rather than fixed-0 for whole numbers: juce::String(double, int) only sets a
+    // formatting flag when the count is greater than zero (juce_String.cpp:486-492), so 0 decimals
+    // falls through to std::ostream's default of six significant digits and renders 33.333332 as
+    // "33.3333". It reads like a rounding instruction and is not one.
+    auto whole  = [] (float v, int) { return juce::String(juce::roundToInt(v)); };
+    auto oneDp  = [] (float v, int) { return juce::String(v, 1); };
+    auto twoDp  = [] (float v, int) { return juce::String(v, 2); };
+
+    auto percentAttrs = juce::AudioParameterFloatAttributes().withLabel("%")
+                            .withStringFromValueFunction(whole);
+    auto dbAttrs = juce::AudioParameterFloatAttributes().withLabel("dB")
+                       .withStringFromValueFunction(oneDp);
 
     // Skewed (matching LP/HP/RAMP's existing 0.3-0.4 convention below): Saturator's drive-gain
     // curve is 1 + shape(driveNorm)*11 feeding tanh(x*driveGain)/tanh(driveGain) (see
@@ -267,7 +284,15 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     params.push_back(std::make_unique<juce::AudioParameterInt>(
         juce::ParameterID{ParamIDs::gen, 1}, "Generation", 1, 8, 1));
 
-    auto hzAttrs = juce::AudioParameterFloatAttributes().withLabel("Hz");
+    // No withLabel here, unlike the others: the unit is value-dependent, so it has to live in the
+    // text. LP spans 1-20 kHz and HP spans 20-2000 Hz, and the printed scales switch at 1k the same
+    // way. A label would double the unit up ("6.3 kHz Hz").
+    auto hzAttrs = juce::AudioParameterFloatAttributes()
+                       .withStringFromValueFunction([] (float v, int)
+                       {
+                           return v >= 1000.0f ? juce::String(v / 1000.0f, 1) + " kHz"
+                                                : juce::String(juce::roundToInt(v)) + " Hz";
+                       });
 
     // Skewed toward the lower end, as is conventional for frequency parameters, since that's
     // where most of the perceptually-relevant tonal action happens. Defaults sit at the
@@ -292,7 +317,10 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         juce::ParameterID{ParamIDs::failAux, 1}, "Fail", false));
 
-    auto secondsAttrs = juce::AudioParameterFloatAttributes().withLabel("s");
+    // Two decimals, not one: RAMP starts at 0.05 s, which one decimal rounds to "0.1" - the same
+    // string it gives at 0.14, so the bottom of the range would read as a single value.
+    auto secondsAttrs = juce::AudioParameterFloatAttributes().withLabel("s")
+                            .withStringFromValueFunction(twoDp);
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::ramp, 1}, "Ramp",
         juce::NormalisableRange<float>(0.05f, 4.0f, 0.0f, 0.4f), 0.3f, secondsAttrs));

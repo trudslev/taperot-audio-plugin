@@ -11,6 +11,7 @@ target_sources(TapeRotTests PRIVATE
     ToneFiltersTests.cpp
     AuxEffectsTests.cpp
     ParametersStateTests.cpp
+    ParameterTextTests.cpp
     GenerationCascadeTests.cpp
     FilmstripConformanceTests.cpp
     MeteringTests.cpp
