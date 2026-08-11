@@ -110,7 +110,7 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
         // same thing from the keyboard.
         if (namingMode)
             cancelNaming();
-        else if (! processorRef.isFactoryProgram(processorRef.getCurrentProgram()))
+        else if (deleteEnabled())
             processorRef.deleteUserProgram(processorRef.getCurrentProgram());
 
         repaint();
@@ -122,8 +122,7 @@ void ProgramHeader::mouseMove(const juce::MouseEvent& e)
     // Position-dependent, so it can't be a one-off setMouseCursor in the constructor: this
     // component spans the whole canvas and only these three cells are clickable.
     const bool saveLive   = namingMode || processorRef.isProgramModified();
-    const bool deleteLive = namingMode
-                         || ! processorRef.isFactoryProgram(processorRef.getCurrentProgram());
+    const bool deleteLive = namingMode || deleteEnabled();
 
     const bool clickable = Layout::programLcd.contains(e.position)
                         || (saveBounds.contains(e.position) && saveLive)
@@ -133,21 +132,36 @@ void ProgramHeader::mouseMove(const juce::MouseEvent& e)
                              : juce::MouseCursor::NormalCursor);
 }
 
+bool ProgramHeader::deleteEnabled() const
+{
+    const int index = processorRef.getCurrentProgram();
+    return ! TapeRotAudioProcessor::isInitProgram(index) && ! processorRef.isFactoryProgram(index);
+}
+
 void ProgramHeader::showProgramMenu()
 {
     const int numPrograms = processorRef.getNumPrograms();
     const int currentIndex = processorRef.getCurrentProgram();
 
     // Item IDs are index + 1 because PopupMenu reserves 0 for "dismissed without choosing".
+    constexpr int initMenuId = 9999;
+
     juce::PopupMenu menu;
     menu.setLookAndFeel(&menuLookAndFeel);
     bool hasUserPrograms = false;
+
+    // INIT first, unnumbered and above the Factory group, with a divider beneath it. Its item ID
+    // cannot be index + 1 like the rest - that would be 0, which PopupMenu reserves for "dismissed"
+    // - so it carries its own sentinel and is translated back on selection.
+    menu.addItem(initMenuId, "INIT", true,
+                 TapeRotAudioProcessor::isInitProgram(currentIndex));
+    menu.addSeparator();
 
     menu.addSectionHeader("Factory");
     for (int i = 0; i < numPrograms; ++i)
     {
         if (processorRef.isFactoryProgram(i))
-            menu.addItem(i + 1, processorRef.getProgramName(i), true, i == currentIndex);
+            menu.addItem(i + 1, processorRef.getProgramDisplayName(i), true, i == currentIndex);
         else
             hasUserPrograms = true;
     }
@@ -160,7 +174,7 @@ void ProgramHeader::showProgramMenu()
         menu.addSectionHeader("User");
         for (int i = 0; i < numPrograms; ++i)
             if (! processorRef.isFactoryProgram(i))
-                menu.addItem(i + 1, processorRef.getProgramName(i), true, i == currentIndex);
+                menu.addItem(i + 1, processorRef.getProgramDisplayName(i), true, i == currentIndex);
     }
 
     // The menu hangs off the LCD and reads as an extension of it, so it takes the glass's width
@@ -206,7 +220,8 @@ void ProgramHeader::showProgramMenu()
                            // setCurrentProgram defers through the processor's AsyncUpdater (a host
                            // can call it off the message thread), so the repaint has to wait for
                            // the apply rather than happen here.
-                           safeThis->processorRef.setCurrentProgram(result - 1);
+                           safeThis->processorRef.setCurrentProgram(
+                               result == initMenuId ? initProgramIndex : result - 1);
                        });
 }
 
@@ -255,7 +270,7 @@ juce::String ProgramHeader::lcdText() const
             return d;
     }
 
-    return processorRef.getProgramName(processorRef.getCurrentProgram()).toUpperCase();
+    return processorRef.getProgramDisplayName(processorRef.getCurrentProgram()).toUpperCase();
 }
 
 void ProgramHeader::paint(juce::Graphics& g)
@@ -273,10 +288,15 @@ void ProgramHeader::paint(juce::Graphics& g)
                                .withRight(Layout::lcdChevron.getX() - 8.0f);
 
     // Naming always produces a User Program, so the chip says so from the first keystroke.
+    const bool onInit   = TapeRotAudioProcessor::isInitProgram(index) && ! namingMode;
     const bool userBank = namingMode || ! processorRef.isFactoryProgram(index);
 
-    Text::drawTracked(g, userBank ? "USER" : "FACT", lcdFont,
-                      Layout::lcdTracking, bankArea, juce::Justification::centred, Colour::lcdText);
+    // **On INIT the chip reads an em-dash at 42% ink, not FACT and not USER.** INIT sits outside
+    // both banks, so naming one here would print the wrong bank rather than no bank - and leaving
+    // the chip on FACT would put INIT in the numbered bank it was deliberately taken out of.
+    Text::drawTracked(g, onInit ? Text::emDash() : (userBank ? "USER" : "FACT"), lcdFont,
+                      Layout::lcdTracking, bankArea, juce::Justification::centred,
+                      onInit ? Colour::lcdText.withAlpha(0.42f) : Colour::lcdText);
 
     if (namingMode)
     {
@@ -310,9 +330,8 @@ void ProgramHeader::paint(juce::Graphics& g)
                Layout::saveSpriteTopLeft);
 
     blitButton(Asset::deleteButton(namingMode ? Asset::DeleteFace::cancel
-                                   : (processorRef.isFactoryProgram(index)
-                                          ? Asset::DeleteFace::disabled
-                                          : Asset::DeleteFace::enabled)),
+                                   : (deleteEnabled() ? Asset::DeleteFace::enabled
+                                                      : Asset::DeleteFace::disabled)),
                Layout::deleteSpriteTopLeft);
 
     // --- MODEL readout --------------------------------------------------------------------------

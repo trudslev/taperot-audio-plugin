@@ -52,6 +52,17 @@ public:
     // in getUserProgramDirectory(), sorted alphabetically by filename. "Save" is never in-place for
     // a factory program - the GUI's Save always calls saveUserProgram, which creates a new file.
     bool isFactoryProgram(int index) const noexcept { return index >= 0 && index < (int) kNumFactoryPrograms; }
+
+    /** INIT sits outside both banks at index -1, so it is neither factory nor user. */
+    static bool isInitProgram(int index) noexcept { return index == initProgramIndex; }
+
+    /** What the LCD and the dropdown show: a two-digit 1-based index, a space, then the name.
+        getProgramName stays raw, because that is what the HOST's program list wants - a host
+        renders its own numbering and would print "01" twice.
+
+        INIT is unnumbered. It is outside the bank, so a number would place it in a running order it
+        is not part of. */
+    juce::String getProgramDisplayName(int index);
     void saveUserProgram(const juce::String& name);
     void deleteUserProgram(int index);
 
@@ -91,7 +102,10 @@ private:
     // program is pending and triggers an async update; handleAsyncUpdate (guaranteed message
     // thread) does the real work.
     void handleAsyncUpdate() override;
-    std::atomic<int> pendingProgramIndex{-1};
+    // **-2, not -1.** -1 is INIT's index now, so it can no longer double as "nothing pending" -
+    // using it would make selecting INIT indistinguishable from having nothing queued.
+    static constexpr int noPendingProgram = -2;
+    std::atomic<int> pendingProgramIndex{noPendingProgram};
 
     void applyProgramByIndex(int index);
     void applyFactoryProgram(const FactoryProgram& program);

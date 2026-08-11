@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "../Source/DSP/FactoryPrograms.h"
 #include "../Source/Parameters.h"
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -138,11 +139,47 @@ public:
                          "the schema-version attribute must still be found under this exact name");
         }
 
-        beginTest("The schema version is unchanged by the rename");
-        // The rename altered no state format, so bumping this would arm a migration path with
-        // nothing to migrate - and make every existing session take a hop it does not need.
-        expectEquals(LegacyMigration::currentStateSchemaVersion, 3,
-                     "the Preset->Program rename must not bump the state schema version");
+        beginTest("The schema version is 4, and the bump is the Init promotion - nothing else");
+        // This asserted 3 until Init left the numbered bank, on the reasoning that the
+        // Preset->Program RENAME altered no state format and so must not arm a migration with
+        // nothing to migrate. That reasoning still stands and is why the number is checked at all:
+        // a bump has to be justified by an actual format change. v4 is one - every Factory index
+        // shifted by one - so the guard now pins the new number rather than the old.
+        expectEquals(LegacyMigration::currentStateSchemaVersion, 4,
+                     "only a real state-format change may bump this");
+
+        beginTest("A v3 session's program index is remapped across the Init promotion");
+        {
+            // The fixture above is a REAL file written by the shipping v3 build, and it remembers
+            // index 1 - which under the old numbering was Warm Cassette, sitting behind Init at 0.
+            // Under v4 that same sound is index 0. Getting this wrong is silent: the knob values
+            // restore correctly and only the NAME on the panel is wrong, so it names a sound it is
+            // not making.
+            std::unique_ptr<juce::XmlElement> xml(juce::XmlDocument::parse(shippingBuildProgram));
+            expect(xml != nullptr);
+
+            const int saved = xml->getIntAttribute("taperotCurrentProgramIndex", -99);
+            expectEquals(saved, 1, "the fixture should be the v3 build's Warm Cassette");
+            expectEquals(LegacyMigration::remapProgramIndexV3ToV4(saved), 0,
+                         "v3's Warm Cassette (1) must become v4's Warm Cassette (0)");
+
+            // Old index 0 was Init itself, which is no longer in the bank at all.
+            expectEquals(LegacyMigration::remapProgramIndexV3ToV4(0), initProgramIndex,
+                         "v3's Init (0) must become the unnumbered INIT slot");
+
+            // The shift is uniform, so User Programs ride along on the same subtraction.
+            expectEquals(LegacyMigration::remapProgramIndexV3ToV4(13), 12);
+        }
+
+        beginTest("INIT is outside both banks and is not the instantiation default");
+        {
+            expect(initProgramIndex < 0, "INIT must not occupy a bank index");
+            expectEquals((int) warmCassetteProgramIndex, 0,
+                         "the instantiation default must be Program 01, not the entry behind it");
+            expectEquals((int) kNumFactoryPrograms, 13,
+                         "Init left the numbered bank, so thirteen authored Programs remain");
+            expect(juce::String(kFactoryPrograms[warmCassetteProgramIndex].name) == "Warm Cassette");
+        }
 
         beginTest("An unknown parameter id in a saved session is ignored, not fatal");
         {

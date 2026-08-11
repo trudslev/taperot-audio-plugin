@@ -48,7 +48,26 @@ namespace LegacyMigration
     // setStateInformation XML, which is keyed by the plain ID string regardless of versionHint -
     // that path needs this explicit marker instead.
     constexpr auto stateSchemaVersionAttribute = "taperotStateSchemaVersion";
-    constexpr int currentStateSchemaVersion = 3;
+    constexpr int currentStateSchemaVersion = 4;
+
+    /** v3 -> v4: **Init left the numbered Factory bank**, so every Factory index shifted down by
+        one and Warm Cassette became 01 instead of 02.
+
+        This matters because the session stores the current Program **by index**, not by name. Left
+        alone, every session saved before this change would reopen showing the name of the Program
+        AFTER the one it was saved with - silently, and while the restored knob values stayed
+        correct, so the panel would name a sound it was not making.
+
+        The mapping is exact rather than approximate, which is why this is a migration and not a
+        reset-to-default: old 0 was Init and becomes INIT's -1; every other old index k, factory or
+        user alike, becomes k - 1, because the whole list above it shifted by exactly one.
+
+        Applied to the SESSION attribute only. User Program FILES are unaffected - they store
+        parameter values, never an index. */
+    inline int remapProgramIndexV3ToV4(int savedIndex) noexcept
+    {
+        return savedIndex == 0 ? -1 : savedIndex - 1;
+    }
 
     // v1 -> v2: old table order was VCR HiFi, Camcorder, Dictaphone, Toy, Cassette Type I,
     // Cassette Type II, Reel-to-Reel, Answering Machine (indices 0-7). Maps each to its closest

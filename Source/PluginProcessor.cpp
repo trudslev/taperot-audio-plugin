@@ -35,8 +35,10 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     for (int i = 0; i < maxGenerations; ++i)
         generationStages[(size_t) i] = std::make_unique<DegradationCore>(i);
 
-    // Boots into Warm Cassette, not Init - construction is single-threaded and has no host/
-    // automation attached yet, so applying this synchronously (rather than through the
+    // Boots into Warm Cassette, which is now Program 01 rather than the entry behind Init.
+    // **INIT is never the instantiation default** - it is a starting point the user chooses, not
+    // the sound the plugin should make when a host loads it. Construction is single-threaded with
+    // no host or automation attached, so applying this synchronously (rather than through the
     // pendingProgramIndex/AsyncUpdater path used by setCurrentProgram) is safe.
     refreshUserProgramList();
     applyFactoryProgram(kFactoryPrograms[warmCassetteProgramIndex]);
@@ -46,8 +48,8 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
 
 void TapeRotAudioProcessor::handleAsyncUpdate()
 {
-    const int index = pendingProgramIndex.exchange(-1, std::memory_order_relaxed);
-    if (index >= 0)
+    const int index = pendingProgramIndex.exchange(noPendingProgram, std::memory_order_relaxed);
+    if (index != noPendingProgram)
         applyProgramByIndex(index);
 }
 
@@ -58,7 +60,9 @@ int TapeRotAudioProcessor::getNumPrograms()
 
 void TapeRotAudioProcessor::setCurrentProgram(int index)
 {
-    if (index < 0 || index >= getNumPrograms())
+    // INIT is a legal target and is NOT in [0, getNumPrograms()), so it is admitted explicitly
+    // rather than by widening the range check - which would also admit every other negative index.
+    if (! isInitProgram(index) && (index < 0 || index >= getNumPrograms()))
         return;
     pendingProgramIndex.store(index, std::memory_order_relaxed);
     triggerAsyncUpdate();
@@ -66,6 +70,9 @@ void TapeRotAudioProcessor::setCurrentProgram(int index)
 
 const juce::String TapeRotAudioProcessor::getProgramName(int index)
 {
+    if (isInitProgram(index))
+        return kInitProgram.name;
+
     if (isFactoryProgram(index))
         return kFactoryPrograms[(size_t) index].name;
 
@@ -73,6 +80,16 @@ const juce::String TapeRotAudioProcessor::getProgramName(int index)
     if (userIndex >= 0 && userIndex < userProgramFiles.size())
         return userProgramFiles.getReference(userIndex).getFileNameWithoutExtension();
     return {};
+}
+
+juce::String TapeRotAudioProcessor::getProgramDisplayName(int index)
+{
+    const auto name = getProgramName(index);
+
+    if (isInitProgram(index) || name.isEmpty())
+        return name;
+
+    return juce::String(index + 1).paddedLeft('0', 2) + " " + name;
 }
 
 juce::File TapeRotAudioProcessor::getUserProgramDirectory()
@@ -179,7 +196,11 @@ bool TapeRotAudioProcessor::isProgramModified() const
 
 void TapeRotAudioProcessor::applyProgramByIndex(int index)
 {
-    if (isFactoryProgram(index))
+    if (isInitProgram(index))
+    {
+        applyFactoryProgram(kInitProgram);
+    }
+    else if (isFactoryProgram(index))
     {
         applyFactoryProgram(kFactoryPrograms[(size_t) index]);
     }
@@ -546,14 +567,26 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
             // overwrite the just-restored parameter values with the stale pending program. A full
             // state restore is always authoritative, so any such pending program change is
             // dropped rather than left to fire later.
-            pendingProgramIndex.store(-1, std::memory_order_relaxed);
+            pendingProgramIndex.store(noPendingProgram, std::memory_order_relaxed);
 
             LegacyMigration::remapLegacyModelIndexIfNeeded(*xml);
             apvts.replaceState(juce::ValueTree::fromXml(*xml));
 
-            const int savedProgramIndex = xml->getIntAttribute("taperotCurrentProgramIndex", (int) warmCassetteProgramIndex);
-            currentProgramIndex.store(juce::isPositiveAndBelow(savedProgramIndex, getNumPrograms())
-                                           ? savedProgramIndex : (int) warmCassetteProgramIndex,
+            // **Read the schema BEFORE using the index.** Init left the numbered bank in v4, so
+            // every index in a v3-or-older session is one too high; restoring one unmapped would
+            // name the Program AFTER the one the session was saved with, while the restored knob
+            // values stayed correct - a panel naming a sound it is not making, with nothing to
+            // signal it.
+            const int savedSchema = xml->getIntAttribute(LegacyMigration::stateSchemaVersionAttribute, 1);
+            int savedProgramIndex = xml->getIntAttribute("taperotCurrentProgramIndex", (int) warmCassetteProgramIndex);
+
+            if (savedSchema < 4)
+                savedProgramIndex = LegacyMigration::remapProgramIndexV3ToV4(savedProgramIndex);
+
+            const bool valid = isInitProgram(savedProgramIndex)
+                               || juce::isPositiveAndBelow(savedProgramIndex, getNumPrograms());
+
+            currentProgramIndex.store(valid ? savedProgramIndex : (int) warmCassetteProgramIndex,
                                        std::memory_order_relaxed);
 
             // Snapshot the restored state, not the named Program's definition: reopening a session

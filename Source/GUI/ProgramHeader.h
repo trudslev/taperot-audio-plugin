@@ -61,6 +61,12 @@ public:
 private:
     void timerCallback() override;
     void showProgramMenu();
+
+    /** DELETE is live for a User Program only. Disabled for every Factory Program **and for INIT**
+        - INIT is not a stored thing, so there is nothing to delete. Defined in the .cpp because the
+        processor is only forward-declared here. */
+    bool deleteEnabled() const;
+
     juce::String lcdText() const;
     juce::String describe(const juce::String& paramId) const;
 

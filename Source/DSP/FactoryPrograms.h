@@ -34,11 +34,7 @@ struct FactoryProgram
 // Ordered per the brief's own list. Values are directionally correct per each program's
 // description, not yet tuned by ear (that's a deliberate later pass - build, load, listen,
 // adjust - not something to guess precisely up front).
-inline constexpr std::array<FactoryProgram, 14> kFactoryPrograms{{
-    {"Init", "Clean pass-through starting point",
-     (int) noneModelIndex, 0.0f, 0.0f, 0.0f, 0.0f, 0, false, 0.0f, true, true, true, true,
-     100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
-
+inline constexpr std::array<FactoryProgram, 13> kFactoryPrograms{{
     {"Warm Cassette", "Just a little warmth",
      5 /* CASSETTE I */, 15.0f, 20.0f, 6.7f, 10.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
@@ -93,4 +89,42 @@ inline constexpr std::array<FactoryProgram, 14> kFactoryPrograms{{
 }};
 
 constexpr size_t kNumFactoryPrograms = kFactoryPrograms.size();
-constexpr size_t warmCassetteProgramIndex = 1;
+
+/** **Warm Cassette is Program 01 and the instantiation default, and those are now the same thing.**
+    It used to be index 1 behind Init, so the plugin opened on the second entry in its own list -
+    which reads as a bug whether or not it is one. */
+constexpr size_t warmCassetteProgramIndex = 0;
+
+/** INIT's index. **-1, deliberately outside the bank rather than at position 0 within it.**
+
+    INIT is not an authored sound competing with the other thirteen; it is the blank canvas you
+    start from, so numbering it 01 would push RAIN ALL DAY to 02 and imply a running order it is not
+    part of. Keeping it outside also means adding or removing it never renumbers anything.
+
+    The cost is that -1 is now a meaningful index, so every "no index" sentinel in this casting has
+    to be something else - see pendingProgramIndex, which moved to -2. */
+constexpr int initProgramIndex = -1;
+
+/** The blank canvas: the tape path present and audible in its plainest form, with everything that
+    gives TapeRot its character at zero.
+
+    Three rules decide every value, and they are not the same rule:
+      - **Character and amount go to zero** - Drive, Wow, Flutter, Noise, Failure. Raise any one and
+        you immediately hear what that one does.
+      - **Structure goes to a usable middle, never zero** - Ramp at 0.3 s. A zero-length ramp is not
+        neutral, it is a different (and broken) behaviour.
+      - **Anything meaning "not acting" takes whatever value that is** - LP wide open at 20 kHz, HP
+        at 20 Hz, Output 0 dB, Mix 100 %.
+
+    **Mix is 100 %, not 50 %**, and that is the one value most likely to be "corrected" later.
+    TapeRot is serial: the whole signal passes through the tape path. At 50 % the plugin would be
+    half-bypassed rather than idle, and the first knob the user raised would appear weaker than it
+    is. The four wet/dry castings sit at 50 % for the opposite reason.
+
+    All four failure modes are left ON with Failure at 0 %: the amount is the control that silences
+    them, and switching the modes off as well would mean the first thing a user did with the Failure
+    knob produced nothing. */
+inline constexpr FactoryProgram kInitProgram
+    {"INIT", "Clean pass-through starting point",
+     (int) noneModelIndex, 0.0f, 0.0f, 0.0f, 0.0f, 0, false, 0.0f, true, true, true, true,
+     100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false};
