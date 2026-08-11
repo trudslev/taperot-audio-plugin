@@ -91,55 +91,55 @@ struct FactoryProgram
 // description, not yet tuned by ear (that's a deliberate later pass - build, load, listen,
 // adjust - not something to guess precisely up front).
 inline constexpr std::array<FactoryProgram, 13> kFactoryPrograms{{
-    {"warm-cassette", "Warm Cassette", "Just a little warmth",
+    {"warm-cassette", "WARM CASSETTE", "Just a little warmth",
      5 /* CASSETTE I */, 15.0f, 20.0f, 6.7f, 10.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
-    {"revox-reference", "Revox Reference", "The cleanest model, barely-there tape warmth",
+    {"revox-reference", "REVOX REFERENCE", "The cleanest model, barely-there tape warmth",
      1 /* REVOX B77 */, 8.0f, 8.0f, 3.0f, 5.0f, 0, false, 0.0f, true, true, true, true,
      100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
-    {"vhs-memory", "VHS Memory", "Camcorder character, light occasional dropout",
+    {"vhs-memory", "VHS MEMORY", "Camcorder character, light occasional dropout",
      4 /* CAMCORDER */, 20.0f, 15.0f, 5.0f, 20.0f, 1 /* VCR */, false, 15.0f,
      true, false, false, false, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"home-movie-night", "Home Movie Night", "Camcorder pushed further: more failure, hum",
+    {"home-movie-night", "HOME MOVIE NIGHT", "Camcorder pushed further: more failure, hum",
      4 /* CAMCORDER */, 25.0f, 20.0f, 6.5f, 23.1f, 1 /* VCR */, true, 40.0f,
      true, false, false, true, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"answering-machine", "Answering Machine", "Dictaphone, narrowed band, occasional snag",
+    {"answering-machine", "ANSWERING MACHINE", "Dictaphone, narrowed band, occasional snag",
      7 /* DICTAPHONE */, 15.0f, 10.0f, 4.0f, 10.0f, 0 /* TAPE */, false, 30.0f,
      false, true, false, false, 100.0f, 0.0f, false, 1, 4000.0f, 300.0f, 0.3f, false},
 
-    {"bedroom-4-track", "Bedroom 4-Track", "Cassette II, moderate drive and wow/flutter",
+    {"bedroom-4-track", "BEDROOM 4-TRACK", "Cassette II, moderate drive and wow/flutter",
      6 /* CASSETTE II */, 35.0f, 30.0f, 9.2f, 13.4f, 0 /* TAPE */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"third-generation-dub", "Third Generation Dub", "Cassette I, GEN3, decorrelated stereo",
+    {"third-generation-dub", "THIRD GENERATION DUB", "Cassette I, GEN3, decorrelated stereo",
      5 /* CASSETTE I */, 8.8f, 25.0f, 4.5f, 20.0f, 0 /* TAPE */, false, 35.0f,
      true, true, true, true, 100.0f, 0.0f, true, 3, 20000.0f, 20.0f, 0.3f, false},
 
-    {"lo-fi-beat-tape", "Lo-Fi Beat Tape", "Toy model, dust noise, boxy LP-shaped tone",
+    {"lo-fi-beat-tape", "LO-FI BEAT TAPE", "Toy model, dust noise, boxy LP-shaped tone",
      8 /* TOY */, 5.8f, 8.2f, 5.7f, 30.0f, 2 /* DUST */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 2, 6000.0f, 20.0f, 0.3f, false},
 
-    {"radio-drift", "Radio Drift", "Toy model, prominent wow, thinned low end",
+    {"radio-drift", "RADIO DRIFT", "Toy model, prominent wow, thinned low end",
      8 /* TOY */, 25.0f, 55.0f, 10.0f, 15.0f, 0 /* TAPE */, true, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 1, 20000.0f, 250.0f, 0.3f, false},
 
-    {"fifth-gen-fade", "Fifth Gen Fade", "Cassette II, GEN5 - degraded but still musical",
+    {"fifth-gen-fade", "FIFTH GEN FADE", "Cassette II, GEN5 - degraded but still musical",
      6 /* CASSETTE II */, 3.5f, 15.1f, 5.8f, 25.0f, 0 /* TAPE */, false, 15.0f,
      true, true, false, false, 100.0f, -5.1f, false, 5, 20000.0f, 20.0f, 0.3f, false},
 
-    {"dust-and-crackle", "Dust and Crackle", "Revox B77, dust noise as the featured element",
+    {"dust-and-crackle", "DUST AND CRACKLE", "Revox B77, dust noise as the featured element",
      1 /* REVOX B77 */, 10.0f, 10.0f, 4.0f, 25.0f, 2 /* DUST */, false, 5.0f,
      true, false, false, false, 100.0f, 0.0f, false, 2, 20000.0f, 20.0f, 0.3f, false},
 
-    {"tape-stop-ready", "Tape Stop Ready", "Near-clean base, short ramp for a snappy stop",
+    {"tape-stop-ready", "TAPE STOP READY", "Near-clean base, short ramp for a snappy stop",
      5 /* CASSETTE I */, 10.0f, 10.0f, 4.0f, 5.0f, 0 /* TAPE */, false, 0.0f,
      true, true, true, true, 100.0f, 0.0f, false, 1, 20000.0f, 20.0f, 0.3f, false},
 
-    {"total-meltdown", "Total Meltdown", "As far as it goes - the one deliberate extreme",
+    {"total-meltdown", "TOTAL MELTDOWN", "As far as it goes - the one deliberate extreme",
      8 /* TOY */, 70.0f, 60.0f, 27.5f, 60.0f, 2 /* DUST */, true, 85.0f,
      true, true, true, true, 100.0f, 0.0f, true, 8, 20000.0f, 20.0f, 0.3f, false},
 }};

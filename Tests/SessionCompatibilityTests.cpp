@@ -225,7 +225,7 @@ public:
                          "the instantiation default must be Program 01, not the entry behind it");
             expectEquals((int) kNumFactoryPrograms, 13,
                          "Init left the numbered bank, so thirteen authored Programs remain");
-            expect(juce::String(kFactoryPrograms[warmCassetteProgramIndex].name) == "Warm Cassette");
+            expect(juce::String(kFactoryPrograms[warmCassetteProgramIndex].name) == "WARM CASSETTE");
         }
 
         beginTest("An unknown parameter id in a saved session is ignored, not fatal");
