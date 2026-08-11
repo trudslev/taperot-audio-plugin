@@ -131,10 +131,23 @@ namespace LegacyMigration
 
     // Free function (rather than a TapeRotAudioProcessor method) so it's unit-testable with a
     // synthetic XmlElement, without needing the real plugin target's JucePlugin_* macros.
+    /** **Gated on the version this migration belongs to, NOT on the current one.**
+
+        The MODEL table was reordered twice - v1->v2 and v2->v3 - so this applies to sessions below
+        3 and to nothing else. It used to read `>= currentStateSchemaVersion`, which was correct
+        exactly once: every later schema bump silently widened its reach to versions it knows
+        nothing about. Gatecrasher had the same shape and it was not harmless there - bumping the
+        schema re-ran its algorithm remap on already-migrated sessions and rotated the choice a
+        second time on every load.
+
+        Harmless here only by luck: both inner hops are themselves version-gated, so a v3 or v4
+        session fell through doing nothing. The next hop added without one would not be. */
     inline void remapLegacyModelIndexIfNeeded(juce::XmlElement& xml)
     {
+        constexpr int modelRemapAppliesBelow = 3;
+
         const int schemaVersion = xml.getIntAttribute(stateSchemaVersionAttribute, 1);
-        if (schemaVersion >= currentStateSchemaVersion)
+        if (schemaVersion >= modelRemapAppliesBelow)
             return;
 
         for (int i = 0; i < xml.getNumChildElements(); ++i)

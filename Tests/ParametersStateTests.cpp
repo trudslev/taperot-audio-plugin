@@ -192,6 +192,50 @@ public:
 
             expectEquals((int) xml.getChildElement(0)->getDoubleAttribute("value"), 8);
         }
+
+        beginTest("The model remap reaches v1 and v2 only - LITERAL versions, not the current one");
+        {
+            // **The case the test above cannot make.** It writes currentStateSchemaVersion, so it
+            // only ever asserts "today's schema is left alone" - and every schema bump moves what
+            // "today" means. A migration gated on the moving constant therefore silently widens to
+            // versions it knows nothing about, and the test widens with it.
+            //
+            // Gatecrasher had exactly this and it was not harmless: bumping its schema re-ran the
+            // algorithm remap on already-migrated sessions, rotating the choice a second time on
+            // every load. It was caught only because a different test happened to pin a value.
+            //
+            // So these spell the versions out. A session at 3 has already been through both hops;
+            // running either again would move the model to a different machine.
+            for (const int alreadyMigrated : { 3, 4, 5 })
+            {
+                juce::XmlElement xml("PARAMETERS");
+                xml.setAttribute(LegacyMigration::stateSchemaVersionAttribute, alreadyMigrated);
+                auto* param = xml.createNewChildElement("PARAM");
+                param->setAttribute("id", ParamIDs::model);
+                param->setAttribute("value", 8.0);
+
+                LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
+
+                expectEquals((int) xml.getChildElement(0)->getDoubleAttribute("value"), 8,
+                             "schema " + juce::String(alreadyMigrated) + " must not be remapped again");
+            }
+
+            // ...and it must still reach the versions it IS for, or pinning it would have broken
+            // the migration instead of the gate.
+            {
+                juce::XmlElement xml("PARAMETERS");
+                xml.setAttribute(LegacyMigration::stateSchemaVersionAttribute, 1);
+                auto* param = xml.createNewChildElement("PARAM");
+                param->setAttribute("id", ParamIDs::model);
+                param->setAttribute("value", 0.0);
+
+                LegacyMigration::remapLegacyModelIndexIfNeeded(xml);
+
+                expect((int) xml.getChildElement(0)->getDoubleAttribute("value")
+                           != 0 || LegacyMigration::legacyModelIndexRemapV1ToV2[0] == 0,
+                       "a v1 session must still be migrated");
+            }
+        }
     }
 };
 
