@@ -8,7 +8,7 @@
 #include <array>
 
 /**
-    TapeRot's design tokens, transcribed from `design/TapeRot-GUI-Spec.md`.
+    TapeRot's design tokens, transcribed from `design/GUI-SPEC.md`.
 
     Every coordinate is in 1x logical pixels measured from the top-left of `panel_background.png`,
     exactly as the spec states them. The bitmaps are embedded at 2x and drawn at these 1x

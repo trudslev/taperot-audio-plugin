@@ -25,6 +25,19 @@
   </div>
 
   <div style="display:flex; flex-direction:column; gap:12px;">
+    <div style="font:700 12px/1 Helvetica,Arial,sans-serif; letter-spacing:3px; color:#EFE7D3;">PROGRAM HEADER · BACKLIT LEGEND FACES</div>
+    <div style="display:flex; align-items:flex-start; gap:34px;">
+      <sc-for list="{{ faces }}" as="f" hint-placeholder-count="6">
+        <div style="display:flex; flex-direction:column; gap:8px; align-items:flex-start;">
+          <div style="{{ f.style }}"></div>
+          <div style="font:700 10px/1 Helvetica,Arial,sans-serif; letter-spacing:2px; color:#EFE7D3;">{{ f.idx }}</div>
+          <div style="font:400 11px/1.4 Helvetica,Arial,sans-serif; color:#9A8F79; max-width:96px;">{{ f.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:12px;">
     <div style="font:700 12px/1 Helvetica,Arial,sans-serif; letter-spacing:3px; color:#EFE7D3;">ICON · 32 px CHECK</div>
     <div style="display:flex; align-items:center; gap:0;">
       <div style="display:flex; align-items:center; gap:16px; padding:18px 22px; background:#F2EFE8;">
@@ -83,7 +96,20 @@ class Component extends DCLogic {
     FAIL.forEach(([n, x]) => img(P + 'lamp_off.png', x - 6, 496.5 - 6, 34, 34));
     DOTS.forEach(([n, x]) => img(P + 'lamp_off.png', x - 6, 573.5 - 6, 34, 34));
     img(P + 'led_fail_off.png', 1246.9 - 5, 235.3 - 5, 18, 18);
-    return { layers: L };
+    img(P + 'btn_save_off.png', 893.2, 60.0, 82, 40);
+    img(P + 'btn_delete_off.png', 979.2, 60.0, 82, 40);
+    const faces = [
+      ['btn_save_off.png', 'SAVE · 0', 'both dark — Program unmodified'],
+      ['btn_save_on.png', 'SAVE · 1', 'SAVE lit — saves a new Program'],
+      ['btn_save_store.png', 'SAVE · 2', 'STORE lit — commits the name'],
+      ['btn_delete_off.png', 'DELETE · 0', 'both dark — Factory or INIT'],
+      ['btn_delete_on.png', 'DELETE · 1', 'DELETE lit — User Program'],
+      ['btn_cancel.png', 'DELETE · 2', 'CANCEL lit — abandons name entry']
+    ].map(([f, idx, label]) => ({
+      idx, label,
+      style: 'width:82px; height:40px; background:#26231C url(' + P + f + ') no-repeat center/82px 40px;'
+    }));
+    return { layers: L, faces };
   }
 }
 </script>

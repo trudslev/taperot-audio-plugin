@@ -2,6 +2,8 @@
 
 MT-77 · v1.0 · panel and icon approved 8 Aug 2026
 
+**This file is the whole build contract.** Nothing else in the bundle needs reading to build the GUI: the `.dc.html` files are working references, `plate/buttons/` holds reference renders called out from §3, and `delta/CHANGES.md` (outside this bundle) lists only what moved since the last cut.
+
 All coordinates are in 1x logical pixels, measured from the **top-left of `panel_background.png`** (the full plate including its 8 px outer bezel). Multiply by 2 for the `2x` set; nothing else changes.
 
 Panel size: **1336 × 679** (1x) / **2672 × 1358** (2x).
@@ -23,11 +25,13 @@ Empty frames included in the plate (contents drawn at runtime, see §6):
 
 | Element | x | y | w | h |
 |---|---|---|---|---|
-| PROGRAM LCD | 417 | 47 | 470 | 40 |
+| PROGRAM LCD | 416.2 | 63 | 470 | 34 |
 | Scope well (drawable area) | 43 | 158.5 | 1250 | 70 |
 | MODEL readout | 508.5 | 476.5 | 134 | 27 |
-| IN meter | 1134 | 47 | 80 | 42 |
-| OUT meter | 1226 | 47 | 80 | 42 |
+| IN meter | 1132.4 | 63 | 80.8 | 34 |
+| OUT meter | 1225.2 | 63 | 80.8 | 34 |
+| SAVE / STORE button | 896.2 | 63 | 76 | 34 |
+| DELETE / CANCEL button | 982.2 | 63 | 76 | 34 |
 
 ---
 
@@ -95,26 +99,92 @@ Plate 98 × 25 with a 2 px bleed for the drop shadow → sprite **102 × 29**; p
 
 Each group is exclusive-select: exactly one member lit at all times.
 
-### Program header — SAVE / DELETE / CANCEL
+### Program header — dual-legend backlit buttons
 
-Plate 76 × 40, corner radius 4, with a 3 px bleed for the drop shadow → sprite **82 × 46**. Placement below is the sprite's top-left (plate top-left is +3, +3). The plate leaves both frames empty; the sprite carries every state.
+Each of the two header buttons carries **two permanently printed legends, stacked** — SAVE above STORE, DELETE above CANCEL. Top is the resting function, bottom is what the button becomes while a Program is being named. **The face never changes**; only the backlight behind each legend does. There is no disabled face and no relabelling.
+
+**Dimensions.** Plate **76 × 34** — the suite-wide header height. At 10 px Helvetica Bold the cap height is 7 px, and the legends are placed by cap row rather than by line box: cap rows **10–16** and **23–29** of the sprite, 13 px cap-top to cap-top (3 px leading between the 10 px line boxes). That is a 20 px printed block with 7 px of clear plate above the first cap and 7 px below the second — 34 px exactly. Legend size is unchanged at 10 px; both are functional text and neither is available as the place to save the six pixels. Widest legend, CANCEL at 10 px + 2 px tracking, measures 55 px inside a 68 px usable width.
 
 | Button | Sprite x | Sprite y |
 |---|---|---|
-| SAVE | 894.0 | 44.0 |
-| DELETE / CANCEL | 980.0 | 44.0 |
+| SAVE / STORE | 893.2 | 60.0 |
+| DELETE / CANCEL | 979.2 | 60.0 |
 
-| Sprite | State |
+**Face** (identical in every state): vertical `#35312A → #26231C`, border `#6B6254`, 1 px `rgba(255,255,255,.10)` inner top highlight, drop shadow `0 2px 3px rgba(0,0,0,.45)`, corner radius 4, 3 px bleed → sprite **82 × 40**.
+
+**Legends:** Helvetica Bold **10 px**, +2 px tracking, centred. Neither legend goes below 10 px — both are functional text.
+
+| Legend state | Value | Treatment | Contrast vs face |
+|---|---|---|---|
+| Lit | `#F6F1E4` | warm three-layer bloom: `0 0 1.5px rgba(255,238,208,.42)`, `0 0 4px rgba(255,216,154,.26)`, `0 0 8px rgba(255,198,128,.14)` | **11.5:1** top of gradient, 13.9:1 bottom |
+| Unlit | `#877F72` | flat, matte, no bloom whatsoever | **3.27:1** top of gradient, 3.96:1 bottom |
+
+Lit is a neutral bright, deliberately **not** the accent `#F0A94B` — the accent stays reserved for the scope trace, LCD and lamps. The *bloom* is warm (unsaturated amber-white, well off the accent hue) so the legend reads as genuinely backlit rather than as a heavier weight of the same ink: the two states differ in **kind** — luminous vs matte — not only in degree. The three layers give the falloff a real lamp has; a single flat shadow reads as a blur. The bloom is a **halo only** — it must not thicken the letterforms. In the exported sprites the lit glyph core measures within ~10 % of the same glyph drawn with no bloom at all, and the counters of S, A and E stay open; if a re-cut closes them, the bloom is compositing over the ink instead of around it. When baking, draw each bloom pass as shadow alone (glyph off-canvas, shadow offset onto the plate) and the ink once on top: stacking opaque passes compounds both halo alpha and glyph coverage, and radii lifted verbatim from CSS are stronger in canvas than in the browser. Unlit carries no bloom at all. Unlit is measured at the *worst case* end of the face gradient and clears the 3:1 state floor there; lit against unlit is 3.51:1, so which legend is live is legible as a difference and not only as a brightness.
+
+**Frame layout.** Two strips, `btn_save_strip.png` and `btn_delete_strip.png` — frame **82 × 40** (2x: 164 × 80), strip **82 × 120** (2x: 164 × 240). Frame order is fixed and must not be reordered.
+
+| Frame | 1x y | 2x y | Backlight | SAVE button state | DELETE button state |
+|---|---|---|---|---|---|
+| 0 | 0 | 0 | both dark | nothing to do — Program unmodified | nothing to do — Factory Program or INIT |
+| 1 | 40 | 80 | top lit | SAVE live — saves a new Program | DELETE live — a User Program is selected |
+| 2 | 80 | 160 | bottom lit | STORE live — commits the typed name | CANCEL live — abandons name entry |
+
+Individual sprites carry the same three faces per button:
+
+| Sprite | Face |
 |---|---|
-| `btn_save_on.png` | SAVE enabled |
-| `btn_save_off.png` | SAVE disabled — until a knob has been moved |
-| `btn_delete_on.png` | DELETE enabled — a User Program is selected |
-| `btn_delete_off.png` | DELETE disabled |
-| `btn_cancel.png` | replaces DELETE while a name is being typed |
+| `btn_save_off.png` / `btn_delete_off.png` | frame 0 — both legends dark |
+| `btn_save_on.png` / `btn_delete_on.png` | frame 1 — top legend lit |
+| `btn_save_store.png` / `btn_cancel.png` | frame 2 — bottom legend lit |
 
-Enabled: vertical `#EFE6D0 → #DBD0B4`, border `#8E8471`, 1 px white inner top highlight, drop shadow `0 2px 3px rgba(0,0,0,.4)`, label `#26221B`. Disabled: `#2A2721`, border `#3E382F`, inset top shade, label `#8F8574`. Label is Helvetica Bold 11 px, +2.2 px tracking, centred.
+Both legends lit is not a state and is not exported: the two functions are mutually exclusive, so a fourth face would only ever indicate a bug.
 
-CANCEL takes the enabled treatment unchanged — it is an escape hatch, not a destructive action, so it stays neutral and lets DELETE keep the only loaded lettering in the header.
+Frame 0 is inert in code as well as in appearance — a button showing both legends dark must not act when clicked, or the backlight is claiming something the control contradicts.
+
+### Program header — state matrix
+
+Five panel states, and the two buttons are not independent — read the row, not the buttons. `lit` is the backlit legend; every other legend on that button is dark.
+
+| Panel state | SAVE | STORE | DELETE | CANCEL | SAVE frame | DELETE frame |
+|---|---|---|---|---|---|---|
+| Factory Program, unmodified | dark | dark | dark | dark | 0 | 0 |
+| Factory Program, edited | **lit** | dark | dark | dark | 1 | 0 |
+| User Program, unmodified | dark | dark | **lit** | dark | 0 | 1 |
+| User Program, edited | **lit** | dark | **lit** | dark | 1 | 1 |
+| Naming a Program | dark | **lit** | dark | **lit** | 2 | 2 |
+
+Rules the lighting alone does not imply:
+
+- **Escape out of naming leaves the edited state set**, because nothing was stored — the panel returns to whichever row it came from, so SAVE comes back lit. It does not fall back to "unmodified".
+- **Naming overrides both resting legends.** While naming, SAVE and DELETE are dark even on an edited User Program: nothing can be saved or deleted until the name is committed or abandoned.
+- **INIT counts as a Factory Program** for row purposes — nothing to delete, so DELETE stays dark however edited it is.
+- **A dark legend is an inert control**, not a hidden one (see below).
+
+Both legends lit on one button is not a state and no such face is exported; a fourth face could only ever indicate a bug.
+
+### Program header — reference renders
+
+The header row moves as one band, so the pair is rendered **together**, at 3×, one file per matrix row. Diff these, not per-face crops.
+
+| File | Matrix row |
+|---|---|
+| `plate/buttons/01-rest-nothing-to-do.png` | Factory Program, unmodified |
+| `plate/buttons/02-factory-edited-save.png` | Factory Program, edited |
+| `plate/buttons/03-user-program-delete.png` | User Program, unmodified |
+| `plate/buttons/04-user-edited-both.png` | User Program, edited |
+| `plate/buttons/05-naming-store-cancel.png` | Naming a Program |
+
+Each is 504 × 120 (168 × 40 at 3×) on the fascia gradient, pitch 86 px — reference only, not a shippable asset.
+
+### What stays runtime, and why
+
+Baked into sprites: **both legends and their backlighting**. The legend text is fixed for the life of the panel and only three faces per button exist, so baking costs nothing and guarantees the bloom matches the approved cut — a runtime `text-shadow` re-derives the halo from CSS radii, which render stronger in canvas than in the browser (see the bloom note above) and drift per platform.
+
+Drawn live: **LCD contents** (Program index, name, dirty marker), **meter fills**, **scope trace**. Those are data, not lighting — baking any of them would freeze one moment's reading into the bitmap.
+
+**Per-casting choice, resolved.** BRAND.md allows either a backlit legend or a discrete lamp beside a printed one. TapeRot's fascia is a mid-warm grey, light enough that a small lamp beside the legend would read as a scuff at 10 px, so **the legend itself lights** and there is no lamp beside it. **Do not mix the two forms on this panel** — the exclusive-select group buttons in §3 keep their lamps because they carry no second legend, and that is the only place lamps appear.
+
+**On the removed disabled face.** The greyed-out plate is gone. A lamp behind the legend going out is what rack hardware does, and it is what BRAND.md's LED rule already prescribed — the disabled face was the divergence. Both legends dark reads as "nothing to do here" while the button is still plainly a button, since the face is unchanged and both legends stay above the state floor.
 
 ---
 
@@ -189,6 +259,24 @@ Not exported; draw these over the panel bitmap so they match it.
 
 LCD behaviour: while a knob is dragged the LCD shows `PARAMETER: value unit` and reverts to the program name 1.1 s after release.
 
+### Header row height and the LCD character budget
+
+Every element in the header row shares one height: **34 px** — PROGRAM LCD, SAVE, DELETE, IN meter, OUT meter. TapeRot came down from 40; widths are unchanged.
+
+| Element | Final size | Type |
+|---|---|---|
+| PROGRAM LCD | 470 × 34 (border-box) | Share Tech Mono 18 px, +2 px |
+| SAVE / STORE | 76 × 34 | Helvetica Bold 10 px, +2 px, two stacked legends |
+| DELETE / CANCEL | 76 × 34 | Helvetica Bold 10 px, +2 px, two stacked legends |
+| IN meter | 80.8 × 34 (border-box) | Share Tech Mono 19 px |
+| OUT meter | 80.8 × 34 (border-box) | Share Tech Mono 19 px |
+
+**No type shrank.** Six pixels came out of padding, not font size. The 18 px LCD face in a 34 px cell has 6.6 px of clear space above and below the line box; the 19 px meter numerals sit in 31.2 px of interior. Both were checked at 34 before anything was resized.
+
+**Character budget — measured at 18 px, not estimated.** Share Tech Mono advances **11.72 px** per character at 18 px with +2 px tracking. The 470 px cell spends 2.8 px on its bezel, 20 px on padding, 46.9 px on the `FACT`/`USER`/`NAME` chip plus 6 px of chip padding, 20 px on two 10 px gaps, 1 px on the divider and 19 px on the chevron — leaving **354.3 px** of text width.
+
+354.3 ÷ 11.72 = **30 characters**. The budget is 30, above the required 27, so the 25-character cap on user Program names (27 less the two-digit index and the dirty marker) is unchanged and no cap contracts. Had it fallen short, the cell would have widened rather than the face shrinking or the cap dropping.
+
 ---
 
 ## 7. Colour and type
@@ -204,6 +292,7 @@ LCD behaviour: while a knob is dragged the LCD shows `PARAMETER: value unit` and
 | Header label | `#EFE7D3`; secondary `#CCC1A6` / `#C4B99F` |
 | Knob cap | radial `#F8F2E3 → #EFE7D2 45% → #DED3B8`, rim `#443E36`, pointer `#2B251C` |
 | Button plate | `#EAE0C8 → #DBD0B4`, border `#A79B80`, text `#2E2820` |
+| Header button plate | `#35312A → #26231C`, border `#6B6254`; legend lit `#F6F1E4`, unlit `#877F72` |
 | LED unlit | `#B3A88C` on fascia, `#4B443A` on dark |
 | Lamp unlit | `#3A342C → #17140F`, ring `#6E675A` |
 | Divider | 1 px `#B2A68A` + 1 px `rgba(255,255,255,.7)` |
@@ -222,7 +311,8 @@ LCD behaviour: while a knob is dragged the LCD shows `PARAMETER: value unit` and
 export/
   assets/1x/   panel_background.png
                knob_large.png, knob_small.png, knob_model.png
-               btn_*_on|off.png (18) + btn_save|delete_on|off.png, btn_cancel.png
+               btn_*_on|off.png (18) + btn_save_on|off|store.png, btn_delete_on|off.png,
+               btn_cancel.png, btn_save_strip.png, btn_delete_strip.png
                gen_seg_on|off.png
                lamp_on|off|press.png
                led_fail_on|off.png
@@ -235,64 +325,3 @@ export/
 Sprites whose art is identical across controls are shipped once and shared — the two knob strips, the ⌀22 lamp, and the ⌀8 LED. The panel bitmap is what distinguishes one control from another.
 
 Open `Handoff Assembly.dc.html` (in the bundle, beside `support.js`) in any browser: it composites these bitmaps at the coordinates above and is the reference build.
-
----
-
-## Program model — identity, numbering and the INIT entry
-
-*Recorded 2026-08-11. This section is authoritative for the Program list's behaviour; where an earlier
-part of this document describes numbering or the factory bank differently, this governs.*
-
-**A Program is identified by name, never by position.** Factory Programs carry a permanent slug fixed
-when the Program is created and unchanged even if its display name is later revised; User Programs are
-identified by their filename. Positions appear only in the four `AudioProcessor` overrides JUCE
-requires them for, and nowhere else — not in saved state, not in the dropdown, not in the LCD.
-
-**The INIT entry.** A single row at the **top of the dropdown, above the FACTORY group and separated
-from it by a divider**. It is:
-
-- **unnumbered** — it sits outside both banks, so a number would place it in a running order it is
-  not part of;
-- **never the default on instantiation** — it is a starting point the user chooses, not the sound the
-  plugin makes when a host loads it;
-- shown with the bank tag reading an **em-dash**, not FACT and not USER, because it is in neither;
-- **DELETE disabled while it is selected**, as for a Factory Program — INIT is not a stored thing, so
-  there is nothing to delete.
-
-**Factory numbering starts at 01 on the first authored sound**, and the two-digit number is a **label
-computed when the panel paints**, from the Program's position in the factory bank. It is not stored
-and nothing is looked up by it.
-
-**User Programs carry no number at all** — the bank tag, then the name alone:
-
-```
-FACT  │  01 WARM CASSETTE
-USER  │  BRIGHT ROOM
-  —   │  INIT
-```
-
-They are sorted **alphabetically and case-insensitively, on the displayed name** (the filename stem,
-without its extension). Any number would change whenever another Program was saved, which is why they
-have none. Comparing the filename *with* its extension sorts `AB C` before `AB`, since a space
-(0x20) precedes the dot (0x2E); comparing case-sensitively puts every lowercase name after every
-uppercase one.
-
-**Dirty marker.** An edited Program shows a trailing ` *` in the LCD, in the same type and colour as
-the name. The marker and SAVE's enabled state read the same flag, so they cannot disagree. No marker
-appears on an unresolved identifier — there is no baseline to differ from.
-
-**Unresolved identifier.** If a stored identifier no longer names anything — a Factory Program
-removed in a later version, or a deleted user file — the **parameter values still restore**; only the
-name is unknown. The display then shows the em-dash bank tag and the remembered name with a trailing
-`?` (`—  │  BRIGHT ROOM?`), SAVE enabled, DELETE disabled, no dirty marker. Deleting a Program from
-the panel is deliberately *not* this case: the intent is unambiguous, so it falls back to the default.
-
-**User-name cap: 25 characters.** 27 characters of name field (x 510-849 at 18px Share Tech Mono, +2px tracking) less 2 for the dirty marker.
-
-**This figure is per-casting and must not be collapsed into a shared one** — each panel's cell width,
-type size and tracking differ, and the caps range from 22 to 35 across the suite. The cap is the
-budget less whichever of the dirty marker (2) and the naming cursor (1) is larger.
-
-**Release rule.** Once a version ships, new Factory Programs may only be **appended** — never
-inserted, reordered or removed — because the host addresses the factory bank by position. See
-`../../BRAND.md`.
