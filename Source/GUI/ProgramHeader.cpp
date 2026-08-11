@@ -86,7 +86,13 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
 {
     // The glass is the selector. The plate prints a dropdown chevron at its right-hand end
     // (delta v1.0.3), so the whole cell has to be clickable or that chevron is a lie.
-    if (Layout::programLcd.contains(e.position))
+    //
+    // **Except while naming**, when the glass belongs to the name field. Opening the list then
+    // applies a Program underneath a half-typed name, leaving a stale field sitting over a Program
+    // that never had it - and the field stays open, so the next keystroke edits a name for the
+    // wrong Program entirely. The other five castings all guard this; Fifth Member's
+    // ProgramHeader.cpp names it as TapeRot's bug and deliberately does not copy it.
+    if (Layout::programLcd.contains(e.position) && ! namingMode)
     {
         showProgramMenu();
         return;
@@ -299,7 +305,11 @@ juce::String ProgramHeader::lcdText() const
     // Chorus-60, Fifth Member and Elmer. TapeRot signalled dirty only through SAVE's enabled
     // sprite, which has to be looked for; the marker is seen at a glance, and the two read the
     // same predicate so they cannot disagree.
-    return processorRef.displayLabelFor(id).toUpperCase()
+    // No toUpperCase() here: the bank stores its display names upper-cased, so case has exactly
+    // one source. Doing it at the LCD instead made this the only site that applied it - the
+    // dropdown and the host's own Program menu both read the label raw, so the same Program showed
+    // as "01 WARM CASSETTE" on the glass and "01 Warm Cassette" in the list beneath it.
+    return processorRef.displayLabelFor(id)
          + (processorRef.isProgramModified() ? " *" : "");
 }
 
