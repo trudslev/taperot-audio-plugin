@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nf/MenuMetrics.h>
+
 #include "TapeRotTheme.h"
 
 /**
@@ -15,10 +17,11 @@
     bank chip and the program name. Nothing here invents a colour - every value comes from
     TapeRotTheme::Colour.
 */
-class ProgramMenuLookAndFeel final : public juce::LookAndFeel_V4
+class ProgramMenuLookAndFeel final : public nf::MenuMetricsLookAndFeel
 {
 public:
     ProgramMenuLookAndFeel()
+        : nf::MenuMetricsLookAndFeel (metrics())
     {
         // Covers the few bits JUCE draws without asking us first (the drop shadow's backdrop).
         setColour (juce::PopupMenu::backgroundColourId, glass);
@@ -28,6 +31,14 @@ public:
         setColour (juce::PopupMenu::highlightedTextColourId, TapeRotTheme::Colour::meterNumerals);
     }
 
+protected:
+    /** Plain, untracked measurement - this panel draws its rows with a plain run. */
+    float measureMenuItemText (const juce::String& text) override
+    {
+        return juce::GlyphArrangement::getStringWidth (getPopupMenuFont(), text);
+    }
+
+public:
     juce::Font getPopupMenuFont() override
     {
         return TapeRotTheme::Font::of (itemTextSize);
@@ -42,23 +53,6 @@ public:
         g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
     }
 
-    void getIdealPopupMenuItemSize (const juce::String& text, bool isSeparator,
-                                    int standardMenuItemHeight, int& idealWidth,
-                                    int& idealHeight) override
-    {
-        if (isSeparator)
-        {
-            idealWidth = 50;
-            idealHeight = 9;
-            return;
-        }
-
-        const auto f = getPopupMenuFont();
-        idealWidth = (int) std::ceil (juce::GlyphArrangement::getStringWidth (f, text))
-                     + tickColumn + 26;
-        idealHeight = standardMenuItemHeight > 0 ? juce::jmax (rowHeight, standardMenuItemHeight)
-                                                 : rowHeight;
-    }
 
     void drawPopupMenuItem (juce::Graphics& g, const juce::Rectangle<int>& area,
                             bool isSeparator, bool isActive, bool isHighlighted,
@@ -137,6 +131,28 @@ private:
     static constexpr float tracking       = 1.0f;
     static constexpr float headerTextSize = 11.0f;
     static constexpr float headerTracking = 1.6f;
+    /** **This panel's dropdown sizes, stated rather than inherited.**
+
+        `sectionHeaderHeight` is 36 because that is what this panel has ALWAYS drawn - JUCE's
+        `LookAndFeel_V2` sizes a section caption at the row height plus half again, and this casting
+        took that default by omission. It is written down now so it is a number somebody can see and
+        argue with; **it is deliberately not changed here**, because altering it moves every row
+        below FACTORY and that is the designers' call, not a refactor's. Elmer designed 19 against
+        22px rows and is the only casting that chose.
+
+        The row height is pinned and never grows to the platform's standard item height - see
+        nf::MenuMetricsLookAndFeel. */
+    static nf::MenuMetrics metrics()
+    {
+        nf::MenuMetrics m;
+        m.rowHeight = rowHeight;
+        m.sectionHeaderHeight = rowHeight + rowHeight / 2;   // JUCE's own rule, made explicit
+        m.separatorHeight = 9;
+        m.leadingColumn = tickColumn;
+        m.horizontalPadding = 26;
+        return m;
+    }
+
     static constexpr int   rowHeight      = 24;
     static constexpr int   tickColumn     = 22;
 };
