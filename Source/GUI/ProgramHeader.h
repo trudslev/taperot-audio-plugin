@@ -41,26 +41,7 @@ public:
     void showParameter(const juce::String& paramId);
     void releaseParameter();
 
-    /** This casting's spelling of the readout: `NAME: VALUE UNIT`, with a WORD upper-cased.
 
-        **`wordsOnly`, which TapeRot and Gatecrasher arrived at independently.** A value carrying no
-        unit and no digit is a choice name rather than a reading - MODEL and SWITCH read as panel
-        labels and get the name's treatment, while a numeric reading keeps its case because any
-        letters in it belong to the unit. `s` and `S` are different units and `kHz` upper-cased is
-        not a unit at all, which is how Reflect-84 came to print `DECAY: 4.6 S`.
-
-        Elmer's source argues that even a choice name should be authored in caps in `Parameters.h`
-        instead, so the host's automation lane agrees. Both arguments are recorded beside
-        `nf::ReadoutFormat::ValueCase`; this panel keeps what it has until the designers rule.
-
-        The revert is core's 900 ms, where this panel carried 1100. */
-    static nf::ReadoutFormat readoutFormat()
-    {
-        nf::ReadoutFormat f;
-        f.valueCase = nf::ReadoutFormat::ValueCase::wordsOnly;
-        f.nameCharacterBudget = 24;
-        return f;
-    }
 
     /** The component the Program list is laid out inside. Its bounds become the list's parent area,
         which is what fixes the list's top edge and caps its height - layout, not plumbing. Passing
@@ -123,7 +104,7 @@ private:
     juce::Component* menuParent = nullptr;
     /** The parameter takeover: what to show, and until when. The deadline is core's; the one-shot
         Timer that notices it, the font, the cell and every pixel of the painting stay here. */
-    nf::ReadoutTimer readout { readoutFormat() };
+    nf::ReadoutTimer readout { TapeRotTheme::Layout::readoutFormat() };
     /** Outlives showMenuAsync's callback, so it must be a member rather than a local. */
     ProgramMenuLookAndFeel menuLookAndFeel;
 

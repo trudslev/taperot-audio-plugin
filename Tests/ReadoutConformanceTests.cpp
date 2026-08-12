@@ -1,6 +1,5 @@
 #include "../Source/Parameters.h"
 #include "../Source/GUI/TapeRotTheme.h"
-#include "../Source/GUI/ProgramHeader.h"
 
 #include <nf/ParameterReadout.h>
 
@@ -77,7 +76,7 @@ public:
 
                     p->setValueNotifyingHost (position);
 
-                    const auto defects = nf::readoutDefects (*p, ProgramHeader::readoutFormat());
+                    const auto defects = nf::readoutDefects (*p, TapeRotTheme::Layout::readoutFormat());
 
                     for (const auto& defect : defects)
                         expect (false, p->paramID + " at " + juce::String (position, 2)
@@ -106,7 +105,7 @@ public:
                     {
                         p->setValueNotifyingHost (position);
 
-                        const auto text = nf::describeParameter (*p, ProgramHeader::readoutFormat());
+                        const auto text = nf::describeParameter (*p, TapeRotTheme::Layout::readoutFormat());
                         expect (text.length() <= budget,
                                 p->paramID + " prints " + juce::String (text.length())
                                     + " characters: \"" + text + "\"");

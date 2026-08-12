@@ -269,8 +269,8 @@ void ProgramHeader::showParameter(const juce::String& paramId)
     // Straight through nf::describeParameter, which is straight through the parameter's own getText
     // and getLabel - so the LCD and the host cannot disagree about what a control reads. That
     // guarantee is the whole reason the string moved to core; the case rule this panel wants is
-    // stated in readoutFormat() rather than hand-written here.
-    readout.show(nf::describeParameter(*param, readoutFormat()));
+    // stated in TapeRotTheme::Layout::readoutFormat() rather than hand-written here.
+    readout.show(nf::describeParameter(*param, TapeRotTheme::Layout::readoutFormat()));
     repaint();
 }
 

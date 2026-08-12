@@ -24,6 +24,8 @@
     blits at its stated position with no further offset. All assets carry straight (non-
     premultiplied) alpha.
 */
+#include <nf/ParameterReadout.h>
+
 namespace TapeRotTheme
 {
 
@@ -399,6 +401,35 @@ namespace Layout
         token 10-15%. */
     inline constexpr float minScale = 0.5f;
     inline constexpr float maxScale = 2.0f;
+
+    /** **How this panel spells the LCD parameter readout.**
+
+        A presentation decision, so it lives with the other presentation constants rather than in
+        ProgramHeader - and that placement is load-bearing for the test: ProgramHeader.h reaches the
+        processor, whose JucePlugin_* macros exist only in the plugin target, so a test reading the
+        format from there cannot link. The test must read the SHIPPING format rather than a copy, or
+        it asserts against itself. All six castings state it in the same place for that reason.
+    */
+    /** This casting's spelling of the readout: `NAME: VALUE UNIT`, with a WORD upper-cased.
+
+        **`wordsOnly`, which TapeRot and Gatecrasher arrived at independently.** A value carrying no
+        unit and no digit is a choice name rather than a reading - MODEL and SWITCH read as panel
+        labels and get the name's treatment, while a numeric reading keeps its case because any
+        letters in it belong to the unit. `s` and `S` are different units and `kHz` upper-cased is
+        not a unit at all, which is how Reflect-84 came to print `DECAY: 4.6 S`.
+
+        Elmer's source argues that even a choice name should be authored in caps in `Parameters.h`
+        instead, so the host's automation lane agrees. Both arguments are recorded beside
+        `nf::ReadoutFormat::ValueCase`; this panel keeps what it has until the designers rule.
+
+        The revert is core's 900 ms, where this panel carried 1100. */
+    inline nf::ReadoutFormat readoutFormat()
+    {
+        nf::ReadoutFormat f;
+        f.valueCase = nf::ReadoutFormat::ValueCase::wordsOnly;
+        f.nameCharacterBudget = 24;
+        return f;
+    }
 }
 
 //==============================================================================
