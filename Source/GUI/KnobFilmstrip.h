@@ -21,6 +21,8 @@ public:
 
     void paint(juce::Graphics&) override;
 
+    void mouseDown (const juce::MouseEvent& e) override;   // Shift = 4x fine drag
+
     /** Places the component at the sprite's top-left, as the spec states it (bleed included). */
     void setSpriteTopLeft(juce::Point<float> topLeft);
 

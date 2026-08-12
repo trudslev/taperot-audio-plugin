@@ -33,6 +33,18 @@ public:
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
 
+    /** **TapeRot has no bypass, and that is a decision rather than an omission.**
+
+        BRAND.md makes a disengaged state optional; the suite audit found four castings documenting
+        which they had chosen and two - this one and Gatecrasher - saying nothing either way, which
+        left a reader unable to tell a decision from an oversight.
+
+        The decision: this effect is a tape path, and a bypass would be the tape being out of the
+        machine. The Standalone already gates its generated hiss and hum on the transport, and a
+        host bypasses the plugin itself; adding a second, panel-level disengage would give two
+        controls for one idea and invite the caption BRAND.md forbids. Reflect-84 is the reference
+        if that is ever reversed - a real AudioParameterBool behind getBypassParameter(), a 0.50
+        multiply over the whole canvas, no caption, no control on the panel. */
     const juce::String getName() const override { return JucePlugin_Name; }
     bool acceptsMidi() const override { return false; }
     bool producesMidi() const override { return false; }

@@ -115,7 +115,13 @@ public:
                                          TapeRotTheme::Font::of (headerTextSize), headerTracking,
                                          r.withTrimmedLeft ((float) tickColumn),
                                          juce::Justification::left,
-                                         TapeRotTheme::Colour::lcdText.withAlpha (0.55f));
+                                         // **Opaque.** BRAND.md permits opacity for STATE and
+                                         // forbids it for HIERARCHY, and a section header is
+                                         // hierarchy - not disabled, inactive or not-current. The
+                                         // smaller size and wider tracking against the rows already
+                                         // carry it; the .55 was doing the same job twice, the
+                                         // second time by the mechanism the brand book rules out.
+                                         TapeRotTheme::Colour::lcdText);
 
         g.setColour (rule);
         g.fillRect (r.reduced (5.0f, 0.0f).withHeight (1.0f).withY (r.getBottom() - 1.0f));

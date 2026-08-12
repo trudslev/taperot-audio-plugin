@@ -30,6 +30,7 @@ public:
     void mouseDown(const juce::MouseEvent&) override;
     void mouseMove(const juce::MouseEvent&) override;
     bool keyPressed(const juce::KeyPress&) override;
+    void focusLost (FocusChangeType) override;
 
     /** Spans the canvas to draw the LCD, MODEL readout and IN/OUT numerals, but owns only the
         three clickable header cells. See LampStrip::hitTest for why this matters. */

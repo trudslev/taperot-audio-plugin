@@ -7,6 +7,24 @@ KnobFilmstrip::KnobFilmstrip(Layout::Cap cap)
 {
     setVelocityBasedMode(false);
     setMouseCursor(juce::MouseCursor::UpDownResizeCursor);
+    setMouseDragSensitivity(Layout::knobDragPixels);
+
+    // Stated rather than inherited - see Layout::knobSweepDegrees for why a fully-overridden
+    // paint() is exactly the situation in which an unstated sweep goes unnoticed.
+    setRotaryParameters(juce::degreesToRadians(180.0f - Layout::knobSweepDegrees * 0.5f),
+                        juce::degreesToRadians(180.0f + Layout::knobSweepDegrees * 0.5f),
+                        true);
+}
+
+void KnobFilmstrip::mouseDown(const juce::MouseEvent& e)
+{
+    // Sensitivity has to be settled BEFORE Slider::mouseDown records its drag anchor: JUCE measures
+    // the drag from that anchor and scales by the current sensitivity, so changing it part-way
+    // through rescales the distance already travelled and the value jumps.
+    setMouseDragSensitivity(e.mods.isShiftDown() ? Layout::knobFineDragPixels
+                                                 : Layout::knobDragPixels);
+
+    juce::Slider::mouseDown(e);
 }
 
 void KnobFilmstrip::setSpriteTopLeft(juce::Point<float> topLeft)

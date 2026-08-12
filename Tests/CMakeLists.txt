@@ -48,11 +48,21 @@ target_sources(TapeRotTests PRIVATE
 
 # The plugin target gets these from its generated JuceHeader; a console app does not, and
 # PluginProcessor.cpp needs them for the user-Program directory.
+# NF_COMPANY_NAME/NF_PRODUCT_NAME come from the parent CMakeLists and must match what the plugin
+# target gets - PluginProcessor.cpp is compiled into BOTH, and builds the user-Programs path from
+# them. Inherited from the parent scope rather than restated here, so there is nothing to re-sync:
+# a hand-synced copy in CHORUS-60 drifted to a dead company name and quietly pointed saved Programs
+# at a directory nothing reads.
+#
+# The JucePlugin_* pair stays because juce_add_console_app does not define them and PluginProcessor
+# still uses JucePlugin_Name for getName().
 target_compile_definitions(TapeRotTests PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    JucePlugin_Name="TapeRot"
-    JucePlugin_Manufacturer="Neon Foundry")
+    JucePlugin_Name="${TAPEROT_PRODUCT_NAME}"
+    JucePlugin_Manufacturer="${TAPEROT_COMPANY_NAME}"
+    NF_COMPANY_NAME="${TAPEROT_COMPANY_NAME}"
+    NF_PRODUCT_NAME="${TAPEROT_PRODUCT_NAME}")
 
 target_link_libraries(TapeRotTests PRIVATE
     juce::juce_dsp

@@ -223,6 +223,24 @@ namespace Layout
     inline const juce::Rectangle<float> outMeter    { 1225.2f, 63.0f,  80.8f, 34.0f };
 
     //==========================================================================
+    /** **270 degrees, -135 to +135, and it is a CONSTANT now rather than only prose.**
+
+        It is baked into every filmstrip, so it is a property of the artwork - but nothing was
+        telling JUCE. With paint() fully overridden and RotaryVerticalDrag in use the default arc
+        never rendered, so the figure survived only in the comment below, and anything later
+        reading the Slider's own rotary parameters would have got JUCE's default and been quietly
+        wrong. Elmer is the one casting that is not 270; BRAND.md records that as explicit
+        per-casting freedom, which only means anything if the other five state their figure. */
+    inline constexpr float knobSweepDegrees = 270.0f;
+
+    /** 190px of vertical drag spans the full range, 760 while Shift is held. Both are suite
+        figures: six castings had six drag feels - this one was on JUCE's untouched 250 - so the
+        same hand got a different response from each. 190 is the plurality; the Shift fine mode
+        comes from Reflect-84, because a player who learns it on one casting expects it on the
+        next. */
+    inline constexpr int knobDragPixels = 190;
+    inline constexpr int knobFineDragPixels = 760;
+
     /** Knob filmstrips. Frame index = round(value01 * 127); the pointer sweeps -135 to +135
         degrees, baked frame by frame. The sprite is the CAP ONLY - ticks, numerals, unit and the
         control's name are in the plate.

@@ -78,9 +78,16 @@ else()
     set(TAPEROT_EXTRA_ARGS "")
 endif()
 
+# Company and product live here rather than as literals, because ProgramManager's user-Program
+# path is built from them and that path is where saved work goes. Gatecrasher shipped a hand-synced
+# copy that drifted to a dead company name; CMake handing every target the same values makes drift a
+# build error instead of silent data loss.
+set(TAPEROT_COMPANY_NAME "Neon Foundry")
+set(TAPEROT_PRODUCT_NAME "TapeRot")
+
 juce_add_plugin(TapeRot
-    PRODUCT_NAME "TapeRot"
-    COMPANY_NAME "Neon Foundry"
+    PRODUCT_NAME "${TAPEROT_PRODUCT_NAME}"
+    COMPANY_NAME "${TAPEROT_COMPANY_NAME}"
     BUNDLE_ID "com.neonfoundry.taperot"
     # Direction D2. Both are exactly square at a size the .icns accepts, so the generated icon gets
     # clean 1024 and 256 entries. JUCE builds the .icns and .ico at CONFIGURE time and these PNGs are
@@ -135,7 +142,9 @@ target_sources(TapeRot PRIVATE
 target_compile_definitions(TapeRot PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    JUCE_VST3_CAN_REPLACE_VST2=0)
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    NF_COMPANY_NAME="${TAPEROT_COMPANY_NAME}"
+    NF_PRODUCT_NAME="${TAPEROT_PRODUCT_NAME}")
 
 target_link_libraries(TapeRot
     PRIVATE

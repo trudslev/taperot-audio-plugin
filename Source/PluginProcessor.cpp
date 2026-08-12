@@ -2,6 +2,27 @@
 #include "PluginEditor.h"
 #include <algorithm>
 
+namespace
+{
+    // **Company and product come from CMake, not from JucePlugin_*.** The five siblings all read
+    // NF_COMPANY_NAME / NF_PRODUCT_NAME, and this casting was the one still reading JUCE's own
+    // macros - which meant it also had no guard. A missing definition is a hard error here rather
+    // than a silent fallback, because a silent fallback is precisely the failure: the path this
+    // builds is where the user's saved Programs live, and pointing it somewhere else loses them
+    // without an error anywhere. Gatecrasher's hand-synced copy drifted to a dead company name
+    // exactly that way.
+#if !defined(NF_COMPANY_NAME) || !defined(NF_PRODUCT_NAME)
+ #error "NF_COMPANY_NAME and NF_PRODUCT_NAME must be defined by CMake - see CMakeLists.txt."
+#endif
+    constexpr const char* pluginCompanyName = NF_COMPANY_NAME;
+    constexpr const char* pluginProductName = NF_PRODUCT_NAME;
+
+    // The file extension, named once. It was a literal in two places, which is two chances to
+    // rename one and not the other - and a Program written under one spelling is invisible to a
+    // scan using the other.
+    constexpr const char* programFileExtension = ".taperotprogram";
+}
+
 TapeRotAudioProcessor::TapeRotAudioProcessor()
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
@@ -234,8 +255,8 @@ juce::File TapeRotAudioProcessor::getUserProgramDirectory()
    #endif
 
     return dir
-        .getChildFile(JucePlugin_Manufacturer)
-        .getChildFile(JucePlugin_Name)
+        .getChildFile(pluginCompanyName)
+        .getChildFile(pluginProductName)
         .getChildFile("Programs");
 }
 
@@ -246,7 +267,7 @@ void TapeRotAudioProcessor::refreshUserProgramList()
     if (!dir.isDirectory())
         return;
 
-    for (const auto& entry : juce::RangedDirectoryIterator(dir, false, "*.taperotprogram"))
+    for (const auto& entry : juce::RangedDirectoryIterator(dir, false, juce::String("*") + programFileExtension))
         userProgramFiles.add(entry.getFile());
 
     // **The displayed name, case-insensitively.** Two deliberate details:
@@ -432,7 +453,7 @@ void TapeRotAudioProcessor::saveUserProgram(const juce::String& rawName)
                 xml->removeChildElement(child, true);
         }
 
-    juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + ".taperotprogram");
+    juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + programFileExtension);
 
     // **SAVE never overwrites**, which BRAND.md states as a guarantee and this used to break: a
     // second save under the same name replaced the first Program's contents silently. It matters

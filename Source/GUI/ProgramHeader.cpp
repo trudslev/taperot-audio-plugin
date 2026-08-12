@@ -123,6 +123,19 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
     }
 }
 
+void ProgramHeader::focusLost(FocusChangeType)
+{
+    // **Losing focus cancels naming.** Half-typed names must not survive a click elsewhere on the
+    // panel: the field would stay open over a Program the user has moved on from, and the next
+    // keystroke would edit a name for the wrong one. Cancel touches no parameter, so whatever was
+    // tweaked before SAVE survives - leaving the mode is the whole of it.
+    //
+    // Reflect-84, Fifth Member and Elmer already did this; TapeRot, Gatecrasher and Chorus-60 did
+    // not, which is drift rather than a decision - no casting's notes ever argued for keeping it.
+    if (namingMode)
+        cancelNaming();
+}
+
 void ProgramHeader::mouseMove(const juce::MouseEvent& e)
 {
     // Position-dependent, so it can't be a one-off setMouseCursor in the constructor: this
@@ -173,7 +186,6 @@ void ProgramHeader::showProgramMenu()
             menu.addSectionHeader("Factory");
         }
 
-        // The User group is absent entirely when empty, header included, rather than shown blank.
         if (id.bank == ProgramBank::user && ! std::exchange(userHeaderDone, true))
         {
             menu.addSeparator();
@@ -181,6 +193,16 @@ void ProgramHeader::showProgramMenu()
         }
 
         menu.addItem(rowId(i), processorRef.displayLabelFor(id), true, id == current);
+    }
+
+    // **The USER section is always shown, with a placeholder when the bank is empty.** An absent
+    // section is ambiguous between "nothing saved yet" and "this plugin does not do that", and the
+    // player cannot tell which without saving something to find out. Reflect-84 had it first.
+    if (! userHeaderDone)
+    {
+        menu.addSeparator();
+        menu.addSectionHeader("User");
+        menu.addItem(-1, Text::emDash() + " none saved " + Text::emDash(), false, false);
     }
 
     // The menu hangs off the LCD and reads as an extension of it, so it takes the glass's width
@@ -334,7 +356,11 @@ void ProgramHeader::paint(juce::Graphics& g)
                                             || currentId.bank == ProgramBank::unresolved);
     const bool userBank = namingMode || currentId.bank == ProgramBank::user;
 
-    Text::drawTracked(g, onInit ? Text::emDash() : (userBank ? "USER" : "FACT"), lcdFont,
+    // **NAME while typing, not USER.** The Program is not in the user bank until the name is
+    // committed, and if the user cancels it never will be - so USER there names a thing that does
+    // not exist yet. Elmer had this right first; it is the suite standard now.
+    Text::drawTracked(g, namingMode ? juce::String("NAME")
+                                    : (onInit ? Text::emDash() : juce::String(userBank ? "USER" : "FACT")), lcdFont,
                       Layout::lcdTracking, bankArea, juce::Justification::centred,
                       onInit ? Colour::lcdText.withAlpha(0.42f) : Colour::lcdText);
 
