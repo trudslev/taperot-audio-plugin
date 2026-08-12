@@ -44,9 +44,9 @@ public:
             }
         }
 
-        beginTest("warmCassetteProgramIndex actually names \"WARM CASSETTE\"");
+        beginTest("defaultFactoryProgramIndex actually names \"WARM CASSETTE\"");
         {
-            expectEquals(juce::String(kFactoryPrograms[warmCassetteProgramIndex].name), juce::String("WARM CASSETTE"));
+            expectEquals(juce::String(kFactoryPrograms[defaultFactoryProgramIndex].name), juce::String("WARM CASSETTE"));
         }
 
         beginTest("Program names are unique");

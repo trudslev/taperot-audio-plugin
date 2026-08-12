@@ -145,10 +145,17 @@ inline constexpr std::array<FactoryProgram, 13> kFactoryPrograms{{
 
 constexpr size_t kNumFactoryPrograms = kFactoryPrograms.size();
 
-/** **Warm Cassette is Program 01 and the instantiation default, and those are now the same thing.**
-    It used to be index 1 behind Init, so the plugin opened on the second entry in its own list -
-    which reads as a bug whether or not it is one. */
-constexpr size_t warmCassetteProgramIndex = 0;
+/** **The Program a fresh instance opens on: factory position 0, WARM CASSETTE.**
+
+    Named for the ROLE, not for the sound that currently fills it. It was `warmCassetteProgramIndex`
+    until the suite settled on one name across all six castings - the other five already called it
+    this, and a constant named after its content has to be renamed whenever the bank is re-authored,
+    which is exactly the drift the permanent slugs exist to prevent one level down.
+
+    Warm Cassette is Program 01 and the instantiation default, and those are now the same thing. It
+    used to be index 1 behind Init, so the plugin opened on the second entry in its own list - which
+    reads as a bug whether or not it is one. */
+constexpr size_t defaultFactoryProgramIndex = 0;
 
 /** INIT's index. **-1, deliberately outside the bank rather than at position 0 within it.**
 

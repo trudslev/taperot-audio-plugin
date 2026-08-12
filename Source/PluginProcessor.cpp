@@ -63,8 +63,8 @@ TapeRotAudioProcessor::TapeRotAudioProcessor(juce::File userDirectoryOverride)
     // no host or automation attached, so applying this synchronously (rather than through the
     // pendingProgramIndex/AsyncUpdater path used by setCurrentProgram) is safe.
     store.refresh();
-    applyFactoryProgram(kFactoryPrograms[warmCassetteProgramIndex]);
-    setCurrentId(factoryIdAt((int) warmCassetteProgramIndex));
+    applyFactoryProgram(kFactoryPrograms[defaultFactoryProgramIndex]);
+    setCurrentId(factoryIdAt((int) defaultFactoryProgramIndex));
     captureProgramSnapshot();
 }
 
@@ -397,7 +397,7 @@ void TapeRotAudioProcessor::deleteUserProgram(const ProgramId& id)
     // Deliberately NOT the unresolved state: deleting from the panel is an unambiguous intent, so
     // it falls back to the default Program. Unresolved is for a session naming something gone.
     if (wasCurrent)
-        requestProgramChange(factoryIdAt((int) warmCassetteProgramIndex));
+        requestProgramChange(factoryIdAt((int) defaultFactoryProgramIndex));
 }
 
 void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -680,7 +680,7 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
                 // because nothing has shipped and the bank has not moved since v4 - and through the
                 // v3->v4 hop first if this predates Init leaving the numbered bank.
                 int savedIndex = xml->getIntAttribute("taperotCurrentProgramIndex",
-                                                       (int) warmCassetteProgramIndex);
+                                                       (int) defaultFactoryProgramIndex);
 
                 if (savedSchema < 4)
                     savedIndex = LegacyMigration::remapProgramIndexV3ToV4(savedIndex);
@@ -696,7 +696,7 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
                     restored = { ProgramBank::user, stem, stem };
                 }
                 else
-                    restored = factoryIdAt((int) warmCassetteProgramIndex);
+                    restored = factoryIdAt((int) defaultFactoryProgramIndex);
             }
 
             setCurrentId(restored);

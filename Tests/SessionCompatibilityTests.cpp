@@ -221,11 +221,11 @@ public:
         beginTest("INIT is outside both banks and is not the instantiation default");
         {
             expect(initProgramIndex < 0, "INIT must not occupy a bank index");
-            expectEquals((int) warmCassetteProgramIndex, 0,
+            expectEquals((int) defaultFactoryProgramIndex, 0,
                          "the instantiation default must be Program 01, not the entry behind it");
             expectEquals((int) kNumFactoryPrograms, 13,
                          "Init left the numbered bank, so thirteen authored Programs remain");
-            expect(juce::String(kFactoryPrograms[warmCassetteProgramIndex].name) == "WARM CASSETTE");
+            expect(juce::String(kFactoryPrograms[defaultFactoryProgramIndex].name) == "WARM CASSETTE");
         }
 
         beginTest("An unknown parameter id in a saved session is ignored, not fatal");
