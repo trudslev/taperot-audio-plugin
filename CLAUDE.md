@@ -171,9 +171,13 @@ Four behaviours share the one LCD, which is why `ProgramHeader` is the busiest c
 
 **Selecting.** Clicking the glass opens the Program menu — Factory section, then User if any exist, current one marked with a lit amber pip. Selection goes through `setCurrentProgram`, which defers via the processor's `AsyncUpdater` because a host can call it off the message thread, so the repaint waits for the apply rather than happening in the callback.
 
-**Naming.** SAVE opens an entry field in the glass rather than saving immediately: characters uppercase as they arrive, a block caret (U+2588) blinks at 1 s / 50 % duty, **Enter commits, Escape cancels**, and DELETE wears the CANCEL sprite and does the same. `TapeRotEditorContent` already repaints this component at 60 Hz for the meters, so the caret needs no timer of its own. An empty name falls back to `USER PROGRAM` **inside `saveUserProgram`**, not in the caller, so no future caller can write a dotfile. Cancelling must never touch a parameter — knob values tweaked but not yet saved have to survive it.
+**Naming.** SAVE opens an entry field in the glass rather than saving immediately: characters uppercase as they arrive, a block caret (U+2588) blinks at 1 s / 50 % duty, **Enter commits, Escape cancels**, and DELETE wears the CANCEL sprite and does the same. `TapeRotEditorContent` already repaints this component at 60 Hz for the meters, so the caret needs no timer of its own. An empty name falls back to `TAKE n` inside `nf::UserProgramStore`, so no caller can write a dotfile — and trimming, upper-casing and the 25-character cap now apply on every save path, not only to the keystrokes typed here. It was `USER PROGRAM` until the suite settled on one fallback; six castings had five different ones. Cancelling must never touch a parameter — knob values tweaked but not yet saved have to survive it.
 
-**SAVE gating.** `TapeRotAudioProcessor::isProgramModified()` compares the live parameters against a snapshot taken whenever a Program is applied or a session restored, so SAVE stays dark until something has actually moved. Two decisions worth keeping: the snapshot is taken from the **live APVTS**, not rebuilt from the Program's definition, so `applyFactoryProgram` stays the single description of what a Program sets with no second copy to drift; and STOP/FILTER/FAIL are excluded from it, because they're momentary and never saved, so holding one must not light SAVE up. `setStateInformation` can arrive on any thread while the GUI polls on the message thread — hence the spin lock.
+**SAVE gating.** `TapeRotAudioProcessor::isProgramModified()` compares the live parameters against an `nf::ParameterSnapshot` taken whenever a Program is applied or a session restored, so SAVE stays dark until something has actually moved. Two decisions worth keeping: the snapshot is taken from the **live APVTS**, not rebuilt from the Program's definition, so `applyFactoryProgram` stays the single description of what a Program sets with no second copy to drift; and STOP/FILTER/FAIL are excluded from it, because they're momentary and never saved, so holding one must not light SAVE up.
+
+That exclusion is stated as `isMomentaryTrigger` — a predicate — rather than as the explicit 20-entry inclusion list it replaced. The list happened to cover the APVTS exactly (20 + 3 = 23), so a parameter added later without a matching line would silently have gone unchecked, with SAVE staying dark while it moved. The two forms are equivalent today; only the predicate stays equivalent.
+
+`setStateInformation` can arrive on any thread while the GUI polls on the message thread — the spin lock that used to guard this is inside `nf::ParameterSnapshot` now, so all six castings get it. Four of them had that read and written across threads with nothing at all.
 
 **Parameter takeover.** While a control is dragged the LCD shows `PARAMETER: value unit`, reverting 1.1 s after release. Guarded on the control's own drag state, because a `SliderAttachment` also fires when a Program is applied and on every host automation step — without the guard the display latches onto whichever parameter was written last and flickers for the length of a song. It also stands down entirely during naming; the glass belongs to the name field until it commits or cancels.
 
@@ -202,11 +206,22 @@ No exotic macOS APIs exist anywhere in `Source/DSP/` (confirmed by audit — no 
 
 - the `CMakeLists.txt` items above (`if(APPLE)` gating `FORMATS`/copy dirs/deployment target).
 
-`getUserProgramDirectory()` **used to** be a platform branch here and no longer is. User Programs now
-live at `<AppData>/<Manufacturer>/<Plugin>/Programs` on all three platforms, via JUCE's
-`userApplicationDataDirectory` — `~/Library/Application Support` on macOS, `%APPDATA%` on Windows,
-`~/.config` on Linux. That segment is JUCE's and must never be hard-coded; a shared literal would be
-wrong on two of the three.
+`getUserProgramDirectory()` is `nf::userProgramDirectory` now — one implementation in
+`neon-foundry-core`, consumed by every casting. User Programs live at
+`<AppData>/<Manufacturer>/<Plugin>/Programs` on all three platforms.
+
+**The "Application Support" segment is NOT JUCE's, and this file claimed it was.** JUCE resolves
+`userApplicationDataDirectory` to `~/Library` on macOS — not `~/Library/Application Support` — while
+it is `%APPDATA%` on Windows and `~/.config` on Linux, both already the right root. So macOS, and
+only macOS, needs the segment appended by hand; JUCE's own `PropertiesFile` does it the same way,
+guarded the same way. The paragraph here used to say the opposite, and all six castings wrote to
+`~/Library/<Company>/` for a day because of it. It was caught by noticing a panel listing a Program
+the filesystem did not have where the note said it would.
+
+Two wrong claims in the same three lines, then, and they rhyme: "Presets is Apple's shared
+convention directory, so our leaf belongs under it", and "JUCE resolves the segment for us". Both
+sound like the kind of thing a good framework does, and both were settled in seconds by looking — at
+what actually reads that folder, and at `juce_Files_mac.mm:210`.
 
 The macOS branch used to point at `~/Library/Audio/Presets/<Manufacturer>/<Plugin>`, justified as
 Apple's shared convention directory. **That reasoning was wrong**, and is worth recording so it

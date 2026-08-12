@@ -86,14 +86,11 @@ private:
     juce::String typedName;
     /** The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits about
         27 characters; this leaves room for the caret without the text reaching the chevron. */
-    // **25 = 27 - 2.** The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking,
-    // which fits 27 characters; the dirty marker " *" takes 2 and the naming cursor takes 1, so the
-    // cap is the budget less the larger of the two.
-    //
-    // It was 24 when the display carried a two-digit index and a space. User Programs no longer
-    // carry one - they sort alphabetically, so any number would change whenever one was saved -
-    // which is what freed the character the marker now costs.
-    static constexpr int maxProgramNameLength = 25;
+    // **An alias, not a copy.** The cap lives on the processor because the store enforces it on
+    // every save path, not only on the keystrokes typed here - see its derivation there. Stated as
+    // an alias beside the constant rather than as a comment in this consumer, because a comment
+    // here is where the explanation gets silently invalidated.
+    static constexpr int maxProgramNameLength = kMaxProgramNameLength;
 
     TapeRotAudioProcessor& processorRef;
 

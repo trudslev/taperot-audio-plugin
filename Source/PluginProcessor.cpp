@@ -1,4 +1,6 @@
 #include "PluginProcessor.h"
+
+#include <nf/UserProgramDirectory.h>
 #include "PluginEditor.h"
 #include <algorithm>
 
@@ -17,17 +19,16 @@ namespace
     constexpr const char* pluginCompanyName = NF_COMPANY_NAME;
     constexpr const char* pluginProductName = NF_PRODUCT_NAME;
 
-    // The file extension, named once. It was a literal in two places, which is two chances to
-    // rename one and not the other - and a Program written under one spelling is invisible to a
-    // scan using the other.
-    constexpr const char* programFileExtension = ".taperotprogram";
 }
 
-TapeRotAudioProcessor::TapeRotAudioProcessor()
+TapeRotAudioProcessor::TapeRotAudioProcessor(juce::File userDirectoryOverride)
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createTapeRotParameterLayout())
+      apvts(*this, nullptr, "PARAMETERS", createTapeRotParameterLayout()),
+      store(nf::userProgramDirectory(pluginCompanyName, pluginProductName, userDirectoryOverride),
+            getProgramFileExtension(),
+            maxProgramNameLength)
 {
     driveParam = apvts.getRawParameterValue(ParamIDs::drive);
     wowParam = apvts.getRawParameterValue(ParamIDs::wow);
@@ -61,7 +62,7 @@ TapeRotAudioProcessor::TapeRotAudioProcessor()
     // the sound the plugin should make when a host loads it. Construction is single-threaded with
     // no host or automation attached, so applying this synchronously (rather than through the
     // pendingProgramIndex/AsyncUpdater path used by setCurrentProgram) is safe.
-    refreshUserProgramList();
+    store.refresh();
     applyFactoryProgram(kFactoryPrograms[warmCassetteProgramIndex]);
     setCurrentId(factoryIdAt((int) warmCassetteProgramIndex));
     captureProgramSnapshot();
@@ -114,9 +115,8 @@ ProgramId TapeRotAudioProcessor::resolve(ProgramBank bank, const juce::String& i
             return factoryIdAt(pos);
 
     if (bank == ProgramBank::user)
-        for (const auto& f : userProgramFiles)
-            if (f.getFileNameWithoutExtension() == id)
-                return { ProgramBank::user, id, id };
+        if (store.fileFor(id) != juce::File())
+            return { ProgramBank::user, id, id };
 
     // **Degrade honestly.** The parameter values restored from the session are correct and stay
     // put; only the NAME is unknown, so the panel says so rather than silently landing on whichever
@@ -128,14 +128,14 @@ ProgramId TapeRotAudioProcessor::resolve(ProgramBank bank, const juce::String& i
 std::vector<ProgramId> TapeRotAudioProcessor::listPrograms() const
 {
     std::vector<ProgramId> out;
-    out.reserve(1 + kFactoryPrograms.size() + (size_t) userProgramFiles.size());
+    out.reserve(1 + kFactoryPrograms.size() + (size_t) store.getFiles().size());
 
     out.push_back(initId());
 
     for (size_t i = 0; i < kFactoryPrograms.size(); ++i)
         out.push_back(factoryIdAt((int) i));
 
-    for (const auto& f : userProgramFiles)
+    for (const auto& f : store.getFiles())
     {
         const auto stem = f.getFileNameWithoutExtension();
         out.push_back({ ProgramBank::user, stem, stem });
@@ -146,14 +146,14 @@ std::vector<ProgramId> TapeRotAudioProcessor::listPrograms() const
 
 juce::String TapeRotAudioProcessor::displayLabelFor(const ProgramId& id) const
 {
-    // The number is computed here, at paint time, from the Program's position in the bank. It is a
-    // label: nothing stores it and nothing resolves by it. Only Factory Programs get one - User
-    // Programs sort alphabetically, so a number would change whenever one was saved.
-    if (id.bank == ProgramBank::factory)
-        if (const int pos = factoryPositionOf(id.id); pos >= 0)
-            return juce::String(pos + 1).paddedLeft('0', 2) + " " + id.displayName;
-
-    return id.displayName;
+    // The number is computed at paint time from the Program's position in the bank. It is a label:
+    // nothing stores it and nothing resolves by it. Only Factory Programs get one - User Programs
+    // sort alphabetically, so a number would change whenever one was saved.
+    //
+    // The position is resolved HERE because the Factory bank is this casting's own; core never
+    // holds one.
+    return nf::programDisplayLabel(id, id.bank == ProgramBank::factory ? factoryPositionOf(id.id)
+                                                                       : -1);
 }
 
 void TapeRotAudioProcessor::requestProgramChange(const ProgramId& id)
@@ -222,119 +222,42 @@ const juce::String TapeRotAudioProcessor::getProgramName(int index)
                : juce::String();
 }
 
-juce::File TapeRotAudioProcessor::getUserProgramDirectory()
+juce::File TapeRotAudioProcessor::getUserProgramDirectory() const
 {
-    // **Application data on every platform - no macOS special case.** This used to branch, putting
-    // macOS Programs under ~/Library/Audio/Presets. That is Apple's location for the AU PRESET
-    // FORMAT: .aupreset files the AU system itself scans, reads and writes. Our user Programs are
-    // not those - they are application-owned data in our own XML format - so they belong where an
-    // application keeps its data, and the AU folder should hold only what AU understands.
-    //
-    // The old comment argued that renaming the leaf "would move saved Programs somewhere no other
-    // tool looks". That was true and beside the point: no other tool was ever going to read a
-    // .taperotprogram out of Apple's preset folder either. Nothing was being made discoverable.
-    //
-    // **macOS needs the "Application Support" segment added by hand, and only macOS.** JUCE's
-    // userApplicationDataDirectory is `~/Library` there - NOT `~/Library/Application Support` -
-    // while it is `%APPDATA%` on Windows and `~/.config` on Linux, both of which are already the
-    // right root. JUCE's own PropertiesFile appends the segment the same way, for the same reason.
-    //
-    // This was got wrong once in exactly the plausible direction: the note here used to claim JUCE
-    // resolved the segment for us, and that hard-coding it would be wrong on two platforms out of
-    // three. The first half was false, and the second half only argues for the `#if` - it is one
-    // platform's extra segment, not a shared literal path. Programs landed directly in
-    // `~/Library/<Company>/` for a while, which is not where application data goes on macOS and is
-    // not a folder anything else writes into.
-    //
-    // No migration from the old location - nothing has shipped, so nothing is there to migrate.
-    // See Elmer's ProgramManager for why that is a decision rather than an oversight.
-    auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory);
-
-   #if JUCE_MAC
-    dir = dir.getChildFile("Application Support");
-   #endif
-
-    return dir
-        .getChildFile(pluginCompanyName)
-        .getChildFile(pluginProductName)
-        .getChildFile("Programs");
+    return store.getDirectory();
 }
 
-void TapeRotAudioProcessor::refreshUserProgramList()
+juce::File TapeRotAudioProcessor::getDefaultUserProgramDirectory()
 {
-    userProgramFiles.clear();
-    const auto dir = getUserProgramDirectory();
-    if (!dir.isDirectory())
-        return;
-
-    for (const auto& entry : juce::RangedDirectoryIterator(dir, false, juce::String("*") + programFileExtension))
-        userProgramFiles.add(entry.getFile());
-
-    // **The displayed name, case-insensitively.** Two deliberate details:
-    //
-    // The STEM, not getFileName() - comparing with the extension attached sorts "AB C" before "AB",
-    // because a space (0x20) precedes the dot (0x2E). Every casting had that bug.
-    //
-    // compareIgnoreCase, not operator< - which is a codepoint compare, so every lowercase name
-    // sorted after every uppercase one and "Zebra" preceded "apple". The GUI forces uppercase as
-    // you type, which masked it for anything created here; a file hand-renamed on disk, copied
-    // between machines or restored from a backup keeps its own case and unmasks it.
-    std::sort(userProgramFiles.begin(), userProgramFiles.end(),
-               [](const juce::File& a, const juce::File& b)
-               {
-                   return a.getFileNameWithoutExtension()
-                           .compareIgnoreCase(b.getFileNameWithoutExtension()) < 0;
-               });
+    // The per-OS resolution, the "Application Support" segment macOS alone needs, and the reason
+    // ~/Library/Audio/Presets is the wrong answer are all in nf/UserProgramDirectory.h now. That
+    // reasoning was carried in six near-identical comment blocks, and the one time it was wrong it
+    // was wrong in all six at once.
+    return nf::userProgramDirectory(pluginCompanyName, pluginProductName);
 }
 
-const juce::StringArray& TapeRotAudioProcessor::snapshotParamIds()
+bool TapeRotAudioProcessor::isMomentaryTrigger(const juce::String& parameterID)
 {
-    // Everything a Program stores. STOP/FILTER/FAIL are deliberately absent - they are momentary
-    // triggers, never saved, so holding one must not make the Program look modified.
-    static const juce::StringArray ids {
-        ParamIDs::drive, ParamIDs::wow, ParamIDs::flutter, ParamIDs::model, ParamIDs::noise,
-        ParamIDs::noiseCharacter, ParamIDs::hum, ParamIDs::failure, ParamIDs::failureDropouts,
-        ParamIDs::failureSnags, ParamIDs::failureCrinkles, ParamIDs::failureImbalance,
-        ParamIDs::mix, ParamIDs::output, ParamIDs::spread, ParamIDs::gen, ParamIDs::lp,
-        ParamIDs::hp, ParamIDs::ramp, ParamIDs::switchMode };
-    return ids;
+    // STOP, FILTER and FAIL are momentary triggers: never stored, forced false on every apply, and
+    // deliberately not part of the dirty check either - holding one down must not read as an edit.
+    //
+    // **Stated as an exclusion now, not as the inclusion list it replaced.** That list named all 20
+    // stored parameters explicitly, so 20 + 3 = 23 exactly covered the APVTS - and a parameter added
+    // later without a matching line would silently have gone unchecked, with SAVE staying dark while
+    // it moved. The two forms are equivalent today; only this one stays equivalent.
+    return parameterID == ParamIDs::stop
+        || parameterID == ParamIDs::filterAux
+        || parameterID == ParamIDs::failAux;
 }
 
 void TapeRotAudioProcessor::captureProgramSnapshot()
 {
-    const auto& ids = snapshotParamIds();
-    std::vector<float> fresh;
-    fresh.reserve((size_t) ids.size());
-
-    for (const auto& id : ids)
-        if (auto* v = apvts.getRawParameterValue(id))
-            fresh.push_back(v->load(std::memory_order_relaxed));
-        else
-            fresh.push_back(0.0f);
-
-    const juce::SpinLock::ScopedLockType lock(snapshotLock);
-    programSnapshot = std::move(fresh);
+    programSnapshot.capture(*this);
 }
 
 bool TapeRotAudioProcessor::isProgramModified() const
 {
-    const auto& ids = snapshotParamIds();
-
-    const juce::SpinLock::ScopedLockType lock(snapshotLock);
-    if (programSnapshot.size() != (size_t) ids.size())
-        return false;                       // nothing captured yet - nothing to compare against
-
-    for (int i = 0; i < ids.size(); ++i)
-        if (auto* v = apvts.getRawParameterValue(ids[i]))
-        {
-            // Physical values, so the tolerance has to suit the widest range here (LP, 1k-20k).
-            // Anything a user can hear moving is far larger than this.
-            const float current = v->load(std::memory_order_relaxed);
-            if (std::abs(current - programSnapshot[(size_t) i]) > 1.0e-3f)
-                return true;
-        }
-
-    return false;
+    return programSnapshot.differsFrom(*this, isMomentaryTrigger);
 }
 
 void TapeRotAudioProcessor::applyProgram(const ProgramId& id)
@@ -354,7 +277,7 @@ void TapeRotAudioProcessor::applyProgram(const ProgramId& id)
     }
     else if (id.bank == ProgramBank::user)
     {
-        const auto file = userProgramFile(id.id);
+        const auto file = store.fileFor(id.id);
 
         if (file == juce::File())
             return;
@@ -386,15 +309,6 @@ void TapeRotAudioProcessor::applyProgram(const ProgramId& id)
     setCurrentId(id);
     captureProgramSnapshot();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
-}
-
-juce::File TapeRotAudioProcessor::userProgramFile(const juce::String& stem) const
-{
-    for (const auto& f : userProgramFiles)
-        if (f.getFileNameWithoutExtension() == stem)
-            return f;
-
-    return {};
 }
 
 void TapeRotAudioProcessor::applyFactoryProgram(const FactoryProgram& program)
@@ -430,42 +344,40 @@ void TapeRotAudioProcessor::applyFactoryProgram(const FactoryProgram& program)
 
 void TapeRotAudioProcessor::saveUserProgram(const juce::String& rawName)
 {
-    // The GUI lets the name be typed, so it can arrive empty or as whitespace. Falling back here
-    // rather than in the caller means every future caller is safe too - an empty name would
-    // otherwise reduce to an empty filename and write a dotfile.
-    const auto name = rawName.trim().isEmpty() ? juce::String("USER PROGRAM") : rawName.trim();
-
-    const auto dir = getUserProgramDirectory();
-    if (!dir.isDirectory())
-        dir.createDirectory();
-
+    // **What a Program CONTAINS stays here.** The whole APVTS state, less the three momentary
+    // triggers - core owns naming, the collision check and the write, and takes finished XML.
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     xml->setAttribute(LegacyMigration::stateSchemaVersionAttribute, LegacyMigration::currentStateSchemaVersion);
 
     // Momentary triggers are never part of a saved program (see applyProgramByIndex/
     // applyFactoryProgram) - stripped here too so the file on disk doesn't imply otherwise.
-    for (auto* id : {ParamIDs::stop, ParamIDs::filterAux, ParamIDs::failAux})
-        for (int i = xml->getNumChildElements(); --i >= 0;)
-        {
-            auto* child = xml->getChildElement(i);
-            if (child->getStringAttribute("id") == juce::String(id))
-                xml->removeChildElement(child, true);
-        }
+    for (int i = xml->getNumChildElements(); --i >= 0;)
+    {
+        auto* child = xml->getChildElement(i);
 
-    juce::File file = dir.getChildFile(juce::File::createLegalFileName(name) + programFileExtension);
+        if (isMomentaryTrigger(child->getStringAttribute("id")))
+            xml->removeChildElement(child, true);
+    }
 
-    // **SAVE never overwrites**, which BRAND.md states as a guarantee and this used to break: a
-    // second save under the same name replaced the first Program's contents silently. It matters
-    // more now that the filename IS the identity - two Programs cannot share one.
-    if (file.existsAsFile())
-        file = file.getNonexistentSibling();
+    // **The empty-name fallback is `TAKE n` now, not `USER PROGRAM`.** The suite had six different
+    // ones - USER PROGRAM, NEW PROGRAM three times, UNTITLED, TAKE n - and this is the one that is
+    // better rather than merely different: consecutive empty saves give TAKE 3, TAKE 4 instead of
+    // leaning on getNonexistentSibling for "USER PROGRAM (2)". A player meeting UNTITLED on one
+    // casting and TAKE 3 on another is meeting drift, not character.
+    //
+    // Trimming, upper-casing and the 25-character cap also apply on every path now. They used to
+    // live in ProgramHeader's keystroke filter alone, so any programmatic save bypassed all three.
+    const auto file = store.save(rawName, *xml);
 
-    xml->writeTo(file);
+    if (file == juce::File())
+        return;   // the write failed; the panel keeps naming the Program it was already on
 
-    refreshUserProgramList();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 
+    // **The stem comes off the file core returned, not off the requested name.** A collision takes
+    // the next free sibling, so taking it from the request would point the panel at the first file
+    // while the values came from the second.
     const auto stem = file.getFileNameWithoutExtension();
     requestProgramChange({ ProgramBank::user, stem, stem });
 }
@@ -475,14 +387,11 @@ void TapeRotAudioProcessor::deleteUserProgram(const ProgramId& id)
     if (id.bank != ProgramBank::user)
         return;
 
-    const auto file = userProgramFile(id.id);
+    const bool wasCurrent = getCurrentProgramId() == id;
 
-    if (file == juce::File())
+    if (! store.remove(id.id))
         return;
 
-    const bool wasCurrent = getCurrentProgramId() == id;
-    file.deleteFile();
-    refreshUserProgramList();
     updateHostDisplay(juce::AudioProcessorListener::ChangeDetails().withProgramChanged(true));
 
     // Deliberately NOT the unresolved state: deleting from the panel is an unambiguous intent, so
@@ -781,9 +690,9 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
                 else if (juce::isPositiveAndBelow(savedIndex, (int) kNumFactoryPrograms))
                     restored = factoryIdAt(savedIndex);
                 else if (const int u = savedIndex - (int) kNumFactoryPrograms;
-                         u >= 0 && u < userProgramFiles.size())
+                         u >= 0 && u < store.getFiles().size())
                 {
-                    const auto stem = userProgramFiles.getReference(u).getFileNameWithoutExtension();
+                    const auto stem = store.getFiles().getReference(u).getFileNameWithoutExtension();
                     restored = { ProgramBank::user, stem, stem };
                 }
                 else

@@ -4,48 +4,47 @@
 
 #include <juce_core/juce_core.h>
 
+#include <nf/ProgramId.h>
+
 #include <array>
 
-/** Which list a Program belongs to. INIT is its own bank rather than a magic index, because it is
-    in neither of the other two: the dropdown prints it unnumbered above FACTORY, the bank tag shows
-    an em-dash rather than naming a bank it is not in, and DELETE is disabled on it. */
-enum class ProgramBank
-{
-    init,
-    factory,
-    user,
-    unresolved      ///< A stored identifier that no longer names anything. See ProgramId::id.
-};
+/** **Program identity comes from core, and these aliases are the whole of the local surface.**
 
-/** **How a Program is identified everywhere except the host adapter.**
+    `nf::ProgramBank` and `nf::ProgramId` say what six identical copies used to say separately:
+    INIT is its own bank rather than a magic index - the dropdown prints it unnumbered above
+    FACTORY, the bank tag shows an em-dash rather than naming a bank it is not in, and DELETE is
+    disabled on it. Identity is a permanent slug for a Factory Program and the filename stem for a
+    User one. `unresolved` carries an identifier that no longer names anything, kept only so the
+    panel can say which Program the session meant; see PluginProcessor::setStateInformation.
 
-    Not a position. Positions change when the bank is reordered or extended, and - while User
-    Programs were on the host list - whenever the user saved or deleted one of their own. A stored
-    position is a name that stops meaning the same thing.
+    `displayName` is carried for presentation and is deliberately outside `operator==`, because a
+    factory slug is not presentable - `warm-cassette?` in the LCD would read as a rendering fault -
+    and because comparing on it would make a Program stop equalling itself the moment someone
+    corrected a typo in the bank.
 
-    - `factory`    - `id` is the entry's permanent `FactoryProgram::slug`.
-    - `user`       - `id` is the file's stem, which is also its displayed name.
-    - `init`       - `id` is `"init"`.
-    - `unresolved` - `id` is the identifier that failed to resolve, kept only so the panel can say
-                     which Program the session meant. `displayName` is what actually gets painted;
-                     see PluginProcessor::setStateInformation.
+    Aliased rather than used qualified at every call site, because the unqualified names are what
+    the panel, the header and the tests already read. */
+using ProgramBank = nf::ProgramBank;
+using ProgramId   = nf::ProgramId;
 
-    `displayName` is carried alongside because a factory slug is not presentable - `warm-cassette?`
-    in the LCD would read as a rendering fault rather than an unresolved Program. It is display only
-    and never resolves anything. */
-struct ProgramId
-{
-    ProgramBank bank = ProgramBank::factory;
-    juce::String id;
-    juce::String displayName;
+/** **The User Program name cap: 25 = 27 - 2.**
 
-    bool operator== (const ProgramId& other) const noexcept
-    {
-        return bank == other.bank && id == other.id;    // displayName is not identity
-    }
+    The name field runs x 510-849 at 18px Share Tech Mono with 2px tracking, which fits 27
+    characters; the dirty marker " *" takes 2 and the naming cursor takes 1, so the cap is the
+    budget less the larger of the two.
 
-    bool operator!= (const ProgramId& other) const noexcept { return ! operator== (other); }
-};
+    It was 24 when the display carried a two-digit index and a space. User Programs no longer carry
+    one - they sort alphabetically, so any number would change whenever one was saved - which is
+    what freed the character the marker now costs.
+
+    **It lives beside the identity types rather than in ProgramHeader because the keystroke filter
+    was the only thing applying it.** Any programmatic save bypassed the cap entirely, and a name
+    longer than the budget is one the panel cannot show. The store enforces it on every path now,
+    and the header aliases this rather than holding its own copy.
+
+    **A budget may grow; a cap may never shrink.** Lowering it orphans names already on disk - they
+    would load, then fail to save back under their own name. */
+constexpr int kMaxProgramNameLength = 25;
 
 // A full parameter-state snapshot, one field per APVTS parameter except the three momentary aux
 // triggers (STOP/FILTER/FAIL) - those are deliberately not part of a program's own state at all;

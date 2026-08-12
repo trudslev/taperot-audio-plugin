@@ -15,6 +15,8 @@
 #include "DSP/AuxEnvelope.h"
 #include "DSP/OutputStage.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <nf/ParameterSnapshot.h>
+#include <nf/UserProgramStore.h>
 #include <array>
 #include <memory>
 
@@ -22,7 +24,15 @@ class TapeRotAudioProcessor final : public juce::AudioProcessor,
                                      private juce::AsyncUpdater
 {
 public:
-    TapeRotAudioProcessor();
+    /** @param userDirectoryOverride  where User Programs live. Defaults to the real per-OS
+                                      location; a test passes a temporary directory so it never
+                                      writes into the user's own Programs folder.
+
+        **The seam exists because the tests were writing into the live folder.** ProgramIdentityTests
+        saved and deleted `IDENTITY TEST A` in the directory holding the user's own work - by exact
+        name, which is the safe form, but still one interrupted run away from leaving litter there.
+        Defaulted, so JUCE's `createPluginFilter()` is unaffected. */
+    explicit TapeRotAudioProcessor(juce::File userDirectoryOverride = {});
     ~TapeRotAudioProcessor() override = default;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
@@ -125,6 +135,16 @@ public:
     void saveUserProgram(const juce::String& name);
     void deleteUserProgram(const ProgramId& id);
 
+    /** The User Program name cap. Derived and explained in FactoryPrograms.h, beside the identity
+        types, so the store and the header read one constant rather than two copies. */
+    static constexpr int maxProgramNameLength = kMaxProgramNameLength;
+
+    static juce::String getProgramFileExtension() { return ".taperotprogram"; }
+
+    /** Where this instance stores User Programs, and the real per-OS location regardless of it. */
+    juce::File getUserProgramDirectory() const;
+    static juce::File getDefaultUserProgramDirectory();
+
     /** Applies a deferred change right now instead of waiting for the message loop. Only the tests
         need this: the console app they run in has no message loop to deliver the async callback, so
         without it every requestProgramChange would silently never arrive. Matches the siblings'
@@ -179,21 +199,23 @@ private:
 
     void applyProgram(const ProgramId& id);
     void setCurrentId(const ProgramId& id);
-    juce::File userProgramFile(const juce::String& stem) const;
     void applyFactoryProgram(const FactoryProgram& program);
-    void refreshUserProgramList();
-    static juce::File getUserProgramDirectory();
+
+    /** The User bank on disk. Scanning, sorting, naming, the collision check, save and delete are
+        core's; WHAT a Program contains - the whole APVTS state, less the three momentary triggers -
+        stays here. */
+    nf::UserProgramStore store;
 
     // Taken from the live APVTS right after a Program is applied or a session restored, rather
     // than reconstructed from the Program's definition - that way there is exactly one description
     // of what a Program sets, in applyFactoryProgram, and no second copy to drift out of step.
+    //
+    // The SpinLock that used to sit beside this is core's now: setStateInformation carries no
+    // thread guarantee and the GUI polls isProgramModified on the message thread, and four of the
+    // six castings had that unguarded. See nf/ParameterSnapshot.h.
     void captureProgramSnapshot();
-    static const juce::StringArray& snapshotParamIds();
-    std::vector<float> programSnapshot;
-    // setStateInformation can arrive on any thread; the GUI polls isProgramModified on the message
-    // thread. Contention is near-zero (writes happen on program change only), so a spin lock costs
-    // nothing and never allocates.
-    mutable juce::SpinLock snapshotLock;
+    static bool isMomentaryTrigger(const juce::String& parameterID);
+    nf::ParameterSnapshot programSnapshot;
 
     // Guarded rather than atomic: a ProgramId holds two juce::Strings. Contention is near-zero -
     // writes happen on a Program change only - so the spin lock costs nothing and never allocates.
@@ -219,9 +241,6 @@ private:
         Bounded on purpose: left armed indefinitely it would swallow a genuine matching call much
         later - the user editing a Program and re-selecting it from the host to revert. */
     std::atomic<bool> justRestoredState{false};
-    // Sorted alphabetically by filename (stable across relaunches, unlike mtime-sort). Index i in
-    // this array is program index kNumFactoryPrograms + i.
-    juce::Array<juce::File> userProgramFiles;
 
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* wowParam = nullptr;

@@ -65,6 +65,8 @@ target_compile_definitions(TapeRotTests PRIVATE
     NF_PRODUCT_NAME="${TAPEROT_PRODUCT_NAME}")
 
 target_link_libraries(TapeRotTests PRIVATE
+    # PluginProcessor.cpp is compiled into both targets and calls into core, so both link it.
+    nf::core
     juce::juce_dsp
     juce::juce_audio_basics
     juce::juce_audio_processors

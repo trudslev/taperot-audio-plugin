@@ -10,6 +10,33 @@
     ordering between two AudioProcessor entry points - setStateInformation then setCurrentProgram -
     and a harness that reimplemented that ordering would assert against a copy of the code.
 */
+namespace
+{
+    /** A temporary Programs directory that removes itself.
+
+        **These tests used to save and delete inside the user's own Programs folder**, by exact
+        name, which is the safe form - but an interrupted run still leaves litter in the one
+        directory the root CLAUDE.md says not to touch while the plugin is in use. A cleanup glob
+        in this suite has already destroyed a Program somebody had just saved.
+
+        The processor takes the override as a defaulted constructor argument, so nothing about the
+        shipping path changes: JUCE's createPluginFilter() passes nothing and gets the real
+        location. */
+    struct TempProgramDir
+    {
+        TempProgramDir()
+            : dir(juce::File::getSpecialLocation(juce::File::tempDirectory)
+                      .getChildFile("taperot-test-"
+                                    + juce::String(juce::Random::getSystemRandom().nextInt(1 << 30))))
+        {
+            dir.createDirectory();
+        }
+
+        ~TempProgramDir() { dir.deleteRecursively(); }
+
+        juce::File dir;
+    };
+}
 class ProgramIdentityTests final : public juce::UnitTest
 {
 public:
@@ -19,7 +46,8 @@ public:
     {
         beginTest("The host list is the Factory bank, and its size never changes");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             expectEquals(p.getNumPrograms(), (int) kNumFactoryPrograms,
                          "the host list must be Factory-only - not INIT, not User Programs");
@@ -35,7 +63,8 @@ public:
 
         beginTest("Every factory position round-trips through identity");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             for (int i = 0; i < p.getNumPrograms(); ++i)
             {
@@ -51,7 +80,8 @@ public:
 
         beginTest("A stale host replay right after a restore is ignored");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             // Put the plugin somewhere distinctive and capture that session.
             p.requestProgramChange(TapeRotAudioProcessor::factoryIdAt(6));
@@ -77,7 +107,8 @@ public:
 
         beginTest("A genuine change immediately after a restore is honoured");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             juce::MemoryBlock session;
             p.requestProgramChange(TapeRotAudioProcessor::factoryIdAt(6));
@@ -93,7 +124,8 @@ public:
 
         beginTest("The guard expires - a matching change later in the session is honoured");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             juce::MemoryBlock session;
             p.requestProgramChange(TapeRotAudioProcessor::factoryIdAt(6));
@@ -117,7 +149,8 @@ public:
 
         beginTest("A user edit disarms the guard, so a later matching change still applies");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             juce::MemoryBlock session;
             p.requestProgramChange(TapeRotAudioProcessor::factoryIdAt(6));
@@ -134,7 +167,8 @@ public:
 
         beginTest("A restored User Program survives the replay, which reports position 0");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             p.saveUserProgram("IDENTITY TEST B");
             p.flushPendingProgramChange();
@@ -162,7 +196,8 @@ public:
 
         beginTest("An unresolved identifier keeps the values and says it does not know the name");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             p.requestProgramChange(TapeRotAudioProcessor::factoryIdAt(9));
             p.flushPendingProgramChange();
@@ -192,7 +227,8 @@ public:
 
         beginTest("User Programs sort by displayed name, case-insensitively");
         {
-            TapeRotAudioProcessor p;
+            TempProgramDir tmp;
+            TapeRotAudioProcessor p{tmp.dir};
 
             // "AB C" vs "AB" is the pair that exposes sorting on the filename WITH its extension:
             // a space (0x20) precedes the dot (0x2E), so "AB C" used to sort first.

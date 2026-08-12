@@ -25,6 +25,27 @@ FetchContent_Declare(JUCE
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
+# ---------------------------------------------------------------------------------------------
+# neon-foundry-core: shared BEHAVIOUR across the suite, pinned by tag exactly like JUCE above.
+#
+# **This is not a dependency on a sibling casting.** Depending on one of those is still forbidden -
+# it couples two things that must ship on their own schedules. This is a versioned library that no
+# casting owns, so a change to it forces nothing on anyone until they move their own pin, which is
+# the same relationship every casting already has with JUCE. The root CLAUDE.md draws that
+# distinction under "Structure".
+#
+# **Declared AFTER JUCE, and that ordering is load-bearing.** Core links juce::juce_core and does
+# not fetch its own when consumed; it fails with an explicit message if JUCE is not already
+# available. Two JUCE trees in one build link two juce_core builds into one binary and surface as
+# duplicate symbols a long way from the cause.
+#
+FetchContent_Declare(NeonFoundryCore
+    GIT_REPOSITORY https://github.com/trudslev/neon-foundry-core.git
+    GIT_TAG v1.0.0
+    GIT_SHALLOW TRUE)
+FetchContent_MakeAvailable(NeonFoundryCore)
+
+
 # The 2x asset set - 29 sprites, role-named rather than per-control.
 #
 # Several controls deliberately share one sprite: knob_large serves all seven large knobs (the cap
@@ -151,6 +172,9 @@ target_link_libraries(TapeRot
         juce::juce_audio_utils
         juce::juce_dsp
         TapeRotBinaryData
+        # PluginProcessor.cpp is compiled into both this target and the tests, and calls into core,
+        # so both link it.
+        nf::core
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
