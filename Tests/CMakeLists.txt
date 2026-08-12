@@ -2,6 +2,7 @@ juce_add_console_app(TapeRotTests PRODUCT_NAME "TapeRotTests")
 
 target_sources(TapeRotTests PRIVATE
     TestMain.cpp
+    ReadoutConformanceTests.cpp
     SaturatorTests.cpp
     WowFlutterTests.cpp
     TapeModelEQTests.cpp

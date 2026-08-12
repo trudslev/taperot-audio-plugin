@@ -1,6 +1,8 @@
 #pragma once
 
 #include "TapeRotTheme.h"
+
+#include <nf/ParameterReadout.h>
 #include "ProgramMenuLookAndFeel.h"
 #include "../DSP/FactoryPrograms.h"      // ProgramId / ProgramBank
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -39,6 +41,27 @@ public:
     void showParameter(const juce::String& paramId);
     void releaseParameter();
 
+    /** This casting's spelling of the readout: `NAME: VALUE UNIT`, with a WORD upper-cased.
+
+        **`wordsOnly`, which TapeRot and Gatecrasher arrived at independently.** A value carrying no
+        unit and no digit is a choice name rather than a reading - MODEL and SWITCH read as panel
+        labels and get the name's treatment, while a numeric reading keeps its case because any
+        letters in it belong to the unit. `s` and `S` are different units and `kHz` upper-cased is
+        not a unit at all, which is how Reflect-84 came to print `DECAY: 4.6 S`.
+
+        Elmer's source argues that even a choice name should be authored in caps in `Parameters.h`
+        instead, so the host's automation lane agrees. Both arguments are recorded beside
+        `nf::ReadoutFormat::ValueCase`; this panel keeps what it has until the designers rule.
+
+        The revert is core's 900 ms, where this panel carried 1100. */
+    static nf::ReadoutFormat readoutFormat()
+    {
+        nf::ReadoutFormat f;
+        f.valueCase = nf::ReadoutFormat::ValueCase::wordsOnly;
+        f.nameCharacterBudget = 24;
+        return f;
+    }
+
     /** The component the Program list is laid out inside. Its bounds become the list's parent area,
         which is what fixes the list's top edge and caps its height - layout, not plumbing. Passing
         nullptr returns the list to being a free desktop window sized to its own content, which for
@@ -72,7 +95,6 @@ private:
     bool deleteEnabled() const;
 
     juce::String lcdText() const;
-    juce::String describe(const juce::String& paramId) const;
 
     // --- naming a User Program, typed straight into the LCD ------------------------------------
     // SAVE opens an entry field in the glass rather than saving immediately, so a User Program can
@@ -99,7 +121,9 @@ private:
     // while the list is open. Drawing one over the top would double-print it; un-baking is a plate
     // change, raised with the designers rather than worked around in code.
     juce::Component* menuParent = nullptr;
-    juce::String editingParam;
+    /** The parameter takeover: what to show, and until when. The deadline is core's; the one-shot
+        Timer that notices it, the font, the cell and every pixel of the painting stay here. */
+    nf::ReadoutTimer readout { readoutFormat() };
     /** Outlives showMenuAsync's callback, so it must be a member rather than a local. */
     ProgramMenuLookAndFeel menuLookAndFeel;
 

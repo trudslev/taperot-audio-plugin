@@ -371,11 +371,16 @@ namespace Layout
     inline constexpr float scopeLegendSize  = 12.0f;
     inline constexpr float scopeLegendTracking = 1.3f;
 
-    /** The LCD shows `PARAMETER: value unit` while a control is moved and reverts to the program
-        name this long after release. Only direct manipulation triggers it - a SliderAttachment
-        also fires on Program apply and on every host automation step, so the takeover has to be
-        guarded on the control's own drag state or the display latches and flickers. */
-    inline constexpr int lcdRevertMs = 1100;
+    /** **The readout revert lives in core now - `nf::ReadoutFormat::revertMs`, 900 ms.**
+
+        It was 1100 here. The suite ran 800 / 900 / 1100 / 1200 under three different constant names
+        and two mechanisms, and no spec anywhere justified any of them; 900 is what three castings
+        already had. `ProgramHeader::readoutFormat()` is where this panel states its readout
+        spelling, and the delay comes with it rather than being a separate number here that nothing
+        binds to the others.
+
+        Left as a comment rather than deleted silently, because a reader looking for the old
+        constant should find out where it went rather than conclude the revert was removed. */
 
     inline constexpr int animationHz = 60;
 
