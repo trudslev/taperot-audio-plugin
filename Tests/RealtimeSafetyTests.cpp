@@ -50,7 +50,27 @@ public:
             logMessage ("  512/512 cold   -> " + c.describe());
             logMessage ("  512/512 steady -> " + s.describe());
 
-            expect (s.clean(), "steady-state processBlock allocates on every block: " + s.describe());
+            // **FINDING, and one an allocation-only detector reported as clean.** The cold row is
+            // `0 alloc, 4 free` — four deallocations on the first block, no allocations at all. The
+            // earlier instrument counted only allocations and called this row "no allocation".
+            //
+            // Cause: TapeRot caches its IIR coefficients as Ptr arrays built in prepare, and assigns
+            // them per block — Saturator.cpp:38/40/92/94 and TapeModelEQ.cpp:36. Assigning a
+            // ReferenceCountedObjectPtr releases whatever the target held. On the FIRST block that
+            // release drops the last reference to what prepare left there, and free() runs four
+            // times. On every block after, the assignment is the same pointer, so the refcount goes
+            // down and back up without reaching zero — which is why steady state is genuinely clean.
+            //
+            // So the caching TapeRot uses to avoid per-block ALLOCATION still costs four per-block
+            // frees' worth of heap activity once, on the first block. Classification: live defect,
+            // measured, one-off. Nothing is fixed in this pass.
+            expectEquals (c.frees, 4,
+                          "the first-block coefficient release count moved. If it went to 0 the "
+                          "one-off is fixed; if it went up, something else releases on the audio "
+                          "thread.");
+            expectEquals (c.allocations, 0, "the cold block started allocating, not just freeing");
+
+            expect (s.clean(), "steady-state processBlock touches the heap: " + s.describe());
         }
 
         beginTest ("processBlock when a host over-delivers — up to the measured crash threshold");
