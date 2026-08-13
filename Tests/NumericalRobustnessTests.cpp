@@ -137,10 +137,19 @@ public:
             // outruns the decay. That is a structural reason for a clean result rather than luck,
             // and it is what a per-stage scan can establish and an output-only scan cannot — the
             // output would have read clean either way, with no way to tell which.
+            // **This pins a REASON, not the behaviour.** It is not an endorsement of the
+            // amplification and must not be read as "do not change this" — the level question it
+            // raises is open (see the silence-in test below, and category 3's ruling).
+            //
+            // What it pins is the CONDITIONALITY of the zero above: that result holds *because* the
+            // cascade amplifies. If someone restages the gain — which the level question might well
+            // argue for — this assertion fires, and the correct response is to **re-run the scan**,
+            // not to re-tune the assertion. A decaying cascade could reach subnormal territory where
+            // an amplifying one cannot.
             expectGreaterThan (peakAt[7], peakAt[0],
-                               "the cascade no longer amplifies, so the structural reason this "
-                               "chain cannot reach subnormal territory no longer holds — re-check "
-                               "the per-stage figures rather than trusting the zero above");
+                               "the cascade no longer amplifies. The zero-subnormal result above was "
+                               "conditional on it doing so, so RE-RUN the per-stage scan — do not "
+                               "adjust this assertion to match.");
 
             for (size_t s = 0; s < stages.size(); ++s)
                 expect (std::isfinite (peakAt[s]),
@@ -172,6 +181,63 @@ public:
 
             // TapeRot GENERATES hiss and hum deliberately, so "never fell silent" is correct here
             // and is not asserted against — see category 3's silence-in/silence-out ruling.
+        }
+
+        beginTest ("Silence in at GEN 8 — what the cascade drives the noise bed to");
+        {
+            // **A level question, raised by the per-stage scan rather than by the ear.** A decaying
+            // tail rises 0.056 -> 0.999 through the eight stages, which means that with the input
+            // gone the cascade drives whatever remains toward full scale. TapeRot generates hiss and
+            // hum deliberately, so what remains is not nothing: it is the noise bed, carried through
+            // ~8x of pre-saturation gain.
+            //
+            // That may be exactly right — eight generations of dubbing should sound like eight
+            // generations of dubbing, and a swelling noise floor is the point of the plugin. But it
+            // is a number worth being deliberate about rather than discovering, so it is MEASURED
+            // here rather than inferred from the tail, and belongs to category 3's
+            // silence-in/silence-out ruling: this is the "confirm it generates only where intended"
+            // half.
+            for (int gen : { 0, 4, 8 })
+            {
+                TapeRotAudioProcessor processor;
+
+                set (processor, ParamIDs::gen, gen == 0 ? 0.0f : (float) gen / 8.0f);
+                set (processor, ParamIDs::noise, 1.0f);
+
+                nf::testing::RenderSpec spec;
+                spec.numBlocks = 64;
+                spec.fillInput = [] (juce::AudioBuffer<float>& b, int) { b.clear(); };  // silence in
+
+                const auto out = nf::testing::render (processor, spec);
+
+                double peak = 0.0, rms = 0.0;
+                size_t n = 0;
+
+                for (const auto& channel : out)
+                    for (auto v : channel)
+                    {
+                        peak = juce::jmax (peak, (double) std::abs (v));
+                        rms += (double) v * (double) v;
+                        ++n;
+                    }
+
+                rms = n > 0 ? std::sqrt (rms / (double) n) : 0.0;
+
+                logMessage ("  GEN " + readBack (processor, ParamIDs::gen)
+                                + ", NOISE 100, silence in -> peak " + juce::String (peak, 6)
+                                + " (" + juce::String (juce::Decibels::gainToDecibels (peak), 1)
+                                + " dB), rms " + juce::String (rms, 6)
+                                + " (" + juce::String (juce::Decibels::gainToDecibels (rms), 1) + " dB)");
+
+                // Reported, not judged. Whether the generated floor is at the right LEVEL is a
+                // design ruling; what this asserts is only that it is bounded and finite, which is
+                // the sweep's business.
+                expect (std::isfinite (peak), "non-finite output from silence in at GEN " + juce::String (gen));
+                expectLessThan (peak, 4.0,
+                                "the generated noise bed at GEN " + juce::String (gen)
+                                    + " exceeds 4x full scale, which is a level defect rather than a "
+                                    "design choice");
+            }
         }
     }
 
