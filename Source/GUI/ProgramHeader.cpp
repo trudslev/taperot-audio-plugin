@@ -405,8 +405,13 @@ void ProgramHeader::paint(juce::Graphics& g)
                                  : Frame::bothDark);
 
     // --- MODEL readout --------------------------------------------------------------------------
+    // **Printed as the parameter spells it, never re-cased.** This carried a .toUpperCase() until
+    // 2026-08-13, which was invisible only because kTapeModels already authors every displayName in
+    // caps - so it re-cased nothing and looked harmless while being the second display site in this
+    // file deciding case for itself. The moment a model were added in mixed case, this readout and
+    // the host's automation lane would have printed different strings for one parameter.
     if (auto* modelParam = processorRef.apvts.getParameter("model"))
-        Text::drawTracked(g, modelParam->getText(modelParam->getValue(), 0).toUpperCase(),
+        Text::drawTracked(g, modelParam->getText(modelParam->getValue(), 0),
                           Font::of(Layout::modelTextSize), Layout::modelTracking,
                           Layout::modelReadout, juce::Justification::centred, Colour::lcdText);
 

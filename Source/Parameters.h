@@ -195,6 +195,22 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     auto dbAttrs = juce::AudioParameterFloatAttributes().withLabel("dB")
                        .withStringFromValueFunction(oneDp);
 
+    // **ON/OFF is authored here, not upper-cased at the readout.** JUCE's default bool text is
+    // "On"/"Off" (juce_AudioParameterBool.cpp:47), and the LCD used to upper-case any unitless,
+    // digit-free value on the way out - which made the display the only place that knew this panel
+    // spells its switch legends in caps, and made the host's automation lane disagree with it.
+    // BRAND.md: case belongs at the source. Every bool below carries this except SWITCH.
+    auto onOffAttrs = juce::AudioParameterBoolAttributes()
+                          .withStringFromValueFunction([] (bool v, int) { return v ? "ON" : "OFF"; });
+
+    // **SWITCH is the one parameter whose readout deliberately CHANGES**, from `SWITCH: OFF`/`ON`
+    // to `SWITCH: FADE`/`CLUNK`. It is a bool for storage reasons, but it has never meant on/off:
+    // false is FADE (parallel-chain crossfade) and true is CLUNK (hard coefficient swap under a
+    // mute dip). The old text named the storage rather than the control, and the panel's own
+    // printed legends read FADE and CLUNK, so the LCD contradicted the plate it sits in.
+    auto switchModeAttrs = juce::AudioParameterBoolAttributes()
+                               .withStringFromValueFunction([] (bool v, int) { return v ? "CLUNK" : "FADE"; });
+
     // Skewed (matching LP/HP/RAMP's existing 0.3-0.4 convention below): Saturator's drive-gain
     // curve is 1 + shape(driveNorm)*11 feeding tanh(x*driveGain)/tanh(driveGain) (see
     // Saturator::driveCurveExponent), which still reaches its audibly-maxed-out ceiling well
@@ -220,15 +236,15 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     // bug; it doesn't affect the parameter's default value (stored/interpreted as a physical number
     // either way) or any session/preset file.
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::drive, 1}, "Drive",
+        juce::ParameterID{ParamIDs::drive, 1}, "DRIVE",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.2f), 20.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::wow, 1}, "Wow",
+        juce::ParameterID{ParamIDs::wow, 1}, "WOW",
         juce::NormalisableRange<float>(0.0f, 100.0f), 30.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::flutter, 1}, "Flutter",
+        juce::ParameterID{ParamIDs::flutter, 1}, "FLUTTER",
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.2f), 25.0f, percentAttrs));
 
     // versionHint bumped 1 -> 2 -> 3 (protects VST3/AU host automation-lane reattachment only -
@@ -238,51 +254,51 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         modelNames.add(model.displayName);
     constexpr int defaultModelIndex = 5; // CASSETTE I (shifted from 4 now that NONE is index 0)
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{ParamIDs::model, 3}, "Model", modelNames, defaultModelIndex));
+        juce::ParameterID{ParamIDs::model, 3}, "MODEL", modelNames, defaultModelIndex));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::noise, 1}, "Noise",
+        juce::ParameterID{ParamIDs::noise, 1}, "NOISE",
         juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::hum, 1}, "Hum", false));
+        juce::ParameterID{ParamIDs::hum, 1}, "HUM", false, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::failure, 1}, "Failure",
+        juce::ParameterID{ParamIDs::failure, 1}, "FAILURE",
         juce::NormalisableRange<float>(0.0f, 100.0f), 0.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::mix, 1}, "Mix",
+        juce::ParameterID{ParamIDs::mix, 1}, "MIX",
         juce::NormalisableRange<float>(0.0f, 100.0f), 100.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::output, 1}, "Output",
+        juce::ParameterID{ParamIDs::output, 1}, "OUTPUT",
         juce::NormalisableRange<float>(-24.0f, 24.0f), 0.0f, dbAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::spread, 1}, "Spread", false));
+        juce::ParameterID{ParamIDs::spread, 1}, "SPREAD", false, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::failureDropouts, 1}, "Dropouts", true));
+        juce::ParameterID{ParamIDs::failureDropouts, 1}, "DROPOUTS", true, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::failureSnags, 1}, "Snags", true));
+        juce::ParameterID{ParamIDs::failureSnags, 1}, "SNAGS", true, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::failureCrinkles, 1}, "Crinkles", true));
+        juce::ParameterID{ParamIDs::failureCrinkles, 1}, "CRINKLES", true, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::failureImbalance, 1}, "Imbalance", true));
+        juce::ParameterID{ParamIDs::failureImbalance, 1}, "IMBALANCE", true, onOffAttrs));
 
     // New parameters are appended below this line, never inserted above, to keep existing
     // sessions' parameter IDs stable (see BUILDING.md / CLAUDE.md backward-compatibility note).
     params.push_back(std::make_unique<juce::AudioParameterChoice>(
-        juce::ParameterID{ParamIDs::noiseCharacter, 1}, "Noise Character",
+        juce::ParameterID{ParamIDs::noiseCharacter, 1}, "NOISE CHARACTER",
         juce::StringArray{NoiseCharacterNames::tape, NoiseCharacterNames::vcr, NoiseCharacterNames::dust},
         0));
 
     params.push_back(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{ParamIDs::gen, 1}, "Generation", 1, 8, 1));
+        juce::ParameterID{ParamIDs::gen, 1}, "GENERATION", 1, 8, 1));
 
     // No withLabel here, unlike the others: the unit is value-dependent, so it has to live in the
     // text. LP spans 1-20 kHz and HP spans 20-2000 Hz, and the printed scales switch at 1k the same
@@ -309,25 +325,25 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
     // enough for any host's own MIDI-learn to map a note/CC to them without extra plugin-side
     // MIDI handling.
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::stop, 1}, "Stop", false));
+        juce::ParameterID{ParamIDs::stop, 1}, "STOP", false, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::filterAux, 1}, "Filter", false));
+        juce::ParameterID{ParamIDs::filterAux, 1}, "FILTER", false, onOffAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::failAux, 1}, "Fail", false));
+        juce::ParameterID{ParamIDs::failAux, 1}, "FAIL", false, onOffAttrs));
 
     // Two decimals, not one: RAMP starts at 0.05 s, which one decimal rounds to "0.1" - the same
     // string it gives at 0.14, so the bottom of the range would read as a single value.
     auto secondsAttrs = juce::AudioParameterFloatAttributes().withLabel("s")
                             .withStringFromValueFunction(twoDp);
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{ParamIDs::ramp, 1}, "Ramp",
+        juce::ParameterID{ParamIDs::ramp, 1}, "RAMP",
         juce::NormalisableRange<float>(0.05f, 4.0f, 0.0f, 0.4f), 0.3f, secondsAttrs));
 
     // false = FADE (default), true = CLUNK.
     params.push_back(std::make_unique<juce::AudioParameterBool>(
-        juce::ParameterID{ParamIDs::switchMode, 1}, "Switch", false));
+        juce::ParameterID{ParamIDs::switchMode, 1}, "SWITCH", false, switchModeAttrs));
 
     return {params.begin(), params.end()};
 }

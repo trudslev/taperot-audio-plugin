@@ -111,6 +111,54 @@ public:
                                     + " characters: \"" + text + "\"");
                     }
         }
+
+        beginTest ("Case is authored at the source, so no display site re-cases");
+        {
+            // **The guard on BRAND.md's "case belongs at the source".** Core stopped upper-casing
+            // the parameter name on 2026-08-13, so a parameter added with a Title-Case name makes
+            // this panel print one row of its LCD in a different case from every other row - and
+            // the host's automation lane shows the same mixed set. Nothing else fails.
+            //
+            // Asserted on getName() rather than on the literal, because that is what the readout
+            // and the host both actually read.
+            LayoutHost host;
+
+            for (auto* raw : host.getParameters())
+                if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*> (raw))
+                {
+                    const auto name = p->getName (128);
+                    expect (name == name.toUpperCase(),
+                            p->paramID + " is named \"" + name + "\", which is not authored in caps");
+                }
+        }
+
+        beginTest ("A unitless, digit-free value is authored in caps");
+        {
+            // This casting used to set ValueCase::wordsOnly, which upper-cased exactly the values
+            // matched here - an empty label and no digit, i.e. a choice name rather than a reading.
+            // The flag is gone and the caps moved into Parameters.h, so this pins the half of that
+            // move a reader cannot see from the call site.
+            //
+            // Deliberately NOT applied to values carrying a unit or a number: "6.3 kHz" and
+            // "-18.5 dB" are authored as they read, and upper-casing them is the bug that named
+            // ValueCase::all.
+            LayoutHost host;
+
+            for (const float position : { 0.0f, 0.5f, 1.0f })
+                for (auto* raw : host.getParameters())
+                    if (auto* p = dynamic_cast<juce::AudioProcessorParameterWithID*> (raw))
+                    {
+                        p->setValueNotifyingHost (position);
+
+                        const auto value = p->getText (p->getValue(), 0);
+
+                        if (p->getLabel().isNotEmpty() || value.containsAnyOf ("0123456789"))
+                            continue;
+
+                        expect (value == value.toUpperCase(),
+                                p->paramID + " prints \"" + value + "\", which is not authored in caps");
+                    }
+        }
     }
 };
 
