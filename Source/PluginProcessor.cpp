@@ -208,7 +208,7 @@ void TapeRotAudioProcessor::setCurrentProgram(int index)
     // The stale-replay guard, disarmed by this call whether or not it is honoured. A replay carries
     // the position we last reported, so a matching index immediately after a restore is ignored;
     // anything else, and every later call, applies normally.
-    if (justRestoredState.exchange(false, std::memory_order_relaxed) && index == getCurrentProgram())
+    if (userEdits.consumeRestore() && index == getCurrentProgram())
         return;
 
     requestProgramChange(factoryIdAt(index));
@@ -707,7 +707,7 @@ void TapeRotAudioProcessor::setStateInformation(const void* data, int sizeInByte
 
             // **Armed AFTER replaceState**, or the restore's own parameter writes would be mistaken
             // for activity and disarm it immediately. See the member's comment for what it guards.
-            justRestoredState.store(true, std::memory_order_relaxed);
+            userEdits.armRestore();
         }
 }
 

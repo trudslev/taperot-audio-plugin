@@ -15,6 +15,7 @@
 #include "DSP/AuxEnvelope.h"
 #include "DSP/OutputStage.h"
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <nf/UserEditGate.h>
 #include <nf/ParameterSnapshot.h>
 #include <nf/UserProgramStore.h>
 #include <array>
@@ -151,16 +152,24 @@ public:
         ProgramManager::flushPendingChange. */
     void flushPendingProgramChange() { handleUpdateNowIfNeeded(); }
 
-    /** Clears the stale-replay guard. Called from the editor when a change is USER-originated -
-        see the comment on justRestoredState. */
-    void noteUserEdit() noexcept { justRestoredState.store(false, std::memory_order_relaxed); }
-
     /** True once any stored parameter differs from the Program that is currently showing, so the
         GUI can keep SAVE disabled until there is actually something worth saving. The snapshot is
         retaken whenever a Program is applied or a session is restored, and deliberately ignores
         the momentary STOP/FILTER/FAIL triggers - those are never part of a Program, so holding one
         must not light SAVE up. */
     bool isProgramModified() const;
+
+    /** **Guards a host replaying a stale program index over a just-restored session.** Armed by
+        setStateInformation, consumed by the next setCurrentProgram (which ignores it only when the
+        index matches what getCurrentProgram already reports — the shape of a replay), disarmed by
+        the first USER-originated edit. **Automation must not disarm it**: a host may write
+        automation on load before replaying, and that would reopen the hole.
+
+        Public because the editor hands it to `nf::connectUserEdit` for every control, which is the
+        point of it living in core: Reflect-84 once shipped this guard with zero call sites for its
+        disarm, and coupling the disarm to the LCD hand-off is what makes that omission
+        inexpressible. See nf/UserEditGate.h. */
+    nf::UserEditGate userEdits;
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -180,7 +189,6 @@ public:
     float getFlutterRateHz() const noexcept { return flutterRateDisplay.load(std::memory_order_relaxed); }
     float getInputLevelDb() const noexcept { return inputLevelDb.load(std::memory_order_relaxed); }
     float getOutputLevelDb() const noexcept { return outputLevelDb.load(std::memory_order_relaxed); }
-
 
 private:
     // Applying a factory/user program (see setCurrentProgram) sets every parameter via
@@ -221,26 +229,6 @@ private:
     // writes happen on a Program change only - so the spin lock costs nothing and never allocates.
     mutable juce::SpinLock currentIdLock;
     ProgramId currentId;
-
-    /** **Guards against a host replaying a stale program index over a just-restored session.**
-
-        Hosts have been observed calling setCurrentProgram AFTER setStateInformation, echoing back
-        the presetNumber they remembered - which would apply a Factory Program over the state that
-        was just restored, silently, with the panel then naming a sound the session never had.
-
-        Armed by setStateInformation and disarmed by the FIRST of either: a setCurrentProgram call
-        (which is itself ignored only if it matches what getCurrentProgram already reports - the
-        exact shape of a replay), or a user-originated parameter change via noteUserEdit.
-
-        **Automation must not disarm it.** A host may start writing automation on session load
-        before it replays the index; if that disarmed the guard the replay would land unguarded,
-        which is the whole failure being prevented. That is why this is driven from the editor's
-        isMouseButtonDown-guarded callback rather than from a ValueTree listener, which cannot tell
-        a person from an automation lane.
-
-        Bounded on purpose: left armed indefinitely it would swallow a genuine matching call much
-        later - the user editing a Program and re-selecting it from the host to revert. */
-    std::atomic<bool> justRestoredState{false};
 
     std::atomic<float>* driveParam = nullptr;
     std::atomic<float>* wowParam = nullptr;
@@ -301,7 +289,6 @@ private:
 
     std::atomic<float> failAuxDisplay{0.0f};
     double displaySampleRate = 44100.0;
-
 
     juce::AudioBuffer<float> dryBuffer;
 

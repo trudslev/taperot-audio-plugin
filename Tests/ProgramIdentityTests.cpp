@@ -158,7 +158,11 @@ public:
             p.getStateInformation(session);
             p.setStateInformation(session.getData(), (int) session.getSize());
 
-            p.noteUserEdit();               // what the editor calls on a real knob drag
+            // What nf::connectUserEdit does on a real knob drag. Reached through the gate rather
+            // than through a processor method now, because the editor no longer calls a method: the
+            // disarm is installed with the LCD hand-off in one call, so neither can be wired without
+            // the other. See nf/UserEditGate.h.
+            p.userEdits.noteUserEdit();
 
             p.setCurrentProgram(p.getCurrentProgram());
             p.flushPendingProgramChange();

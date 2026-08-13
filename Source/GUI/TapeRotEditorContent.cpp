@@ -52,18 +52,14 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
         // Guarded on the drag state: a SliderAttachment fires this on Program apply and on every
         // host automation step too, and without the guard the LCD latches and flickers.
         //
-        // The same guard now disarms the processor's stale-replay flag, because this is the only
+        // The same guard now disarms the processor's stale-replay gate, because this is the only
         // place that knows a change came from a PERSON. It deliberately does not fire for
         // automation: a host may write automation on session load before replaying its remembered
-        // program index, and disarming there would let that replay land on the restored state.
-        knob->onValueChange = [this, paramId, raw]
-        {
-            if (raw->isMouseButtonDown())
-            {
-                processorRef.noteUserEdit();
-                header.showParameter(paramId);
-            }
-        };
+        // program index, and disarming there would let that replay land on the restored state. One
+        // call rather than two adjacent ones, so the disarm cannot be written without the hand-off -
+        // see nf/UserEditGate.h.
+        nf::connectUserEdit(*raw, processorRef.userEdits,
+                            [this, paramId] { header.showParameter(paramId); });
 
         addAndMakeVisible(*knob);
         attachments.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -76,11 +72,18 @@ TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
         const auto& a = buttonAssets[i];
         auto b = std::make_unique<SpriteButton>(processorRef.apvts, Layout::buttons[i],
                                                 a.on, a.onSize, a.off, a.offSize);
-        // onInteraction fires only on a real click, so it is user-originated by construction and
-        // disarms the stale-replay guard for the same reason the knobs' guarded callback does.
+        // **The one control in the suite that does not go through nf::connectUserEdit**, and it is
+        // shape rather than preference: SpriteButton is a plain Component with an
+        // onInteraction(const juce::String&), not a Slider with an onValueChange, so there is no
+        // drag state to guard on and no matching callback to install.
+        //
+        // It does not need one. onInteraction fires only on a real click, so it is user-originated
+        // by construction — which is the property connectUserEdit's isMouseButtonDown check exists
+        // to establish for controls a SliderAttachment also writes to. Disarming here is right for
+        // exactly the reason the knobs' guarded callback is.
         b->onInteraction = [this](const juce::String& id)
         {
-            processorRef.noteUserEdit();
+            processorRef.userEdits.noteUserEdit();
             header.showParameter(id);
             header.releaseParameter();
         };
