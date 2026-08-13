@@ -410,23 +410,22 @@ namespace Layout
         format from there cannot link. The test must read the SHIPPING format rather than a copy, or
         it asserts against itself. All six castings state it in the same place for that reason.
     */
-    /** This casting's spelling of the readout: `NAME: VALUE UNIT`, with a WORD upper-cased.
+    /** This casting's spelling of the readout: `NAME: VALUE UNIT`, re-cased nowhere.
 
-        **`wordsOnly`, which TapeRot and Gatecrasher arrived at independently.** A value carrying no
-        unit and no digit is a choice name rather than a reading - MODEL and SWITCH read as panel
-        labels and get the name's treatment, while a numeric reading keeps its case because any
-        letters in it belong to the unit. `s` and `S` are different units and `kHz` upper-cased is
-        not a unit at all, which is how Reflect-84 came to print `DECAY: 4.6 S`.
+        **This panel carried `ValueCase::wordsOnly` until 2026-08-13, and the enum is gone.** The
+        ruling is that case belongs at the SOURCE, never at a display site: a choice that should
+        read `PLATE` is authored that way in `Parameters.h`, so the panel and the host's automation
+        lane print the same string. Re-casing here made this the only site that did.
 
-        Elmer's source argues that even a choice name should be authored in caps in `Parameters.h`
-        instead, so the host's automation lane agrees. Both arguments are recorded beside
-        `nf::ReadoutFormat::ValueCase`; this panel keeps what it has until the designers rule.
+        **The re-authoring that ruling requires has NOT been done in this casting yet** - see the
+        suite-level note in `../CLAUDE.md` under "Case belongs at the source". Until the `name`
+        arguments and the choice strings in `Parameters.h` are in caps, this panel's readout prints
+        them as authored, which is a visible change from what shipped.
 
         The revert is core's 900 ms, where this panel carried 1100. */
     inline nf::ReadoutFormat readoutFormat()
     {
         nf::ReadoutFormat f;
-        f.valueCase = nf::ReadoutFormat::ValueCase::wordsOnly;
         f.nameCharacterBudget = 24;
         return f;
     }
