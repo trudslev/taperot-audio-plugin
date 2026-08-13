@@ -1,6 +1,7 @@
 juce_add_console_app(TapeRotTests PRODUCT_NAME "TapeRotTests")
 
 target_sources(TapeRotTests PRIVATE
+    RealtimeSafetyTests.cpp
     TestMain.cpp
     ReadoutConformanceTests.cpp
     MenuMetricsTests.cpp
@@ -67,6 +68,9 @@ target_compile_definitions(TapeRotTests PRIVATE
     NF_PRODUCT_NAME="${TAPEROT_PRODUCT_NAME}")
 
 target_link_libraries(TapeRotTests PRIVATE
+    # The bug sweep's measurement drivers. TEST target only — never the plugin, which must not
+    # carry an operator new override. See nf/testing/ProcessorHarness.h.
+    nf::testing
     # PluginProcessor.cpp is compiled into both targets and calls into core, so both link it.
     nf::core
     juce::juce_dsp
