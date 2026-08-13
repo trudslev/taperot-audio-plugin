@@ -236,3 +236,19 @@ first.
 Everything else was already cross-platform-correct (icon generation, `createLegalFileName`, JUCE's own MSVC-aware recommended-flags targets) or has no Windows/Linux equivalent by nature (AU).
 
 `.github/workflows/edge-build.yml` builds and publishes a macOS installer (`.pkg`, ad-hoc signed), a Windows installer (`installer/windows/TapeRot.iss`, built via Inno Setup - pre-installed on GitHub's Windows runners, no setup step needed - unsigned), and a Linux tarball (`.tar.gz` containing the VST3/Standalone plus `installer/linux/README.txt`, unsigned — no Linux equivalent of code-signing to bypass) to the same rolling `edge` GitHub pre-release on every push to `develop`. The Windows installer places the VST3 in `%COMMONPROGRAMFILES%\VST3\` and the Standalone under `{autopf}\TapeRot\` (Program Files), both requiring admin elevation. The Linux `build-linux` CI job runs on `ubuntu-22.04` (not `ubuntu-latest`) for an older glibc baseline and broader binary compatibility with users' distros, and needs the JUCE Linux apt dependency list (ALSA/JACK/FreeType/Fontconfig/X11/GTK/mesa dev packages — see the job or `BUILDING.md` for the full list) installed before configuring.
+
+### The Program list's group caption
+
+**Sized from its own type plus padding, never derived from the row height.** The construction is
+`nf::captionHeight (font, topPadding, bottomPadding)` — 3px above and 4px below, the suite's adopted
+default — and it comes out **19px** here, from Share Tech Mono at 11px through `withPointHeight`.
+
+**The construction is the rule, not the number.** Writing 19 as a literal would break silently at
+the first change of font, size or font construction, which is a change nobody would think to check a
+caption against. It is also how this caption came to inherit JUCE's `rowHeight + rowHeight / 2` in
+the first place — a caption half again *taller* than a row, which is a menu convention rather than a
+panel one.
+
+TapeRot and Fifth Member both land on 19, and Elmer reaches the same 19 from IBM Plex Mono at
+9px — a coincidence of two line boxes (1.127 em against 1.300) meeting once the padding is added,
+not a shared constant.
