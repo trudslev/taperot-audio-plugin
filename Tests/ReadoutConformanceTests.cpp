@@ -159,6 +159,52 @@ public:
                                 p->paramID + " prints \"" + value + "\", which is not authored in caps");
                     }
         }
+
+        beginTest ("SWITCH reads FADE / CLUNK — the one sanctioned change of this pass");
+        {
+            // **The guard on the only string in the whole case-at-source pass that deliberately
+            // did NOT stay byte-identical.** Every other re-authored parameter prints exactly what
+            // it printed before; SWITCH went from `SWITCH: OFF`/`ON` to `SWITCH: FADE`/`CLUNK`,
+            // because it is a bool for storage reasons and has never meant on/off - false is FADE
+            // (the parallel-chain crossfade) and true is CLUNK (the hard coefficient swap under a
+            // mute dip), and the panel's own printed legends read FADE and CLUNK.
+            //
+            // **ModelSwitchAutomationTests is NOT this test.** Its "CLUNK"/"FADE" strings are the
+            // DSP's own mode names, used to label a test case; they would still read correctly with
+            // the readout reverted to On/Off. Nothing there touches getText, so without this the
+            // sanctioned change can silently revert and every suite in the suite stays green.
+            //
+            // Read through the SHIPPING readout format rather than a copy, for the reason stated on
+            // TapeRotTheme::Layout::readoutFormat: a test that declares its own format asserts
+            // against itself.
+            LayoutHost host;
+
+            // Held as the BASE type on purpose. AudioParameterBool re-declares getText as private,
+            // so a juce::AudioParameterBool* cannot call it; the readout reaches it through
+            // AudioProcessorParameter, and this test has to reach it the same way or it is testing
+            // an access path the panel does not use.
+            auto* switchMode = host.apvts.getParameter (ParamIDs::switchMode);
+
+            expect (switchMode != nullptr, "switchMode is not in the layout");
+
+            if (switchMode != nullptr)
+            {
+                const auto format = TapeRotTheme::Layout::readoutFormat();
+
+                switchMode->setValueNotifyingHost (0.0f);
+                expectEquals (nf::describeParameter (*switchMode, format), juce::String ("SWITCH: FADE"));
+
+                switchMode->setValueNotifyingHost (1.0f);
+                expectEquals (nf::describeParameter (*switchMode, format), juce::String ("SWITCH: CLUNK"));
+
+                // And the halves separately, so a failure says which end moved: the name is
+                // authored in caps, the value is authored by the attributes, and neither is
+                // re-cased on the way out.
+                expectEquals (switchMode->getName (128), juce::String ("SWITCH"));
+                expectEquals (switchMode->getText (0.0f, 0), juce::String ("FADE"));
+                expectEquals (switchMode->getText (1.0f, 0), juce::String ("CLUNK"));
+            }
+        }
     }
 };
 
