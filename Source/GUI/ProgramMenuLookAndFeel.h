@@ -105,7 +105,13 @@ public:
     {
         auto r = area.toFloat().reduced (3.0f, 0.0f);
 
-        TapeRotTheme::Text::drawTracked (g, sectionName.toUpperCase(),
+        // **Drawn as authored, never re-cased.** The caption is authored FACTORY/USER at the
+        // addSectionHeader call in ProgramHeader.cpp, per BRAND.md's rule that case belongs at
+        // the source. It held a .toUpperCase() here until 2026-08-13. Nothing else reads these
+        // two strings today, which is a fact about today rather than a property of the code:
+        // the moment a caption comes from data, the site that re-cases it is the site that
+        // gets it wrong. Re-arguing the exception each time costs more than the rule.
+        TapeRotTheme::Text::drawTracked (g, sectionName,
                                          TapeRotTheme::Font::of (headerTextSize), headerTracking,
                                          r.withTrimmedLeft ((float) tickColumn),
                                          juce::Justification::left,
