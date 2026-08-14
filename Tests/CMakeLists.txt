@@ -7,6 +7,7 @@ target_sources(TapeRotTests PRIVATE
     InvarianceTests.cpp
     LifecycleTests.cpp
     AutomationLatencyTests.cpp
+    ChannelLayoutTests.cpp
     TestMain.cpp
     ReadoutConformanceTests.cpp
     MenuMetricsTests.cpp
