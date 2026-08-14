@@ -560,13 +560,37 @@ public:
             // into different block sizes produces output differing by 1.6 on a signal peaking at
             // 2.2. Not an artefact — a different performance.
             //
-            // **What is NOT yet named is the line.** All three draw from a shared juce::Random, and
-            // FailureEngine's triggerIfDue is called per sample with a per-sample probability
-            // (FailureEngine.cpp:71-79), which is the correct construction — so the mechanism is
-            // not the obvious one and naming it needs the same treatment inside these three that
-            // this bisection just gave the chain. The early return at :39, which skips a draw while
-            // an event is active, is where to start: anything that makes the NUMBER of draws depend
-            // on block boundaries rather than on sample count would do it.
+            // **FAILURE's row is a reclassification, not a table entry.** 1.6 against a 2.2 peak
+            // means someone bouncing at 2048 and monitoring at 128 gets two different takes, and
+            // the plugin's most characterful control behaves differently according to a setting
+            // that has nothing to do with it. "Output depends on block size" reads as a −60 dB
+            // curiosity; this is at the top of the range and it is a different performance.
+            //
+            // **CORRECTION: an earlier note here said all three draw from a shared juce::Random.
+            // That was inferred, stated as fact, and is false in two ways.** They do not share —
+            // FailureEngine has its own seeded instance (FailureEngine.h:109) and NoiseSource has
+            // three per-character ones (NoiseSource.h:62-64) — and **Hum has no Random at all**
+            // (Hum.h:19-21 is a phase, an increment and a smoother).
+            //
+            // Two consequences, and both narrow the next pass rather than widen it. There is no
+            // shared-stream interference class to close, because there is no sharing. And Hum's
+            // divergence cannot be a draw-count mechanism, because Hum is deterministic — so the
+            // three rows do not share a cause and may not share a class.
+            //
+            // What each row is, as far as measurement and construction now say:
+            //
+            //   HUM      0.000049503, about −93 dB of the peak. Hum's construction is per-sample
+            //            correct — getNextValue() per sample, phase += phaseInc per sample, no
+            //            skip-then-apply-flat (Hum.cpp:24-33). At this magnitude the row may be
+            //            floating-point ordering rather than behaviour, and saying so is not a
+            //            dismissal: it is a different investigation from the other two.
+            //   NOISE    0.019260951, about −41 dB. Real, and NoiseSource does draw.
+            //   FAILURE  1.599813402, about −2.8 dB. Behavioural, at the top of the range.
+            //            triggerIfDue is called per sample with a per-sample probability
+            //            (FailureEngine.cpp:71-79), which is the correct construction, so the
+            //            obvious mechanism is already excluded. The early return at :39 skips a
+            //            draw while an event is active — anything making the NUMBER of draws depend
+            //            on block boundaries rather than sample count would do it.
             //
             // Recorded as localised rather than explained. Four attempts by construction produced
             // four refutations; one bisection by stage produced five exact zeroes and three
