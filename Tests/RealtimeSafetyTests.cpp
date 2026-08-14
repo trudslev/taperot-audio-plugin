@@ -73,56 +73,54 @@ public:
             expect (s.clean(), "steady-state processBlock touches the heap: " + s.describe());
         }
 
-        beginTest ("processBlock when a host over-delivers — up to the measured crash threshold");
+        beginTest ("processBlock over-delivery — DOCUMENTED, deliberately NOT exercised");
         {
-            // **TapeRot CRASHES when over-delivered past ~400 samples from a 256 prepare**, and this
-            // test deliberately stops short of that. Driving the crashing size here would abort the
-            // process and take every later suite with it — which is exactly what happened the first
-            // time it ran: SIGTRAP, exit -5, and run_tests.py reported fourteen suites that never
-            // ran rather than a partial pass.
+            // **CORRECTED 2026-08-14, and the correction matters more than the original finding.**
             //
-            // The defect, localised under lldb rather than inferred:
+            // This test previously drove 257, 300 and 400 samples after preparing 256 and reported
+            // "survived, finite" for all three, concluding: "not any over-delivery — there is
+            // headroom, and then there is not". **That was wrong, and wrong in the direction that
+            // understates.**
             //
-            //   EXC_BAD_ACCESS (code=1, address=0x0)
-            //   juce::dsp::Oversampling2TimesPolyphaseIIR<float>::processSamplesDown
+            // Those writes went out of bounds and simply did not fault. The damage surfaced later:
+            // adding an unrelated test file changed the suite's memory layout, and the next test to
+            // run — `Saturator / Exact null at drive = 0`, which drives no over-delivery at all —
+            // died in `Oversampling<float>::processSamplesUp` with EXC_BAD_ACCESS.
             //
-            // Saturator.cpp:29 calls oversampling->initProcessing(spec.maximumBlockSize), sizing the
-            // oversampler's internal buffers at prepare; Saturator.cpp:120 then feeds
-            // processSamplesUp whatever block actually arrives, with no clamp. A block larger than
-            // the prepared maximum runs off the end.
+            // Proved by removing it: with the over-delivery drive taken out and nothing else
+            // changed, the whole suite passes and Saturator runs clean.
             //
-            // Bisected: prepared 256, survives 257 / 300 / 400, crashes by 450. Not "any
-            // over-delivery" — there is headroom, and then there is not.
+            // **So the finding is: ANY block larger than the prepared maximum writes out of bounds.**
+            // Saturator.cpp:29 sizes the oversampler's buffers via initProcessing(maximumBlockSize);
+            // Saturator.cpp:120 feeds processSamplesUp whatever arrives, unclamped. 450 is not a
+            // threshold — it is merely the first size that happened to reach an unmapped page. 257
+            // corrupts just as surely and reports "survived, finite" while doing it.
             //
-            // **Classification: live defect, measured, crash.** A host is supposed to honour
-            // maximumExpectedSamplesPerBlock, so this needs a misbehaving host — but pluginval's
-            // higher strictness levels drive exactly this case, which is category 8's job to confirm.
+            // **Nothing here drives it**, because a test that corrupts the process to demonstrate
+            // corruption takes every later suite with it — which is exactly how this was found, and
+            // is not a thing to keep. The safe case is asserted; the defect is recorded.
+            //
+            // Classification: live defect, measured, MEMORY CORRUPTION on any over-delivery.
             // Nothing is fixed in this pass.
-            for (int driven : { 257, 300, 400 })
-            {
-                TapeRotAudioProcessor p;
-                p.setRateAndBufferSizeDetails (48000.0, 256);
-                p.prepareToPlay (48000.0, 256);
+            TapeRotAudioProcessor p;
+            p.setRateAndBufferSizeDetails (48000.0, 256);
+            p.prepareToPlay (48000.0, 256);
 
-                juce::AudioBuffer<float> buffer (2, driven);
-                juce::MidiBuffer midi;
-                buffer.clear();
-                p.processBlock (buffer, midi);
+            juce::AudioBuffer<float> buffer (2, 256);
+            juce::MidiBuffer midi;
+            buffer.clear();
+            p.processBlock (buffer, midi);
 
-                bool finite = true;
-                for (int ch = 0; ch < 2; ++ch)
-                    for (int i = 0; i < driven; ++i)
-                        if (! std::isfinite (buffer.getSample (ch, i)))
-                            finite = false;
+            bool finite = true;
+            for (int ch = 0; ch < 2; ++ch)
+                for (int i = 0; i < 256; ++i)
+                    if (! std::isfinite (buffer.getSample (ch, i)))
+                        finite = false;
 
-                expect (finite, "non-finite output at " + juce::String (driven) + " samples");
-                logMessage ("  prepared 256, driven " + juce::String (driven) + " -> survived, finite");
-            }
-
-            logMessage ("  driven >= 450 CRASHES (Oversampling2TimesPolyphaseIIR::processSamplesDown"
-                        ", null write) — not exercised here, see this test's comment");
+            expect (finite, "non-finite output at the prepared block size");
+            logMessage ("  prepared 256, driven 256 -> finite (the only size exercised)");
+            logMessage ("  ANY driven size > prepared writes OUT OF BOUNDS — see this test's comment");
         }
-
     }
 };
 
