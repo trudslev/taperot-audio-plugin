@@ -18,6 +18,38 @@
     So nothing here is believed until the processor is shown to be reproducible against itself, and
     the comparison is shown able to fail. Both are asserted below rather than assumed.
 */
+/*  ## The block-size row, traced by SHAPE rather than by bisect
+
+    Reflect-84's LFO and this were 0.025 -> 0.063 -> 0.145 and 0.000200 -> 0.001022 -> 0.001926 —
+    same signature, monotonic with buffer, three orders of magnitude apart. So the first move was to
+    grep this casting's audio path for the construction rather than bisect for the symptom.
+
+    The category 2 oscillator survey put WowFlutter at per-sample phase and per-sample draws, and it
+    still does — but that survey answered "how is the phase advanced", not "is anything else stepped
+    per block", and those are different questions.
+
+    **Two sites carry the shape**, both in PluginProcessor.cpp:
+
+      509-511  genSmoothed.setTargetValue (...); genSmoothed.skip (numSamples);
+               const float genValue = genSmoothed.getCurrentValue();
+      590-592  transportGateSmoothed.setTargetValue (...); transportGateSmoothed.skip (numSamples);
+               buffer.applyGain (transportGateSmoothed.getCurrentValue());
+
+    Both advance a smoother across the whole block and then apply its END-OF-BLOCK value to every
+    sample in that block. That is the same family as Reflect-84's LFO — a per-sample quantity
+    stepped per block — and the second one is a gain ramp drawn as a staircase, which is a zipper on
+    transport start and stop that coarsens as the buffer grows.
+
+    **Neither is proved to be the measured cause, and that is stated rather than left implied.**
+    Both are LATENT: they only express while the target is moving, and `prepareToPlay` sets both
+    smoothers with `setCurrentAndTargetValue` (:421, :431), so a steady render with GEN unautomated
+    and the transport constant may never exercise either. The divergence measured below starts at
+    sample 0, which a smoother already sitting on its target cannot produce.
+
+    So: the construction is real and worth fixing on its own terms; whether it is what these rows
+    measure is open. The next step is the modulation-depth equivalent — drive GEN and the transport
+    and see whether the divergence scales — not a fresh bisect.
+*/
 class InvarianceTests final : public juce::UnitTest
 {
 public:
