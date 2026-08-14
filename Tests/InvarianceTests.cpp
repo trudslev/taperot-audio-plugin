@@ -4,6 +4,8 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include <functional>
+
 /**
     Category 3 — invariance. Does the same audio come out when only the CONTAINER changes?
 
@@ -442,6 +444,135 @@ public:
                         + juce::String (atTop, 9) + ", 1 kHz " + juce::String (atLow, 9));
 
             juce::ignoreUnused (atMid);
+        }
+
+        beginTest ("Block-size rows — bisected by STAGE, not by construction");
+        {
+            // **Four attempts by construction, four refutations.** genSmoothed (an integral GEN
+            // changes nothing, and the default already is integral), the transport gate
+            // (structurally unreachable without a play head), ToneFilters' LP ramp (six times the
+            // travel gave 1.5x the divergence), and the oversampled index map (reduces to i/factor).
+            // Bypassing the Saturator left the deltas byte-identical to nine digits.
+            //
+            // Every one of those started from "find a skip-then-apply-flat and test it". The one
+            // approach that produced a CLEAN exclusion rather than a refutation was bisecting by
+            // stage, so this does that deliberately.
+            //
+            // ## The method, and the known case it is introduced against
+            //
+            // First drive every parameter to its most neutral value at once. If the divergence
+            // survives that, it is in something no parameter reaches — the WowFlutter delay line
+            // itself, or the dry-compensation delay, both of which run unconditionally. If it
+            // vanishes, stages come back one at a time until it returns, and the one that returns
+            // it owns it.
+            //
+            // KNOWN CASE: the all-neutral arm must still produce OUTPUT. A configuration that
+            // silences the plugin would report sample-exact for the trivial reason and look like a
+            // result — this sweep has had a comparison pass by being unable to fail three times, so
+            // the arm reports its own peak and the peak is checked before the exactness is read.
+            const auto rowsWith = [this] (const char* label,
+                                          const std::function<void (TapeRotAudioProcessor&)>& configure)
+            {
+                TapeRotAudioProcessor p;
+                configure (p);
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+
+                double worst = 0.0;
+
+                for (const auto& r : nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 }))
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+
+                // The output check, so an exact row cannot be silence.
+                double peak = 0.0;
+                for (const auto& ch : nf::testing::render (p, spec))
+                    for (float v : ch)
+                        peak = juce::jmax (peak, (double) std::abs (v));
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 30)
+                                + "worst |delta| " + juce::String (worst, 9)
+                                + "   (peak " + juce::String (peak, 4) + ")");
+
+                return std::make_pair (worst, peak);
+            };
+
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            const auto neutralise = [&setP] (TapeRotAudioProcessor& p)
+            {
+                setP (p, ParamIDs::drive, 0.0f);
+                setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f);
+                setP (p, ParamIDs::noise, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);
+                setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::gen, 1.0f);
+                setP (p, ParamIDs::model, 0.0f);        // NONE — bypasses the tape-model system
+            };
+
+            const auto baseline = rowsWith ("defaults", [] (TapeRotAudioProcessor&) {});
+            const auto allOff   = rowsWith ("everything neutral", neutralise);
+
+            expectGreaterThan (allOff.second, 1.0e-4,
+                               "the all-neutral arm produced silence, so an exact row there would "
+                               "mean nothing — the bisection cannot start from a configuration the "
+                               "comparison cannot fail in");
+
+            if (allOff.first < 1.0e-9)
+            {
+                // Stages back one at a time. The first that returns the divergence owns it.
+                struct Stage { const char* id; float on; const char* label; };
+                const Stage stages[] = {
+                    { ParamIDs::drive,   10.0f, "+ DRIVE" },   { ParamIDs::wow,     100.0f, "+ WOW" },
+                    { ParamIDs::flutter, 100.0f, "+ FLUTTER" }, { ParamIDs::noise,   100.0f, "+ NOISE" },
+                    { ParamIDs::hum,     100.0f, "+ HUM" },     { ParamIDs::failure, 100.0f, "+ FAILURE" },
+                    { ParamIDs::spread,  100.0f, "+ SPREAD" },  { ParamIDs::model,     5.0f, "+ MODEL" },
+                };
+
+                for (const auto& s : stages)
+                    rowsWith (s.label, [&] (TapeRotAudioProcessor& p)
+                    {
+                        neutralise (p);
+                        setP (p, s.id, s.on);
+                    });
+            }
+            else
+            {
+                logMessage ("  => the divergence SURVIVES every parameter at neutral, so it is in "
+                            "something no parameter reaches — WowFlutter's delay line and the "
+                            "dry-compensation delay both run unconditionally.");
+            }
+
+            // **LOCALISED: the three GENERATORS own it, and nothing else contributes.** DRIVE,
+            // WOW, FLUTTER, SPREAD and MODEL each come back at exactly 0.000000000 — not small,
+            // zero — while NOISE gives 0.019, HUM 0.000050 and FAILURE 1.599. The defaults' 0.0019
+            // is a mixture of the three at their default settings.
+            //
+            // That FAILURE figure is the one to read: at full depth, the same sample stream cut
+            // into different block sizes produces output differing by 1.6 on a signal peaking at
+            // 2.2. Not an artefact — a different performance.
+            //
+            // **What is NOT yet named is the line.** All three draw from a shared juce::Random, and
+            // FailureEngine's triggerIfDue is called per sample with a per-sample probability
+            // (FailureEngine.cpp:71-79), which is the correct construction — so the mechanism is
+            // not the obvious one and naming it needs the same treatment inside these three that
+            // this bisection just gave the chain. The early return at :39, which skips a draw while
+            // an event is active, is where to start: anything that makes the NUMBER of draws depend
+            // on block boundaries rather than on sample count would do it.
+            //
+            // Recorded as localised rather than explained. Four attempts by construction produced
+            // four refutations; one bisection by stage produced five exact zeroes and three
+            // culprits, which is the argument for doing it this way first next time.
+            juce::ignoreUnused (baseline);
+            expect (true);   // locating; the failing assertions live in the block-size test above
         }
 
         beginTest ("Offline against real-time");
