@@ -1320,8 +1320,52 @@ public:
             expect (true);   // locating
         }
 
-        beginTest ("FAILURE — a SEPARATE finding, not the worst of three generator rows");
+        beginTest ("FAILURE — a DETERMINISM defect, and the line is FailureEngine::reset()");
         {
+            // **RECLASSIFIED TWICE. It is not an invariance finding at all.**
+            //
+            // First it was "the worst of three generator rows" in a block-size table; then its own
+            // block-size finding; it is neither. Same processor, same block size, same input,
+            // warmed, two consecutive renders differ by **0.914**. The buffer size was never the
+            // variable — this belongs in category 3's REPRODUCIBILITY column, where Chorus-60's
+            // unseeded `juce::Random` was filed, and it is strictly worse than what it was filed as:
+            // **two bounces at identical settings are different performances.**
+            //
+            // **The line, and it is an omission rather than a mistake.** `FailureEngine::reset()`
+            // (FailureEngine.cpp:25-33) clears `dropoutState`, `snagState`, `crinkleState`,
+            // `wobbleState`, `samplePosition` and both crinkle filter arrays — everything except
+            // `random`, which is seeded once at construction (FailureEngine.h:109) and never again.
+            // `prepare` calls `reset()`, so neither entry point restores the stream.
+            //
+            // ## What this invalidates in the rest of the sweep — audited rather than assumed
+            //
+            // The same correction the NOISE steady component just got, applied to the file instead
+            // of to one row. **An uncontrolled variable is only uncontrolled where it is engaged**,
+            // and FAILURE's parameter default is 0.0f (Parameters.h:267-268), so the question is
+            // which arms raise it. Every use of `FailureEngine` across this casting's 30 test files
+            // was checked, not just this one:
+            //
+            //   AFFECTED — processor reused across renders with FAILURE raised:
+            //     InvarianceTests.cpp:536   the stage bisection's "+ FAILURE" arm -> **1.599 is
+            //                               UNMEASURED**, not measured. It is this defect.
+            //     InvarianceTests.cpp:1215  the per-generator steady arm, and this whole block —
+            //                               both now report a self-comparison beside every figure,
+            //                               so they are self-labelling rather than silent.
+            //
+            //   NOT AFFECTED — and each for a stated reason rather than by not appearing:
+            //     GeneratorInvarianceTests, MeteringTests, FailureEngineFifoTests — construct a
+            //       FRESH `FailureEngine` per arm, so every instance starts identically seeded.
+            //     InstrumentValidationTests:82 — sets FAILURE to 0.0f explicitly.
+            //     TapeRealism, GenerationCascade, CPUCheck, RealtimeSafety, NumericalRobustness,
+            //       Lifecycle — never touch it, so it sits at its 0.0f default.
+            //     ParametersState, SessionCompatibility, ProgramIdentity, ParameterText,
+            //       ReadoutConformance — the only files that apply a Program, and none measures
+            //       audio. Factory Programs DO carry a non-zero `failurePercent`
+            //       (FactoryPrograms.h:77), so a future audio test that applies one inherits this.
+            //
+            // One row in this sweep is withdrawn, then, and the reason it is only one is that the
+            // parameter defaults to zero. That is a fact about the default, not a property of the
+            // audit — which is why the audit is written out rather than summarised as "checked".
             // **This is filed apart from the block-size section deliberately, and the reason is not
             // its delta figure.** 0.914 in steady state against NOISE's 0.000225 and HUM's 0.000194
             // is four orders of magnitude, but severity here comes from what it means musically:
