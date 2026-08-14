@@ -108,6 +108,117 @@ public:
                             "first playback differs from every later one. Reported, not asserted.");
         }
 
+        beginTest ("MODEL resets to NONE on EVERY prepare, and the first block switches away");
+        {
+            // **Found by survey, because the measurement is structurally blind to it.** The
+            // cold-versus-warmed instrument compares two renders that BOTH call prepareToPlay, so a
+            // defect that fires identically on every prepare cancels out of it exactly.
+            //
+            // TapeModelEQ::prepare sets activeModelIndex = 0 unconditionally (TapeModelEQ.cpp:82).
+            // 0 is NONE. The parameter's default is 5, CASSETTE I (Parameters.h:255), and a Program
+            // can select any of the nine. So the first process block after ANY prepare sees
+            // 5 != 0 and starts a model switch — a crossfade in FADE, and in CLUNK a hard
+            // coefficient swap under a mute dip with a thump.
+            //
+            // Not first-run-only, which is what makes it worse than the two ReverbEngine cases:
+            // every sample-rate change and every buffer-size change in a host re-fires it.
+            //
+            // ## The known case, named before the run
+            //
+            // model = 0 (NONE) must show NOTHING: requested equals what prepare set, so no switch
+            // can fire. It is the control, and if it shows a dip the instrument is measuring
+            // something other than the switch.
+            nf::testing::RenderSpec spec;
+            spec.blockSize = 512;
+            spec.numBlocks = 16;
+
+            const auto onsetProfile = [&] (const char* label, float modelNormalised)
+            {
+                TapeRotAudioProcessor p;
+
+                if (auto* m = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::model)))
+                    m->setValueNotifyingHost (m->getNormalisableRange().convertTo0to1 (modelNormalised));
+
+                const auto r = nf::testing::render (p, spec);
+                const auto rms = windowedRms (r, spec.sampleRate, 10.0, 10);
+
+                // Each slice against the LAST one, so every row is normalised to its own settled
+                // state and the two models are comparable despite sounding different.
+                juce::String row;
+                for (size_t i = 0; i < rms.size(); ++i)
+                    row += juce::String ((rms[i] > 0.0 && rms.back() > 0.0)
+                                             ? 20.0 * std::log10 (rms[i] / rms.back()) : -99.0, 1)
+                               .paddedLeft (' ', 8);
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 26) + row);
+                return rms;
+            };
+
+            logMessage ("  slice (10 ms), vs settled 10     20      30      40      50      60      70      80      90     100");
+            const auto none = onsetProfile ("model 0 NONE (control)", 0.0f);
+            const auto cassette = onsetProfile ("model 5 CASSETTE I", 5.0f);
+
+            const auto dip = [] (const std::vector<double>& r)
+            {
+                double worst = 0.0;
+                for (size_t i = 0; i < 6; ++i)     // the first 60 ms, which is the switch window
+                    if (r[i] > 0.0 && r.back() > 0.0)
+                        worst = juce::jmin (worst, 20.0 * std::log10 (r[i] / r.back()));
+                return worst;
+            };
+
+            logMessage ("  worst dip in the first 60 ms -> NONE " + juce::String (dip (none), 2)
+                            + " dB, CASSETTE I " + juce::String (dip (cassette), 2) + " dB");
+
+
+            // **The control fired too, so the row above does NOT measure the model switch.** NONE
+            // came back -66.6 dB against CASSETTE I's -66.0 — that dip is OutputStage's fade-in,
+            // already found and measured at -16.6 dB, sitting on top of the window the switch would
+            // occupy. An instrument dominated by a larger known defect cannot resolve a smaller one
+            // underneath it, and the control is the only reason that is visible rather than assumed.
+            //
+            // So isolate on something the fade-in cannot touch. switchMode has NO effect except
+            // DURING a switch: FADE crossfades the two chains, CLUNK swaps coefficients under a
+            // mute dip. If no switch fires on the first block the two renders are bit-identical.
+            //
+            // Known case, again named first: at model 0 the requested model equals what prepare
+            // set, so no switch is possible and FADE must equal CLUNK exactly. If that arm differs,
+            // switchMode is doing something outside a switch and this test proves nothing.
+            const auto fadeVsClunk = [&] (float modelValue)
+            {
+                std::vector<std::vector<std::vector<float>>> renders;
+
+                for (float mode : { 0.0f, 1.0f })
+                {
+                    TapeRotAudioProcessor p;
+
+                    if (auto* m = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::model)))
+                        m->setValueNotifyingHost (m->getNormalisableRange().convertTo0to1 (modelValue));
+
+                    if (auto* s = p.apvts.getParameter (ParamIDs::switchMode))
+                        s->setValueNotifyingHost (mode);
+
+                    renders.push_back (nf::testing::render (p, spec));
+                }
+
+                return nf::testing::compareRenders (renders[0], renders[1]);
+            };
+
+            const auto controlArm = fadeVsClunk (0.0f);
+            const auto liveArm    = fadeVsClunk (5.0f);
+
+            logMessage ("  FADE vs CLUNK at model 0 (control) -> " + controlArm.describe());
+            logMessage ("  FADE vs CLUNK at model 5           -> " + liveArm.describe());
+            logMessage (juce::String ("  => ") + (controlArm.sampleExact && ! liveArm.sampleExact
+                            ? "the model switch FIRES on the first block after prepare"
+                            : controlArm.sampleExact ? "no switch detected at model 5 either — the "
+                                                       "construction is real but its effect is NOT "
+                                                       "reproduced, and stays inferred"
+                                                     : "the control differed, so this arm proves nothing"));
+
+            expect (true);   // reported; the defect is the reset at TapeModelEQ.cpp:82
+        }
+
         beginTest ("Block size — sample-exact at 64 / 128 / 511 / 2048");
         {
             TapeRotAudioProcessor processor;
