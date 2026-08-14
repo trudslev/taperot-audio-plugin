@@ -1621,6 +1621,14 @@ public:
             // class that is strictly worse than first-run-only, because a host re-fires it on every
             // sample-rate and buffer-size change rather than once per instance.
             //
+            // **FILED AS LOCALISED-NOT-EXPLAINED, AND THE BISECTION STOPS HERE.** Seven cuts and
+            // five refuted construction hypotheses bought the characterisation below; the next cut
+            // costs what the last five did, and the sweep's job is to report rather than to fix.
+            // Six candidates remain — FailureEngine, StereoSpread, ToneFilters, TapeStop,
+            // FilterSweep, OutputStage — and the realism work changes all three generators, so the
+            // thing being bisected may not survive to be fixed. See the root CLAUDE.md's
+            // every-prepare class, where this is the second member.
+            //
             // **Cut 7 refutes the obvious candidate for it.** A ~20 ms transient re-armed on every
             // prepare and gated on a generator being audible is exactly the shape
             // `TapeModelEQ::activeModelIndex` has — a stored copy of a selection reset in prepare
