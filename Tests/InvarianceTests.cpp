@@ -1055,6 +1055,271 @@ public:
             expect (true);   // locating
         }
 
+        beginTest ("The STEADY component alone — first 128 ms excluded from every arm");
+        {
+            // **The MIX result is re-derived here rather than carried forward, because it was
+            // measured on the composite.** 25 / 50 / 100 came back at exactly x2 and x4 — but the
+            // composite is 57:1 ramp over steady, so that line is a property of the RAMP and the
+            // steady component merely inherited "wholly in the wet path, scaled by mix" from it.
+            //
+            // An inherited constraint is the kind that narrows a search to the wrong half. A
+            // first-run smoother ramp is plausibly in the wet path; something that never decays
+            // could be anywhere, including where the mix does not reach. So the same three points
+            // are measured again with the ramp excluded: if the steady component still scales, the
+            // location constraint is established for both. If it does not, its location is UNKNOWN
+            // rather than known, and the next bisection has to search the whole chain.
+            //
+            // ## Why 128 ms, and what every arm here excludes
+            //
+            // The time profile's first slice is 0-128 ms and reads 0.024078 against 0.00023-0.00045
+            // everywhere after it. Any arm including that slice reports the ramp's figure and says
+            // nothing about the steady one — the same shape as an arm without a generator reporting
+            // exactly zero and meaning nothing. **6144 samples at 48 kHz are dropped from every
+            // comparison below**, and both constraints are asserted rather than assumed: a
+            // generator must be running, and the window must still diverge.
+            constexpr int steadySkip  = 6144;              // 128 ms at 48 kHz
+            constexpr int totalSamples = 512 * 192;        // ~2.05 s
+
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            struct Steady { double worst; double rms; };
+
+            // Renders at 64 and 2048, compares the window AFTER the ramp, and reports the window's
+            // own RMS beside the divergence — so "does it scale" is read against measured level
+            // rather than against a knob percentage, which is not the same question.
+            // Position-determined, gain-scaled input — the corrected construction from the block
+            // above, so an input-level arm is the same stream scaled rather than a second stream.
+            const auto sampleAt = [] (int absoluteIndex, int channel) noexcept
+            {
+                uint32_t x = (uint32_t) (absoluteIndex * 2654435761u)
+                           ^ (uint32_t) (channel * 40503u) ^ 0x9e3779b9u;
+                x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+                return ((float) (x & 0xffffffu) / (float) 0x7fffff) - 1.0f;
+            };
+
+            // 1.0 is the harness default (no hook installed), 0.0 is silence, anything else scales.
+            const auto steadyWith = [this, &setP, sampleAt] (const char* label,
+                                                   const std::function<void (TapeRotAudioProcessor&)>& configure,
+                                                   float inputGain = 1.0f)
+            {
+                TapeRotAudioProcessor p;
+                configure (p);
+
+                const auto renderAt = [&p, inputGain, sampleAt] (int blockSize)
+                {
+                    nf::testing::RenderSpec spec;
+                    spec.blockSize = blockSize;
+                    spec.numBlocks = totalSamples / blockSize;
+
+                    if (inputGain != 1.0f)
+                        spec.fillInput = [inputGain, sampleAt] (juce::AudioBuffer<float>& b, int blockIndex)
+                        {
+                            const int absolute = blockIndex * b.getNumSamples();
+
+                            for (int ch = 0; ch < b.getNumChannels(); ++ch)
+                                for (int i = 0; i < b.getNumSamples(); ++i)
+                                    b.setSample (ch, i, inputGain * sampleAt (absolute + i, ch));
+                        };
+
+                    return nf::testing::render (p, spec);
+                };
+
+                const auto small = renderAt (64);
+                const auto large = renderAt (2048);
+
+                double worst = 0.0, sumSq = 0.0;
+                int counted = 0;
+
+                for (size_t ch = 0; ch < juce::jmin (small.size(), large.size()); ++ch)
+                {
+                    const auto n = (int) juce::jmin (small[ch].size(), large[ch].size());
+
+                    for (int i = steadySkip; i < n; ++i)
+                    {
+                        worst = juce::jmax (worst, (double) std::abs (small[ch][(size_t) i]
+                                                                    - large[ch][(size_t) i]));
+                        sumSq += (double) small[ch][(size_t) i] * (double) small[ch][(size_t) i];
+                        ++counted;
+                    }
+                }
+
+                const Steady s { worst, counted > 0 ? std::sqrt (sumSq / counted) : 0.0 };
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 30)
+                                + "steady |delta| " + juce::String (s.worst, 9)
+                                + "   (rms " + juce::String (s.rms, 6) + ")");
+                return s;
+            };
+
+            const auto neutral = [&setP] (TapeRotAudioProcessor& p)
+            {
+                setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::gen, 1.0f);     setP (p, ParamIDs::model, 0.0f);
+                setP (p, ParamIDs::noise, 0.0f);   setP (p, ParamIDs::mix, 50.0f);
+            };
+
+            // ---- both directions on the window itself, before anything is read from it ----
+            logMessage ("  --- the steady window, both directions ---");
+
+            const auto control = steadyWith ("NOISE 100 (must diverge)", [&] (TapeRotAudioProcessor& p)
+            {
+                neutral (p);
+                setP (p, ParamIDs::noise, 100.0f);
+            });
+
+            const auto blank = steadyWith ("no generator (must be exact)", neutral);
+
+            expectGreaterThan (control.worst, 1.0e-9,
+                               "the steady window does not diverge even with a generator running, "
+                               "so every zero below is zero for the trivial reason");
+
+            expectEquals (blank.worst, 0.0,
+                          "the generator-free chain diverged in the steady window, which the "
+                          "block-size sweep measures as exactly zero — the window is the "
+                          "difference, not the plugin");
+
+            // ---- 1 · the MIX line, RE-DERIVED on the steady component ----
+            logMessage ("  --- MIX, re-derived without the ramp ---");
+
+            const auto mixAt = [&] (const char* label, float mixPercent)
+            {
+                return steadyWith (label, [&] (TapeRotAudioProcessor& p)
+                {
+                    neutral (p);
+                    setP (p, ParamIDs::noise, 100.0f);
+                    setP (p, ParamIDs::mix, mixPercent);
+                }).worst;
+            };
+
+            const auto m25  = mixAt ("MIX 25%",  25.0f);
+            const auto m50  = mixAt ("MIX 50%",  50.0f);
+            const auto m100 = mixAt ("MIX 100%", 100.0f);
+
+            if (m25 > 0.0)
+                logMessage ("  ratios against 25% -> 50%: x" + juce::String (m50 / m25, 3)
+                                + ", 100%: x" + juce::String (m100 / m25, 3)
+                                + "   (linear predicts x2.000 and x4.000)");
+
+            // ---- 2a · WHICH generator. All three were identical driven ALONE, and alone is not
+            //           the configuration that diverges, so the question is open per generator.
+            logMessage ("  --- which generator, one at a time ---");
+
+            steadyWith ("NOISE 100 only",   [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::noise, 100.0f); });
+            steadyWith ("HUM 100 only",     [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::hum, 100.0f); });
+            steadyWith ("FAILURE 100 only", [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::failure, 100.0f); });
+
+            // ---- 2b · does it scale with GENERATOR amplitude? Proportional means the chain is
+            //           responding to the signal; fixed means something accumulates independently
+            //           of level. The rms column is what makes that readable, because a knob
+            //           percentage is not an amplitude.
+            logMessage ("  --- generator amplitude ---");
+
+            const auto n25  = steadyWith ("NOISE 25",  [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::noise, 25.0f); });
+            const auto n50  = steadyWith ("NOISE 50",  [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::noise, 50.0f); });
+            const auto n100 = steadyWith ("NOISE 100", [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::noise, 100.0f); });
+
+            if (n25.worst > 0.0)
+                logMessage ("  delta ratios 25 -> 50: x" + juce::String (n50.worst / n25.worst, 3)
+                                + ", 100: x" + juce::String (n100.worst / n25.worst, 3));
+
+            // **The rms column is what makes that row readable, and it reads it DOWN.** NOISE 25
+            // against NOISE 100 moves the window's rms by 0.00002 on 0.523 — the noise bed sits
+            // about 41 dB under the input — so the manipulation barely moved the quantity it was
+            // supposed to vary. A flat delta across it is consistent with "does not scale with
+            // generator amplitude" and equally consistent with "the arm could not tell". That is
+            // the n=1 question in another unit: ask whether the manipulation moved the thing,
+            // before reading the result as an answer.
+            //
+            // The through-signal is the other half of the same question and it CAN be moved, so
+            // that is the arm below rather than a rerun of this one.
+
+            // ---- 3 · does it need the INPUT at all, and does it scale with it? The origin
+            //          constraint says a generator is required; these two say whether the input is
+            //          required as well, and whether the divergence tracks the signal PASSING
+            //          THROUGH. Proportional to the through-signal with a generator merely present
+            //          is a modulation shape; fixed is an additive one. Gain 1 installs no hook —
+            //          it is the harness default, shown byte-identical to the scaled construction
+            //          in the block above.
+            logMessage ("  --- the through-signal, generator held on ---");
+
+            const auto withNoise = [&] (TapeRotAudioProcessor& p)
+            {
+                neutral (p);
+                setP (p, ParamIDs::noise, 100.0f);
+            };
+
+            const auto i0   = steadyWith ("NOISE 100, silent input",   withNoise, 0.0f);
+            const auto i025 = steadyWith ("NOISE 100, input x0.25",    withNoise, 0.25f);
+            const auto i1   = steadyWith ("NOISE 100, input x1",       withNoise, 1.0f);
+            const auto i4   = steadyWith ("NOISE 100, input x4",       withNoise, 4.0f);
+
+            if (i025.worst > 0.0)
+                logMessage ("  delta ratios x0.25 -> x1: x" + juce::String (i1.worst / i025.worst, 3)
+                                + ", x4: x" + juce::String (i4.worst / i025.worst, 3)
+                                + "   (proportional predicts x4.000 and x16.000)");
+
+            logMessage ("  delta per unit rms: silent " + juce::String (i0.rms > 0.0 ? i0.worst / i0.rms : 0.0, 9)
+                            + ", x1 " + juce::String (i1.rms > 0.0 ? i1.worst / i1.rms : 0.0, 9)
+                            + ", x4 " + juce::String (i4.rms > 0.0 ? i4.worst / i4.rms : 0.0, 9));
+
+            // ================= MEASURED, and it is four results =================
+            //
+            // **1 · The MIX line SURVIVES the ramp's removal, so the location constraint is
+            // established for the steady component rather than inherited.** 0.000112385 /
+            // 0.000224769 / 0.000449538 — x2.000 and x4.000 on the steady window alone. The next
+            // bisection can work upstream of the mix without that being a borrowed assumption. It
+            // still cannot distinguish a linear creator from a nonlinear one, for the same
+            // mechanical reason as before: MIX is a downstream gain and scales whatever arrives.
+            //
+            // **2 · FAILURE is not one of a set of three. It is 0.914 in STEADY STATE**, against
+            // NOISE 0.000225 and HUM 0.000194 — four orders of magnitude, and none of it a ramp
+            // artefact. The composite figure of 1.599 was read as "the worst of three generator
+            // rows"; it is a different finding that happened to be measured alongside two small
+            // ones. At full depth the same sample stream cut into different block sizes is a
+            // different performance, permanently, not for the first 128 ms.
+            //
+            // **3 · The mechanism is MODULATION, not addition — and it took two arms to see,
+            // because the first one could not have answered.** Generator amplitude does nothing:
+            // NOISE 25 / 50 / 100 gives 0.000218 / 0.000275 / 0.000225, flat and non-monotonic. But
+            // that arm barely moved the quantity it was varying — the rms column shows 0.523134
+            // against 0.523152, the noise bed sitting ~41 dB under the input — so on its own it is
+            // as consistent with "the arm could not tell" as with "it does not scale".
+            //
+            // The through-signal CAN be moved, and it is what the divergence tracks:
+            //
+            //   silent input   0.000003379   (rms 0.004597)
+            //   input x0.25    0.000051536   (rms 0.130862)      ratio x4.361 against x0.25
+            //   input x1       0.000224769   (rms 0.523152)
+            //   input x4       0.000872374   (rms 2.092537)      ratio x16.928, proportional says 16
+            //
+            // Per unit rms that is 0.000430 at x1 and 0.000417 at x4 — constant at about -67 dB of
+            // whatever is passing through. So a generator must be RUNNING and its LEVEL is
+            // irrelevant, while the divergence scales with the signal it is riding on. That is the
+            // signature of something multiplying the through-signal under generator-dependent
+            // control, not of a generator's own stream being cut differently — which is also why
+            // all three generators measured invariant driven alone.
+            //
+            // **4 · It is created DOWNSTREAM of the GEN cascade.** NoiseSource injects inside each
+            // DegradationCore; Hum injects after the whole cascade. Two different injection points
+            // return 0.000225 and 0.000194 — the same magnitude — which a mechanism living in the
+            // cascade could not produce. Combined with (1), the creator sits between Hum's
+            // injection and the mix: FailureEngine, StereoSpread, ToneFilters, TapeStop,
+            // FilterSweep, OutputStage.
+            //
+            // **The x8 arm is what makes (3) a claim rather than a restatement.** Level alone with
+            // no generator is exactly zero at eight times full scale, so this is not the chain
+            // responding to loudness; the generator is a gate on the effect and the through-signal
+            // is what the effect is applied to. Two separate dependencies, and neither alone
+            // produces it.
+            expect (true);   // locating
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
