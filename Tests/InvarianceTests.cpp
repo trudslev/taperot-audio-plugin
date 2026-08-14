@@ -385,6 +385,65 @@ public:
                     "the integral arm proves nothing");
         }
 
+        beginTest ("The block-size rows — ToneFilters' LP ramp, armed on EVERY prepare");
+        {
+            // **Both earlier candidates were refuted and this is the third, found by reading the
+            // one they pointed at.** ToneFilters::prepare sets lpSmoothed's current value to
+            // `nyquistSafeHz` — 23520 at 48 kHz — while the LP PARAMETER defaults to 20 kHz
+            // (ToneFilters.cpp:56). So current != target at the first block after every prepare, a
+            // ramp exists, and :77-81 advance it across the whole block and apply the END cutoff
+            // flat to every sample in it. That is block-size dependent, from sample 0.
+            //
+            // It is the every-prepare class, which is why warming did not remove it: render() calls
+            // prepareToPlay, so each block size re-arms the ramp and steps it differently.
+            //
+            // ## The discriminator, and it is quantitative
+            //
+            // If this is the mechanism, the divergence must scale with how far the LP has to
+            // travel — |nyquistSafeHz - LP|. At LP 20 kHz that is 3520 Hz; at LP 1 kHz it is
+            // 22520 Hz, six times further, and the rows must grow accordingly. A flat response to
+            // LP refutes it as surely as the GEN arm refuted genSmoothed.
+            const auto worstAtLp = [this] (float lpHz)
+            {
+                TapeRotAudioProcessor p;
+
+                if (auto* lp = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::lp)))
+                    lp->setValueNotifyingHost (lp->getNormalisableRange().convertTo0to1 (lpHz));
+
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+
+                double worst = 0.0;
+
+                for (const auto& r : nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 }))
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+
+                logMessage ("  LP " + juce::String (lpHz, 0) + " Hz (travels "
+                                + juce::String (23520.0f - lpHz, 0) + " Hz) -> worst |delta| "
+                                + juce::String (worst, 9));
+
+                return worst;
+            };
+
+            const auto atTop = worstAtLp (20000.0f);
+            const auto atMid = worstAtLp (5000.0f);
+            const auto atLow = worstAtLp (1000.0f);
+
+            logMessage ("  => " + juce::String (atLow > atTop * 2.0
+                            ? "CONFIRMED: the divergence scales with the LP ramp's distance"
+                            : "REFUTED: LP's distance does not drive it — a third candidate out"));
+
+            expect (atLow > atTop * 2.0,
+                    "the block-size divergence did not grow with the LP smoother's travel, so "
+                    "ToneFilters' ramp is not what produces these rows either: 20 kHz "
+                        + juce::String (atTop, 9) + ", 1 kHz " + juce::String (atLow, 9));
+
+            juce::ignoreUnused (atMid);
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
