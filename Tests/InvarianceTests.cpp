@@ -679,19 +679,14 @@ public:
             expect (true);   // locating
         }
 
-        beginTest ("Origin or level? — and a third point on the MIX line");
+        beginTest ("The MIX line — a third point, because two always make a line");
         {
-            // **The broadband-input arm is already answered and the answer is in the all-neutral
-            // row.** The harness's default input IS full-scale broadband noise — `deterministicSample`
-            // is an xorshift stream — and the neutral chain fed exactly that returned 0.000000000
-            // at all four block sizes. So signal character is not the trigger and the cause is that
-            // the signal ORIGINATES inside the chain.
-            //
-            // **Except that comparison does not control LEVEL.** NOISE at 100 does not only move
-            // where the signal comes from, it makes the total louder, and a level-dependent stage
-            // would look exactly like an origin-dependent one. So the input is scaled instead: same
-            // origin, same character, more of it. If a louder input still comes back exact, level
-            // is excluded and origin is the remaining claim rather than the untested one.
+            // **The level arms that used to live here have been WITHDRAWN — their fixture was
+            // broken.** They reported a x4 input diverging by 10.1 with no generator running, which
+            // was read as refuting the origin claim and establishing level as the trigger. It
+            // established neither: the scaled-input fixture fed a DIFFERENT waveform at each block
+            // size, so the comparison was between two unrelated noise streams. The rebuilt version
+            // is the block below; the origin question is reopened there, not answered here.
             const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
             {
                 if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
@@ -709,7 +704,7 @@ public:
             };
 
             const auto worstWith = [this, &neutral] (const char* label, float noisePercent,
-                                                     float mixPercent, float inputGain)
+                                                     float mixPercent)
             {
                 TapeRotAudioProcessor p;
                 neutral (p, noisePercent, mixPercent);
@@ -718,15 +713,6 @@ public:
                 nf::testing::RenderSpec spec;
                 spec.blockSize = 512;
                 spec.numBlocks = 64;
-
-                if (inputGain != 1.0f)
-                    spec.fillInput = [inputGain] (juce::AudioBuffer<float>& b, int blockIndex)
-                    {
-                        juce::Random r (2024 + blockIndex);
-                        for (int ch = 0; ch < b.getNumChannels(); ++ch)
-                            for (int i = 0; i < b.getNumSamples(); ++i)
-                                b.setSample (ch, i, inputGain * (r.nextFloat() * 2.0f - 1.0f));
-                    };
 
                 double worst = 0.0;
 
@@ -738,11 +724,6 @@ public:
                 return worst;
             };
 
-            logMessage ("  --- origin against level ---");
-            worstWith ("input x1, no generator",   0.0f, 50.0f, 1.0f);
-            worstWith ("input x4, no generator",   0.0f, 50.0f, 4.0f);
-            worstWith ("input x1, NOISE 100",    100.0f, 50.0f, 1.0f);
-
             // **Three points, because two always make a line.** 50% and 100% came back at exactly
             // 2x and read as linear in wet gain. 25% is what turns that from arithmetic into a
             // claim — and linearity is evidence the divergence is CREATED by something linear and
@@ -750,15 +731,327 @@ public:
             // cleanly. That is the n=1 check one dimension over: two points cannot distinguish a
             // line from anything else that happens to pass through them.
             logMessage ("  --- the MIX line, third point ---");
-            const auto at25  = worstWith ("NOISE 100, MIX 25%",  100.0f,  25.0f, 1.0f);
-            const auto at50  = worstWith ("NOISE 100, MIX 50%",  100.0f,  50.0f, 1.0f);
-            const auto at100 = worstWith ("NOISE 100, MIX 100%", 100.0f, 100.0f, 1.0f);
+            const auto at25  = worstWith ("NOISE 100, MIX 25%",  100.0f,  25.0f);
+            const auto at50  = worstWith ("NOISE 100, MIX 50%",  100.0f,  50.0f);
+            const auto at100 = worstWith ("NOISE 100, MIX 100%", 100.0f, 100.0f);
 
             if (at25 > 0.0)
                 logMessage ("  ratios against 25% -> 50%: x" + juce::String (at50 / at25, 3)
                                 + ", 100%: x" + juce::String (at100 / at25, 3)
                                 + "   (linear predicts x2.000 and x4.000)");
 
+            // **Measured exactly x2.000 and x4.000 — and that is MECHANICALLY NECESSARY rather
+            // than evidence about mechanism.** MIX is a gain applied downstream of wherever the
+            // divergence is created, so it scales whatever arrives at it; a linear creator and a
+            // nonlinear one are indistinguishable here. It confirms the location — wet path, before
+            // the mix — which was already established, and nothing else. Taking the third point was
+            // still right: two points would have supported the stronger reading.
+            expect (true);   // locating
+        }
+
+        beginTest ("The x4 row was a FIXTURE defect — its input differed between block sizes");
+        {
+            // **The instrument was wrong before the measurement, and this time it produced a
+            // confident finding that has had to be withdrawn.**
+            //
+            // `render` hands `fillInput` a BLOCK INDEX, not an absolute sample position
+            // (ProcessorHarness.cpp:232-235). The withdrawn x4 arm seeded a `juce::Random` with
+            // `2024 + blockIndex` and restarted it every block, so the input at 64 samples per block
+            // was a different waveform from the input at 2048 and the comparison was between two
+            // unrelated noise streams. A worst |delta| of 10.1 on a +/-4 signal is what comparing
+            // two unrelated streams looks like; it was read as the plugin being unstable at level.
+            //
+            // Nothing is wrong with the harness. Its default path is position-determined —
+            // `deterministicSample (absolute + i, ch)` with `absolute` accumulating across blocks
+            // (:226, :243) — so the default input is identical at every block size by construction.
+            //
+            // ## The control could not have caught it, and that is the part with reach
+            //
+            // The x1 arm was written as the control and it passed. It passed because
+            // `if (inputGain != 1.0f)` meant it never installed `fillInput` at all: it ran the
+            // DEFAULT path, validated the default path, and was silent about the only thing under
+            // test. **A control that does not exercise the fixture cannot validate the fixture**,
+            // and it is indistinguishable from one that can.
+            //
+            // Same family as the known case that was known along one axis — there the arm asked the
+            // wrong question, here it ran the wrong code path — and both are answerable from the
+            // design before the run. The check is: name the line the control shares with the arm it
+            // is controlling for. If there is none, it is not a control.
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            const auto neutral = [&setP] (TapeRotAudioProcessor& p, float noisePercent)
+            {
+                setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::gen, 1.0f);     setP (p, ParamIDs::model, 0.0f);
+                setP (p, ParamIDs::noise, noisePercent);
+                setP (p, ParamIDs::mix, 50.0f);
+            };
+
+            // `deterministicSample`, transcribed from ProcessorHarness.cpp:42-47 because it is
+            // file-local there. **A transcription is checked against its original rather than
+            // trusted** — the gain-1 arm below asserts it reproduces the default path byte for byte,
+            // which is what makes the louder arms the same signal scaled rather than a second one.
+            const auto sampleAt = [] (int absoluteIndex, int channel) noexcept
+            {
+                uint32_t x = (uint32_t) (absoluteIndex * 2654435761u)
+                           ^ (uint32_t) (channel * 40503u) ^ 0x9e3779b9u;
+                x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+                return ((float) (x & 0xffffffu) / (float) 0x7fffff) - 1.0f;
+            };
+
+            // Absolute position, derived from the block index and the block's own length. `render`
+            // uses one fixed block size for a whole run, which is what makes that exact — and it is
+            // the single line the withdrawn fixture got wrong.
+            const auto scaledInput = [sampleAt] (float gain)
+            {
+                return [sampleAt, gain] (juce::AudioBuffer<float>& b, int blockIndex)
+                {
+                    const int absolute = blockIndex * b.getNumSamples();
+
+                    for (int ch = 0; ch < b.getNumChannels(); ++ch)
+                        for (int i = 0; i < b.getNumSamples(); ++i)
+                            b.setSample (ch, i, gain * sampleAt (absolute + i, ch));
+                };
+            };
+
+            // KNOWN CASE 1 — the transcription reproduces the harness's own generator. Without this
+            // the level arms would be a different signal as well as a louder one, which is the
+            // confound the whole block exists to remove.
+            {
+                TapeRotAudioProcessor a, b;
+                neutral (a, 0.0f);
+                neutral (b, 0.0f);
+                warm (a);
+                warm (b);
+
+                nf::testing::RenderSpec byDefault;
+                byDefault.blockSize = 512;
+                byDefault.numBlocks = 8;
+
+                auto byFill = byDefault;
+                byFill.fillInput = scaledInput (1.0f);
+
+                const auto viaDefault = nf::testing::render (a, byDefault);
+                const auto viaFill    = nf::testing::render (b, byFill);
+
+                double worst = 0.0;
+
+                for (size_t ch = 0; ch < juce::jmin (viaDefault.size(), viaFill.size()); ++ch)
+                    for (size_t i = 0; i < juce::jmin (viaDefault[ch].size(), viaFill[ch].size()); ++i)
+                        worst = juce::jmax (worst, (double) std::abs (viaDefault[ch][i] - viaFill[ch][i]));
+
+                logMessage ("  transcription check, default against fillInput at gain 1 -> "
+                                + juce::String (worst, 9));
+
+                expectEquals (worst, 0.0,
+                              "the transcribed input generator does not reproduce the harness's own, "
+                              "so a louder arm would be a DIFFERENT signal rather than a scaled one");
+            }
+
+            const auto worstAtGain = [this, &neutral, &scaledInput] (const char* label,
+                                                                     float noisePercent, float gain)
+            {
+                TapeRotAudioProcessor p;
+                neutral (p, noisePercent);
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+                spec.fillInput = scaledInput (gain);   // ALWAYS, gain 1 included — see the control note
+
+                double worst = 0.0;
+
+                for (const auto& r : nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 }))
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+
+                double peak = 0.0;
+                bool finite = true;
+
+                for (const auto& ch : nf::testing::render (p, spec))
+                    for (float v : ch)
+                    {
+                        finite = finite && std::isfinite (v);
+                        peak = juce::jmax (peak, (double) std::abs (v));
+                    }
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 30)
+                                + "worst |delta| " + juce::String (worst, 9)
+                                + "   (peak " + juce::String (peak, 4)
+                                + (finite ? ")" : ", NON-FINITE OUTPUT)"));
+
+                return worst;
+            };
+
+            // KNOWN CASE 2 — the fixture must not HIDE divergence either. NOISE at 100 measured
+            // 0.0096 through the default path; if it comes back exact through this one, the fixture
+            // is suppressing rather than measuring and every zero below means nothing.
+            logMessage ("  --- the fixture, both directions ---");
+            const auto noiseThroughFill = worstAtGain ("gain 1, NOISE 100", 100.0f, 1.0f);
+
+            expectGreaterThan (noiseThroughFill, 1.0e-9,
+                               "the known divergent configuration came back exact through this "
+                               "fixture, so the fixture hides divergence and no zero below is "
+                               "readable");
+
+            // The level question, asked properly this time. The claim under test is that the chain
+            // with no generator is exactly invariant at any level — which is what the origin reading
+            // requires, and what the withdrawn arm appeared to refute.
+            logMessage ("  --- level, with no generator anywhere ---");
+            const auto g1  = worstAtGain ("gain 1,  no generator",   0.0f, 1.0f);
+            const auto g15 = worstAtGain ("gain 1.5, no generator",  0.0f, 1.5f);
+            const auto g2  = worstAtGain ("gain 2,  no generator",   0.0f, 2.0f);
+            const auto g4  = worstAtGain ("gain 4,  no generator",   0.0f, 4.0f);
+            const auto g8  = worstAtGain ("gain 8,  no generator",   0.0f, 8.0f);
+
+            const auto loudest = juce::jmax (g15, juce::jmax (g2, juce::jmax (g4, g8)));
+
+            logMessage (juce::String ("  => ") + (loudest < 1.0e-9
+                            ? "LEVEL IS EXCLUDED: the generator-free chain is exactly invariant up "
+                              "to 8x full scale, so the withdrawn x4 row was entirely its fixture "
+                              "and the origin reading stands"
+                            : "level does move it: worst across the louder arms "
+                                  + juce::String (loudest, 9)));
+
+            expectEquals (g1, 0.0,
+                          "the generator-free chain diverged at unity gain through this fixture, "
+                          "which the default path measures as exactly zero — the fixture is the "
+                          "difference, not the plugin");
+
+            expect (true);   // locating
+        }
+
+        beginTest ("Confined to the ramp, or steady? — the partition the withdrawn row owed");
+        {
+            // **The x4 bisection this was to be cannot run: its case does not exist.** So this is
+            // the partition that does — over TIME rather than over stages, which needs no new
+            // hypothesis and halves the space whichever way it comes out.
+            //
+            // The bound that now holds is sharp and worth stating before the run. A generator-free
+            // chain is exactly invariant at a peak of 12.4; NOISE at 100 diverges by 0.0096 at a
+            // peak of 1.56. So it is neither level nor signal character — eight times the amplitude
+            // of the same broadband stream changes nothing, and a quieter internally-generated one
+            // changes the output. The distinguishing property really is that the signal ORIGINATES
+            // inside the chain.
+            //
+            // ## What that leaves, and why time splits it
+            //
+            // `render` calls prepareToPlay and reset() on every arm, so EVERY measurement here is a
+            // cold one — and this casting has seven `SmoothedValue::reset (rate, seconds)` sites
+            // with no following `setCurrentAndTargetValue`, so those smoothers ramp from zero on the
+            // first prepare. The RANKING test measures that as a -16.6 dB first-run fade-in.
+            //
+            // A smoother advanced with `skip (numSamples)` and applied flat across the block is a
+            // staircase whose step IS the block size — so if the divergence lives in the initial
+            // ramp, it is that construction and it is confined to the first few tens of ms. If it
+            // runs to the end of a two-second render, the ramp is not it and the cause is in steady
+            // state. Two very different investigations, separated by one run.
+            //
+            // KNOWN CASE: the arm must diverge at all, or the profile is a row of zeroes that reads
+            // as "confined to nothing". NOISE stays at 100 and the total is asserted non-zero
+            // before any slice is read.
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            TapeRotAudioProcessor p;
+            setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+            setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+            setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+            setP (p, ParamIDs::gen, 1.0f);     setP (p, ParamIDs::model, 0.0f);
+            setP (p, ParamIDs::noise, 100.0f); setP (p, ParamIDs::mix, 100.0f);
+
+            constexpr int totalSamples = 512 * 192;      // ~2.05 s at 48 kHz
+
+            const auto renderAt = [&p] (int blockSize)
+            {
+                nf::testing::RenderSpec spec;
+                spec.blockSize = blockSize;
+                spec.numBlocks = totalSamples / blockSize;
+                return nf::testing::render (p, spec);
+            };
+
+            const auto small = renderAt (64);
+            const auto large = renderAt (2048);
+
+            constexpr int slices = 16;
+            const int perSlice = totalSamples / slices;
+
+            double overall = 0.0;
+            juce::String row, msRow;
+
+            for (int s = 0; s < slices; ++s)
+            {
+                double worst = 0.0;
+
+                for (size_t ch = 0; ch < juce::jmin (small.size(), large.size()); ++ch)
+                    for (int i = s * perSlice; i < (s + 1) * perSlice; ++i)
+                        if ((size_t) i < juce::jmin (small[ch].size(), large[ch].size()))
+                            worst = juce::jmax (worst, (double) std::abs (small[ch][(size_t) i]
+                                                                        - large[ch][(size_t) i]));
+
+                overall = juce::jmax (overall, worst);
+                row += juce::String (worst, 6).paddedLeft (' ', 10);
+                msRow += juce::String ((int) (s * perSlice / 48.0)).paddedLeft (' ', 10);
+            }
+
+            logMessage ("  slice start (ms)  " + msRow);
+            logMessage ("  worst |delta|     " + row);
+
+            expectGreaterThan (overall, 1.0e-9,
+                               "the profiled configuration did not diverge at all, so every slice "
+                               "is zero for the trivial reason and the profile means nothing");
+
+            // Read by comparing the first slice against the last four: a ramp artefact decays to
+            // nothing, a steady-state one does not.
+            double lateWorst = 0.0;
+
+            for (int s = slices - 4; s < slices; ++s)
+            {
+                double worst = 0.0;
+
+                for (size_t ch = 0; ch < juce::jmin (small.size(), large.size()); ++ch)
+                    for (int i = s * perSlice; i < (s + 1) * perSlice; ++i)
+                        if ((size_t) i < juce::jmin (small[ch].size(), large[ch].size()))
+                            worst = juce::jmax (worst, (double) std::abs (small[ch][(size_t) i]
+                                                                        - large[ch][(size_t) i]));
+
+                lateWorst = juce::jmax (lateWorst, worst);
+            }
+
+            logMessage ("  => worst " + juce::String (overall, 9) + " in the first slice against "
+                            + juce::String (lateWorst, 9) + " in the last quarter, a ratio of "
+                            + juce::String (lateWorst > 0.0 ? overall / lateWorst : 0.0, 1));
+
+            // **MEASURED: it is BOTH, and that is two findings rather than one.**
+            //
+            //   slice 0 (0-128 ms)   0.024078
+            //   every later slice    0.00023 .. 0.00045, flat to two seconds, no decay
+            //
+            // So the first-run ramp carries the MAGNITUDE — 0.024 is sixty times the steady figure,
+            // and it is what the headline 0.019 over a 0.68 s render was mostly measuring — while a
+            // steady-state divergence of ~0.0003 runs underneath it and never decays. A ramp
+            // artefact alone would have fallen to nothing; it does not.
+            //
+            // **Filed as two, for the same reason the two smoother sites were.** They have
+            // different exposures: the first-run component fires once per instance and lands under
+            // the -16.6 dB fade-in the RANKING test measures, while the steady one is present in
+            // every second of every render and is the reason a bounce at 2048 and a monitor at 128
+            // are not the same audio. Closing them together would let the smaller and more
+            // permanent of the two be closed by association with the larger.
+            //
+            // The steady component is also what refutes the ramp as a sufficient explanation of the
+            // generator rows, which is what this run was for. Next partition is inside the steady
+            // component alone — with the first 128 ms EXCLUDED from the comparison, so the ramp
+            // cannot dominate the figure being read.
             expect (true);   // locating
         }
 
