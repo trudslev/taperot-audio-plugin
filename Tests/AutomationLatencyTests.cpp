@@ -27,6 +27,43 @@
     track is early against it. Emerging EARLIER is a declaration that over-compensates, which pulls
     the plugin ahead. Both are reported; neither is assumed to be the interesting one.
 */
+/*  ## FINDING — 25 ms per GEN stage, undeclared. TWO problems, and only one is solved.
+
+    Measured 1218 samples at 48 kHz against a declared 4. The source is
+    `WowFlutter::nominalDelayMs = 25.0f` — 1200 samples — carried by EVERY active GEN stage, because
+    the delay line is the modulation mechanism rather than an optional effect. So it scales 1200 to
+    9600 samples as GEN goes 1 to 8.
+
+    **Problem A — the dry path against the wet path. SOLVED.** `dryCompensationDelay` re-times the
+    dry copy to match, tracking `genSmoothed` through transitions. MIX blends aligned signals.
+
+    **Problem B — TapeRot against every other track in the session. NOT SOLVED, and nothing
+    addresses it.** No declaration reaches the host, so the host aligns by 4 samples and the plugin
+    sits up to 200 ms late against everything else.
+
+    **That is why this survived: the failure is inaudible in isolation and obvious only across
+    tracks.** Solo the plugin and it is correct. `PluginProcessor.h:292-300` describes the mechanism
+    completely and accurately, and sits beside the code that fixes A — which is what makes it read
+    as an explanation of a solved problem rather than as a defect nobody declared.
+
+    ## Three options, and the third is only free until release
+
+      1. Declare a fixed 200 ms nominal and internally delay to match at lower GEN — the technique
+         `dryCompensationDelay` already implements. Taxes every user at GEN 1 with GEN 8's latency.
+      2. Call `setLatencySamples` on every GEN change. What hosts handle badly.
+      3. **Make GEN non-automatable.** The whole difficulty is latency moving at runtime under host
+         control; if GEN is a setup choice rather than a performance parameter, a latency change
+         becomes a graph rebuild while somebody is configuring, which hosts do tolerate. Cheapest of
+         the three, a musical question rather than a technical one, and **only free before release**
+         — afterwards it breaks saved automation.
+
+    ## Still a prediction, not a result
+
+    Reading says the centre delay is fixed and the models are EQ, so neither the model set nor the
+    wow/flutter extremes should move this figure. **That is a prediction and it stays one** until
+    GEN 1 / 4 / 8 and the wow/flutter extremes are measured — this sweep has been wrong twice about
+    exactly this kind of reading.
+*/
 class AutomationLatencyTests final : public juce::UnitTest
 {
 public:
