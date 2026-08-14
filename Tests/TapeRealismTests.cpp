@@ -164,17 +164,24 @@ public:
                             noisePeak = juce::jmax (noisePeak, (double) std::abs (v));
                 }
 
-                // --- pitch deviation: NOT MEASURED, and the numbers below say why ------------
-                // Every stage here is default-constructed, so they all take the same seed offset,
-                // run identical LFOs, and are PERFECTLY CORRELATED — which sums linearly by
-                // construction whatever the plugin does. The tell is in the output: 2.00x, 3.00x,
-                // ... 8.00x to two decimals. Independent sources cannot produce exact integers.
-                // The real processor gives each stage its own instanceSeedOffset. This column
-                // measures the fixture and is reported so it is not read as a result.
+                // --- pitch deviation -----------------------------------------------------------
+                // **This column was NOT MEASURED on its first run and the numbers said so.** Every
+                // stage was default-constructed, so all shared one seed offset, ran identical LFOs
+                // and were perfectly correlated — which sums linearly whatever the plugin does. The
+                // tell was in the output: 2.00x, 3.00x ... 8.00x to two decimals, and independent
+                // sources cannot produce exact integers. A result more regular than its mechanism
+                // permits is a result about the fixture.
                 double cents = 0.0;
                 {
                     const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
-                    std::vector<WowFlutter> stages ((size_t) (int) gen);
+                    // **Seeded PER STAGE, as the processor seeds them.** The first version
+                    // default-constructed every stage, so all of them shared one seed offset, ran
+                    // identical LFOs and summed linearly by construction — see the note above.
+                    std::vector<WowFlutter> stages;
+                    stages.reserve ((size_t) (int) gen);
+
+                    for (int i = 0; i < (int) gen; ++i)
+                        stages.emplace_back (i, 1.0f);
 
                     for (auto& s : stages)
                         s.prepare (spec);
