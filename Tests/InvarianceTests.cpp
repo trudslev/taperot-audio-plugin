@@ -46,9 +46,20 @@
     and the transport constant may never exercise either. The divergence measured below starts at
     sample 0, which a smoother already sitting on its target cannot produce.
 
-    So: the construction is real and worth fixing on its own terms; whether it is what these rows
-    measure is open. The next step is the modulation-depth equivalent — drive GEN and the transport
-    and see whether the divergence scales — not a fresh bisect.
+    **FILED AS TWO DEFECTS IN THEIR OWN RIGHT, not as candidates for these rows.** A gain ramp
+    advanced per block and applied flat across every sample in it is a staircase on transport start
+    and stop that coarsens as the buffer grows. That is audible, it does not need the bisect to
+    justify itself, and filing it behind "whether it is the cause here is open" would risk it being
+    closed along with a finding it may be no part of. `genSmoothed` is the same construction and the
+    same argument, with the single difference that GEN moves less often than the transport does.
+
+    **When they are driven, they are driven SEPARATELY** — same reason the three LFO defects were
+    filed apart. Two sites share one signature: if both express, there are two members and a ruling
+    covers both; if only one does, the other is latent-but-real and stays on the list rather than
+    being closed by association.
+
+    Whether either is what these rows measure remains open, and the next step is the
+    modulation-depth equivalent rather than a fresh bisect.
 */
 class InvarianceTests final : public juce::UnitTest
 {
