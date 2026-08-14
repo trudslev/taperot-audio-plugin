@@ -10,9 +10,22 @@ name: Edge Build
 # them and publishes them together in one release-action call, so no platform's asset ever gets
 # wiped out by another's "replace previous assets" step.
 
+# **PAUSED 2026-08-14 — the push trigger is commented out, not deleted.**
+#
+# The suite-wide bug sweep pushes to develop many times a day, and each push costs a full
+# three-platform build and a rolling `edge` pre-release nobody is installing from during a
+# measurement pass. The trigger is restored by uncommenting the two lines below; nothing else about
+# this workflow changed, so a restore is a two-line diff rather than a reconstruction.
+#
+# `workflow_dispatch` stays, so an edge build is still available on demand from the Actions tab
+# whenever one is actually wanted. Pausing it entirely would have meant losing that too.
+#
+# **Releases are unaffected.** release.yml triggers on `v*` tags, not on branches, so tagging still
+# publishes exactly as before.
 on:
-  push:
-    branches: [develop]
+  # push:
+  #   branches: [develop]
+  workflow_dispatch:
 
 permissions:
   contents: write
