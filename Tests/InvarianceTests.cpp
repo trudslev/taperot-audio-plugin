@@ -250,6 +250,141 @@ public:
                         "produced different output: " + r.describe());
         }
 
+        beginTest ("Block size — GEN and the transport gate, driven SEPARATELY");
+        {
+            // Two sites share one signature, so they are driven apart: if both express there are
+            // two members and a ruling covers both; if one does, the other stays on the list rather
+            // than being closed by association.
+            //
+            // ## The transport gate cannot be exercised here, and that is a stated limitation
+            //
+            // `transportGateSmoothed`'s target is `hostIsPlaying ? 1 : 0`, and this harness supplies
+            // no play head, so JUCE's fallback makes it permanently true. The target never moves,
+            // so the smoother never ramps and the per-block `skip`/flat-apply cannot express. It is
+            // therefore NEITHER confirmed nor refuted by anything below — it stays a defect on its
+            // own terms (a gain ramp drawn as a staircase on transport start and stop) that this
+            // instrument is structurally unable to reach, which is the same shape as category 3's
+            // blindness to every-prepare defects.
+            //
+            // ## GEN can, and the mechanism is specific
+            //
+            // prepareToPlay sets genSmoothed to the RAW parameter (PluginProcessor.cpp:421) while
+            // processBlock sets its target to the ROUNDED one (:509). A non-integral GEN therefore
+            // leaves current != target at the first block, so the smoother ramps — and :510-511
+            // advance it across the whole block and apply the END value flat. That is block-size
+            // dependent, from sample 0, small, and growing with the buffer: the measured signature.
+            //
+            // KNOWN CASE: an exactly-integral GEN makes current == target, so no ramp exists to be
+            // stepped. If the rows go sample-exact there, genSmoothed is the cause. If they do not,
+            // both per-block constructions are refuted as the explanation for these rows and the
+            // cause is something neither of them touches — a null result with nothing behind it.
+            const auto rowsAtGen = [this] (const char* label, float genValue, bool setIt)
+            {
+                TapeRotAudioProcessor p;
+
+                if (setIt)
+                    if (auto* g = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::gen)))
+                        g->setValueNotifyingHost (g->getNormalisableRange().convertTo0to1 (genValue));
+
+                logMessage ("  " + juce::String (label) + ", GEN reads \"" 
+                                + p.apvts.getParameter (ParamIDs::gen)->getCurrentValueAsText() + "\"");
+
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+
+                const auto results = nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 });
+
+                double worst = 0.0;
+                bool allExact = true;
+
+                for (const auto& r : results)
+                {
+                    logMessage ("      " + r.describe());
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+                    allExact = allExact && r.sampleExact;
+                }
+
+                return std::make_pair (allExact, worst);
+            };
+
+            const auto atDefault = rowsAtGen ("default", 0.0f, false);
+            const auto atInteger = rowsAtGen ("GEN forced to exactly 4", 4.0f, true);
+
+            logMessage (juce::String ("  => ") + (! atDefault.first && atInteger.first
+                            ? "CONFIRMED: genSmoothed's raw-versus-rounded mismatch is the cause"
+                            : atInteger.first == atDefault.first
+                                ? "REFUTED as the explanation for these rows — an integral GEN "
+                                  "changes nothing, so neither per-block construction produces them"
+                                : "unclassified — reporting and stopping"));
+
+
+            // **Both named constructions are refuted, so localise by STAGE instead.** DRIVE at 0
+            // takes the Saturator's bypass branch (Saturator.cpp:69) and with it the whole
+            // oversampled path — the only other place in this chain where block length enters the
+            // arithmetic at all. If the rows go exact there, the divergence lives in the
+            // oversampler; if they do not, it is downstream of it.
+            //
+            // The oversampled index map at Saturator.cpp:128 was checked and is NOT it:
+            // `i * numSamples / overSamples` with overSamples = numSamples * factor reduces to
+            // `i / factor` exactly in integer arithmetic, so numSamples cancels. Recorded because
+            // it looks block-dependent and is not, and the next reader will find it too.
+            const auto atSilentDrive = rowsAtGen ("DRIVE at 0 (Saturator bypassed)", 0.0f, false);
+
+            {
+                TapeRotAudioProcessor p;
+                if (auto* d = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::drive)))
+                    d->setValueNotifyingHost (0.0f);
+
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+
+                bool allExact = true;
+                double worst = 0.0;
+
+                for (const auto& r : nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 }))
+                {
+                    logMessage ("      DRIVE 0 -> " + r.describe());
+                    allExact = allExact && r.sampleExact;
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+                }
+
+                logMessage (juce::String ("  => ") + (allExact
+                                ? "the divergence is INSIDE the Saturator's oversampled path"
+                                : "the divergence survives a bypassed Saturator — worst "
+                                      + juce::String (worst, 9) + ", so it is downstream of it"));
+
+                // **The deltas came back byte-identical to the default arm** — 0.000200260 /
+                // 0.001022242 / 0.001926094 to nine digits with DRIVE at 0 and at default. Not
+                // merely "still present": the divergent component is wholly independent of the
+                // saturator path, which is a stronger exclusion than the bypass alone gives.
+                //
+                // Remaining candidates, named here so the next pass confirms rather than searches.
+                // Both carry the same skip(numSamples)-then-apply-the-end-value-flat shape as the
+                // two already refuted, and both are downstream of the Saturator:
+                //
+                //   ToneFilters.cpp:77-81   lpSmoothed/hpSmoothed advanced across the block, the
+                //                           END cutoff used for every sample in it. Guarded at
+                //                           prepare, so the question is whether prepare's value and
+                //                           process's target agree — if they do not, it ramps.
+                //   StereoSpread.cpp:20     amountSmoothed, same shape, and no-op guarded.
+                //
+                // The refutations so far are worth as much as a confirmation would be: genSmoothed
+                // is out (an integral GEN changes nothing, and the default is already integral),
+                // the transport gate is structurally unreachable in this harness, the oversampled
+                // index map reduces to i/factor, and the Saturator contributes nothing.
+            }
+
+            expect (! atDefault.first,
+                    "the default arm came back exact, so there was no divergence to explain and "
+                    "the integral arm proves nothing");
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
