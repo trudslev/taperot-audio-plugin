@@ -679,6 +679,89 @@ public:
             expect (true);   // locating
         }
 
+        beginTest ("Origin or level? — and a third point on the MIX line");
+        {
+            // **The broadband-input arm is already answered and the answer is in the all-neutral
+            // row.** The harness's default input IS full-scale broadband noise — `deterministicSample`
+            // is an xorshift stream — and the neutral chain fed exactly that returned 0.000000000
+            // at all four block sizes. So signal character is not the trigger and the cause is that
+            // the signal ORIGINATES inside the chain.
+            //
+            // **Except that comparison does not control LEVEL.** NOISE at 100 does not only move
+            // where the signal comes from, it makes the total louder, and a level-dependent stage
+            // would look exactly like an origin-dependent one. So the input is scaled instead: same
+            // origin, same character, more of it. If a louder input still comes back exact, level
+            // is excluded and origin is the remaining claim rather than the untested one.
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            const auto neutral = [&setP] (TapeRotAudioProcessor& p, float noisePercent, float mixPercent)
+            {
+                setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::gen, 1.0f);     setP (p, ParamIDs::model, 0.0f);
+                setP (p, ParamIDs::noise, noisePercent);
+                setP (p, ParamIDs::mix, mixPercent);
+            };
+
+            const auto worstWith = [this, &neutral] (const char* label, float noisePercent,
+                                                     float mixPercent, float inputGain)
+            {
+                TapeRotAudioProcessor p;
+                neutral (p, noisePercent, mixPercent);
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+
+                if (inputGain != 1.0f)
+                    spec.fillInput = [inputGain] (juce::AudioBuffer<float>& b, int blockIndex)
+                    {
+                        juce::Random r (2024 + blockIndex);
+                        for (int ch = 0; ch < b.getNumChannels(); ++ch)
+                            for (int i = 0; i < b.getNumSamples(); ++i)
+                                b.setSample (ch, i, inputGain * (r.nextFloat() * 2.0f - 1.0f));
+                    };
+
+                double worst = 0.0;
+
+                for (const auto& r : nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 }))
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 34)
+                                + "worst |delta| " + juce::String (worst, 9));
+                return worst;
+            };
+
+            logMessage ("  --- origin against level ---");
+            worstWith ("input x1, no generator",   0.0f, 50.0f, 1.0f);
+            worstWith ("input x4, no generator",   0.0f, 50.0f, 4.0f);
+            worstWith ("input x1, NOISE 100",    100.0f, 50.0f, 1.0f);
+
+            // **Three points, because two always make a line.** 50% and 100% came back at exactly
+            // 2x and read as linear in wet gain. 25% is what turns that from arithmetic into a
+            // claim — and linearity is evidence the divergence is CREATED by something linear and
+            // passed through, rather than made by a nonlinear stage, which would rarely scale this
+            // cleanly. That is the n=1 check one dimension over: two points cannot distinguish a
+            // line from anything else that happens to pass through them.
+            logMessage ("  --- the MIX line, third point ---");
+            const auto at25  = worstWith ("NOISE 100, MIX 25%",  100.0f,  25.0f, 1.0f);
+            const auto at50  = worstWith ("NOISE 100, MIX 50%",  100.0f,  50.0f, 1.0f);
+            const auto at100 = worstWith ("NOISE 100, MIX 100%", 100.0f, 100.0f, 1.0f);
+
+            if (at25 > 0.0)
+                logMessage ("  ratios against 25% -> 50%: x" + juce::String (at50 / at25, 3)
+                                + ", 100%: x" + juce::String (at100 / at25, 3)
+                                + "   (linear predicts x2.000 and x4.000)");
+
+            expect (true);   // locating
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
