@@ -158,9 +158,152 @@ public:
                     "offline differs from real-time. Not a defect on its face — this casting would "
                     "have to intend it: " + r.describe());
         }
+        beginTest ("RANKING — is the first-run difference a FADE-IN, or a hair of drift?");
+        {
+            // **The audible/inaudible split was ranked by reading and this reproduces it.** The
+            // plan's rule: an inferred finding is a hypothesis with a line number until the harness
+            // reproduces it, and this one is carrying a release-blocker claim.
+            //
+            // SITE: OutputStage: output gain and wet/dry mix, 20 ms ramp
+            //
+            // juce::SmoothedValue default-constructs with target 0, and reset(rate, seconds) is
+            // setCurrentAndTargetValue(target) — so a constructed smoother starts at ZERO and the
+            // first process() call ramps it up to its real value. If what it carries is a gain, the
+            // first playback fades in from silence.
+            //
+            // Reported in dB of the cold render against the warmed one, in 5 ms slices. A fade-in
+            // is a monotonic rise from a large negative figure to 0 dB, completing at the ramp
+            // length. A hair of drift is a flat row near 0.
+            TapeRotAudioProcessor cold;
+            TapeRotAudioProcessor warmRef;
+            warm (warmRef);
+
+            nf::testing::RenderSpec spec;
+            spec.blockSize = 512;
+            spec.numBlocks = 16;
+
+            const auto coldRender = nf::testing::render (cold, spec);
+            const auto warmRender = nf::testing::render (warmRef, spec);
+
+            logMessage ("  slice (5 ms each)          5      10      15      20      25      30      35      40      45      50");
+            reportFirstRunEnvelope ("cold vs warmed", coldRender, warmRender, spec.sampleRate);
+
+            // **The control, and it is what makes the row above readable.** Two warmed renders must
+            // be flat at 0 dB across every slice; if they are not, the instrument is reporting
+            // something other than the first-run state and the row above means nothing.
+            TapeRotAudioProcessor warmB;
+            warm (warmB);
+            reportFirstRunEnvelope ("warmed vs warmed", nf::testing::render (warmB, spec),
+                                    warmRender, spec.sampleRate);
+
+            const auto c = windowedRms (coldRender, spec.sampleRate, 5.0, 10);
+            const auto w = windowedRms (warmRender, spec.sampleRate, 5.0, 10);
+
+            const double firstSliceDb = (c[0] > 0.0 && w[0] > 0.0) ? 20.0 * std::log10 (c[0] / w[0])
+                                                                   : -99.0;
+
+            logMessage ("  first 5 ms -> " + juce::String (firstSliceDb, 2) + " dB");
+            logMessage (juce::String ("  => ") + (firstSliceDb < -6.0
+                            ? "AUDIBLE: the first playback is attenuated by more than 6 dB"
+                            : "not a fade-in at this magnitude — the audible ranking does NOT hold here"));
+
+
+            // **A LEVEL-RATIO METRIC IS BLIND TO A TIMING DEFECT, and that is why this second line
+            // exists.** The row above ranks ATTENUATION: it answers "does the first playback fade
+            // in", and it answers it well. It cannot answer "is the first playback audibly
+            // different", because a pre-delay that glides moves WHEN the wet signal arrives and not
+            // how loud it is — two renders can differ audibly and have identical RMS per slice.
+            //
+            // Third instance in this sweep of a metric that reads as a result and cannot rank what
+            // it was asked to rank, after gradient-per-pixel and largestResponseDifferenceDb.
+            // Caught here only because a casting whose defect is MEASURED at 0.124 came back 0.00 dB.
+            //
+            // So: the residual, which is blind to nothing. |cold - warmed| at its worst, against the
+            // warmed render's own peak, in dB. A timing glide shows here at full size.
+            {
+                double worst = 0.0, peak = 0.0;
+
+                for (size_t ch = 0; ch < warmRender.size(); ++ch)
+                    for (size_t i = 0; i < warmRender[ch].size() && i < coldRender[ch].size(); ++i)
+                    {
+                        worst = juce::jmax (worst, (double) std::abs (coldRender[ch][i] - warmRender[ch][i]));
+                        peak  = juce::jmax (peak,  (double) std::abs (warmRender[ch][i]));
+                    }
+
+                const double residualDb = (worst > 0.0 && peak > 0.0) ? 20.0 * std::log10 (worst / peak)
+                                                                      : -99.0;
+
+                logMessage ("  residual -> " + juce::String (worst, 9) + " against peak "
+                                + juce::String (peak, 6) + " = " + juce::String (residualDb, 1)
+                                + " dB below the signal");
+                logMessage (juce::String ("  => ") + (residualDb > -40.0
+                                ? "the first playback differs AUDIBLY, by whatever mechanism"
+                                : "below -40 dB of the signal: not audible on its own"));
+            }
+
+            expect (true);   // ranking, not a pass/fail — the defect is asserted elsewhere
+        }
+
     }
 
 private:
+
+    /** Windowed RMS of a render, one figure per `windowMs` slice, channel 0. */
+    static std::vector<double> windowedRms (const std::vector<std::vector<float>>& render,
+                                            double sampleRate, double windowMs, int windows)
+    {
+        std::vector<double> out;
+        const int n = (int) (windowMs * 0.001 * sampleRate);
+
+        for (int w = 0; w < windows; ++w)
+        {
+            double sum = 0.0;
+            int counted = 0;
+
+            for (int i = w * n; i < (w + 1) * n && i < (int) render[0].size(); ++i)
+            {
+                sum += (double) render[0][(size_t) i] * render[0][(size_t) i];
+                ++counted;
+            }
+
+            out.push_back (counted > 0 ? std::sqrt (sum / counted) : 0.0);
+        }
+
+        return out;
+    }
+
+    /** **The ranking instrument.** A max |delta| says a first playback differs; it does not say
+        whether the difference is a fade-in from silence or a hair of drift, and the release-blocker
+        claim rests entirely on which. This reports the cold render's level against the warmed one
+        in successive slices, in dB, which is the unit the claim is made in.
+
+        A smoother snapping to a constructed zero shows as a monotonic rise from a large negative
+        figure to 0 dB, completing at the smoother's own ramp length. Anything else is not that. */
+    void reportFirstRunEnvelope (const juce::String& label,
+                                 const std::vector<std::vector<float>>& cold,
+                                 const std::vector<std::vector<float>>& warm,
+                                 double sampleRate)
+    {
+        constexpr double windowMs = 5.0;
+        constexpr int windows = 10;
+
+        const auto c = windowedRms (cold, sampleRate, windowMs, windows);
+        const auto w = windowedRms (warm, sampleRate, windowMs, windows);
+
+        juce::String row;
+
+        for (int i = 0; i < windows; ++i)
+        {
+            const double db = (c[(size_t) i] > 0.0 && w[(size_t) i] > 0.0)
+                                  ? 20.0 * std::log10 (c[(size_t) i] / w[(size_t) i])
+                                  : (w[(size_t) i] > 0.0 ? -99.0 : 0.0);
+
+            row += juce::String (db, 1).paddedLeft (' ', 8);
+        }
+
+        logMessage ("  " + label.paddedRight (' ', 22) + row);
+    }
+
     /** One discarded render, so any first-run-only state is spent before a driver measures. */
     static void warm (TapeRotAudioProcessor& p)
     {
