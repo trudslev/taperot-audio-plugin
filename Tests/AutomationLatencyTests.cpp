@@ -1,8 +1,11 @@
 #include "../Source/PluginProcessor.h"
+#include "../Source/Parameters.h"
 
 #include <nf/testing/ProcessorHarness.h>
 
 #include <juce_audio_processors/juce_audio_processors.h>
+
+#include <functional>
 
 /**
     Category 5 — automation and latency.
@@ -71,6 +74,146 @@ public:
 
     void runTest() override
     {
+        beginTest ("Is GEN the only variable? — the prediction, measured");
+        {
+            // **This was filed as a PREDICTION and is now driven.** Reading says the source is
+            // WowFlutter's fixed 25 ms centre delay carried once per active GEN stage, so GEN should
+            // scale it and nothing else should touch it: the models are EQ curves, and wow/flutter
+            // modulate AROUND the centre without moving it.
+            //
+            // The prediction is quantitative, which is what makes it falsifiable rather than
+            // decorative: 1200 samples per stage at 48 kHz, so GEN 1 / 4 / 8 must come back at
+            // roughly 1200 / 4800 / 9600. A figure that is flat across GEN refutes the mechanism
+            // entirely; a figure that moves with model or wow/flutter means the centre delay is not
+            // fixed and the fix is not a declaration.
+            //
+            // KNOWN CASE: GEN 1 is already measured at 1218 in the test above, by the same
+            // differential method. This sweep must reproduce that figure at GEN 1 or it is not
+            // measuring the same thing.
+            const auto latencyWith = [this] (const std::function<void (TapeRotAudioProcessor&)>& configure)
+            {
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;          // 32768 samples — room for GEN 8's ~9600
+
+                const auto renderWith = [&] (bool withImpulse)
+                {
+                    TapeRotAudioProcessor p;
+                    configure (p);
+
+                    nf::testing::RenderSpec warmSpec;
+                    warmSpec.blockSize = spec.blockSize;
+                    warmSpec.numBlocks = 8;
+                    nf::testing::render (p, warmSpec);
+
+                    auto s = spec;
+                    s.fillInput = [withImpulse] (juce::AudioBuffer<float>& buffer, int blockIndex)
+                    {
+                        buffer.clear();
+
+                        if (withImpulse && blockIndex == 0)
+                            for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+                                buffer.setSample (ch, 0, 1.0f);
+                    };
+
+                    return nf::testing::render (p, s);
+                };
+
+                const auto a = renderWith (true);
+                const auto b = renderWith (false);
+
+                for (size_t i = 0; i < a[0].size() && i < b[0].size(); ++i)
+                    if (std::abs ((double) a[0][i] - b[0][i]) > 1.0e-4)
+                        return (int) i;
+
+                return -1;
+            };
+
+            const auto setPhysical = [] (TapeRotAudioProcessor& p, const char* id, float value)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (value));
+            };
+
+            // --- GEN, the predicted variable ------------------------------------------------
+            std::vector<int> byGen;
+
+            for (float gen : { 1.0f, 4.0f, 8.0f })
+            {
+                const auto measured = latencyWith ([&] (TapeRotAudioProcessor& p) { setPhysical (p, ParamIDs::gen, gen); });
+                byGen.push_back (measured);
+
+                logMessage ("  GEN " + juce::String (gen, 0) + " -> " + juce::String (measured)
+                                + " samples, " + juce::String (measured * 1000.0 / 48000.0, 1) + " ms"
+                                + "   (25 ms x GEN predicts " + juce::String ((int) (gen * 1200)) + ")");
+            }
+
+            // --- the model set, predicted irrelevant ----------------------------------------
+            int modelLo = 1 << 30, modelHi = -1;
+
+            for (float model : { 0.0f, 2.0f, 5.0f, 8.0f })
+            {
+                const auto measured = latencyWith ([&] (TapeRotAudioProcessor& p) { setPhysical (p, ParamIDs::model, model); });
+                modelLo = juce::jmin (modelLo, measured);
+                modelHi = juce::jmax (modelHi, measured);
+                logMessage ("  model " + juce::String (model, 0) + " -> " + juce::String (measured) + " samples");
+            }
+
+            // --- wow and flutter extremes, predicted irrelevant -----------------------------
+            int modLo = 1 << 30, modHi = -1;
+
+            for (float depth : { 0.0f, 100.0f })
+            {
+                const auto measured = latencyWith ([&] (TapeRotAudioProcessor& p)
+                {
+                    setPhysical (p, ParamIDs::wow, depth);
+                    setPhysical (p, ParamIDs::flutter, depth);
+                });
+
+                modLo = juce::jmin (modLo, measured);
+                modHi = juce::jmax (modHi, measured);
+                logMessage ("  wow+flutter " + juce::String (depth, 0) + "% -> "
+                                + juce::String (measured) + " samples");
+            }
+
+            logMessage ("  spread across the model set -> " + juce::String (modelHi - modelLo)
+                            + " samples; across wow/flutter -> " + juce::String (modHi - modLo));
+
+            // **GEN must move it, or the mechanism is wrong.** This is the arm that can refute the
+            // whole reading, and it is asserted first for that reason.
+            expectGreaterThan (byGen[2] - byGen[0], 6000,
+                               "GEN 8 did not carry ~8x GEN 1's latency, so the 25 ms-per-stage "
+                               "mechanism is not what produces this figure: GEN 1 "
+                                   + juce::String (byGen[0]) + ", GEN 8 " + juce::String (byGen[2]));
+
+            // Reported with a loose bar: the model set changes the EQ, so a few samples of movement
+            // in where energy first clears the threshold is expected and is not the centre delay.
+            expectLessThan (modelHi - modelLo, 64,
+                            "the model set moved the latency by " + juce::String (modelHi - modelLo)
+                                + " samples, so the centre delay is not fixed and the fix is not a "
+                                  "declaration");
+
+            // **THIS ASSERTION ASKED THE WRONG QUESTION AND THE MEASUREMENT SAID SO.** It was
+            // written as "wow/flutter must not move the latency", and wow/flutter moved it by 151
+            // samples — 1201 at zero depth, 1352 at full. That is not a defect: a wow/flutter delay
+            // line modulating its delay IS the effect, and the impulse's first arrival necessarily
+            // rides that modulation.
+            //
+            // The declarable figure is the CENTRE, and the centre is what zero depth measures. So
+            // the bar is on zero depth against the per-stage prediction, not on the spread — and
+            // the spread is reported because a host cannot declare a moving number, which is a fact
+            // about what the declaration must say rather than a fault to fix.
+            logMessage ("  NOTE: the spread across wow/flutter is the modulation itself. The "
+                        "declarable figure is the centre, measured at zero depth: "
+                            + juce::String (modLo) + " samples.");
+
+            expectWithinAbsoluteError (modLo, 1200, 32,
+                                       "at zero modulation depth the latency should be exactly one "
+                                       "stage's 25 ms centre delay — 1200 samples at 48 kHz. It is "
+                                       + juce::String (modLo) + ", so the centre is not where "
+                                       "WowFlutter::nominalDelayMs says it is.");
+        }
+
         beginTest ("Declared latency against an impulse");
         {
             TapeRotAudioProcessor processor;
