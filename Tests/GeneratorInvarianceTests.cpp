@@ -134,6 +134,32 @@ public:
             expectEquals (worst, 0.0,
                           "NoiseSource's output depends on block size, so its draw count is "
                           "state-determined rather than sample-determined");
+
+            // **CHARACTER 0 WAS THE ONE VALUE THAT COULD NOT FIRE THE CROSSFADE.** NoiseSource
+            // carries a stored-copy character switch (NoiseSource.cpp:142) — the same construction
+            // catalogued in root CLAUDE.md, where a member holding a copy of a selection is
+            // compared per block to detect a change. Driving it at 0, its constructed value, means
+            // requested == stored and no crossfade ever starts. That is a probe chosen at the one
+            // value that cannot distinguish the hypothesis, which this sweep has already done once
+            // with a pre-delay at 0 and 0.5.
+            for (int character : { 0, 1, 2 })
+            {
+                const auto runAt = [&] (int blockSize)
+                {
+                    NoiseSource fresh;
+                    return runAtBlockSize (blockSize,
+                        [&fresh, character] (juce::AudioBuffer<float>& b) { fresh.process (b, 1.0f, character); },
+                        [&fresh] (int bs) { fresh.prepare ({ fs, (juce::uint32) bs, 2 }); });
+                };
+
+                const auto w = compare ((juce::String ("NoiseSource ch") + juce::String (character)).toRawUTF8(),
+                                        runAt (64), runAt (512));
+
+                expectEquals (w, 0.0,
+                              "NoiseSource diverges with block size at character "
+                                  + juce::String (character) + " — its character crossfade is "
+                                  "started per prepare and stepped per block");
+            }
         }
 
         beginTest ("FailureEngine — the EVENT COUNT, which is the quantity that matters");

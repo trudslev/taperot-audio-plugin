@@ -599,6 +599,86 @@ public:
             expect (true);   // locating; the failing assertions live in the block-size test above
         }
 
+        beginTest ("Downstream of the generators — and the known case has to INVERT");
+        {
+            // **The defect requires a generator running and is invisible without one.** All three
+            // generators are bit-identical or event-identical driven alone; five chain stages
+            // measured exactly 0.000000000; and the chain-level rows are still real. So the
+            // divergence is in how something downstream RESPONDS to generator signal.
+            //
+            // That is why four construction hypotheses all missed: it is signal-dependent, not
+            // construction-dependent, and no amount of reading a per-block-looking line finds it.
+            //
+            // **And it inverts the known case.** The first bisection was validated by an
+            // all-neutral arm that still produced output. That arm would report exactly zero here
+            // and mean nothing — it is the configuration in which the defect cannot appear. Every
+            // arm below therefore keeps NOISE at 100, and the control is that NOISE-on-only must
+            // still diverge, or the run measured nothing.
+            //
+            // ## The candidate this points at
+            //
+            // A stage that is active even at neutral settings and whose effect depends on wet
+            // differing from dry. `dryCompensationDelay` is exactly that: it delays the dry copy by
+            // genValue x perStageDrySamples, computed per block, so MIX blends a delayed dry
+            // against the wet. With the generators off and DRIVE at 0 the wet path is nearly the
+            // dry path, so any misalignment cancels and is invisible — which is the shape of every
+            // observation so far.
+            //
+            // MIX fully wet removes the dry path entirely. If the divergence vanishes there, the
+            // dry/wet alignment owns it.
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            const auto worstWith = [this, &setP] (const char* label, float mixPercent)
+            {
+                TapeRotAudioProcessor p;
+
+                setP (p, ParamIDs::drive, 0.0f);
+                setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f);
+                setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);
+                setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::gen, 1.0f);
+                setP (p, ParamIDs::model, 0.0f);
+                setP (p, ParamIDs::noise, 100.0f);      // the generator stays ON — see above
+                setP (p, ParamIDs::mix, mixPercent);
+
+                warm (p);
+
+                nf::testing::RenderSpec spec;
+                spec.blockSize = 512;
+                spec.numBlocks = 64;
+
+                double worst = 0.0;
+
+                for (const auto& r : nf::testing::blockSizeInvariance (p, spec, { 64, 128, 511, 2048 }))
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 28)
+                                + "worst |delta| " + juce::String (worst, 9));
+                return worst;
+            };
+
+            const auto blended = worstWith ("NOISE on, MIX default", 50.0f);
+            const auto fullyWet = worstWith ("NOISE on, MIX 100% wet", 100.0f);
+
+            expectGreaterThan (blended, 1.0e-9,
+                               "the control arm did not diverge, so this run measured nothing — "
+                               "the defect needs a generator and this configuration has one");
+
+            logMessage (juce::String ("  => ") + (fullyWet < 1.0e-9
+                            ? "the DRY/WET alignment owns it: removing the dry path removes the "
+                              "divergence entirely"
+                            : "it survives a fully wet path, so the dry compensation delay is not "
+                              "the cause — worst " + juce::String (fullyWet, 9)));
+
+            expect (true);   // locating
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
