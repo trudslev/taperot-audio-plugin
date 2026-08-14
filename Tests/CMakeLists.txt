@@ -4,6 +4,7 @@ target_sources(TapeRotTests PRIVATE
     RealtimeSafetyTests.cpp
     NumericalRobustnessTests.cpp
     InstrumentValidationTests.cpp
+    InvarianceTests.cpp
     TestMain.cpp
     ReadoutConformanceTests.cpp
     MenuMetricsTests.cpp
