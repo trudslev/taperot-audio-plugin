@@ -1559,17 +1559,33 @@ public:
 
             // ================= THE ARMS ABOVE OVERTURN THE ROWS THEY WERE RUN TO EXPLAIN =========
             //
-            // **NOISE and HUM are EXACTLY ZERO at every block size once both renders are warm** —
-            // 64 included. The "steady component" of ~0.0002 that the previous run characterised as
-            // modulation does not exist as block dependence. It was a COLD render compared against a
-            // WARM one, and the four properties measured for it — upstream of the mix, proportional
-            // to the through-signal, indifferent to generator level, downstream of the cascade —
-            // are properties of a first-run difference, not of a block-size one.
+            // **The ~0.0002 STEADY component does not exist.** Warmed, NOISE and HUM measure
+            // exactly zero after 128 ms at every block size, 64 included. The previous run
+            // characterised it as modulation on four measured properties — upstream of the mix,
+            // proportional to the through-signal, indifferent to generator level, downstream of the
+            // cascade — and every one of those was a property of a COLD render compared against a
+            // WARM one rather than of a block-size difference.
             //
-            // That first-run difference is still real and still requires a generator (no generator
-            // is exactly zero cold-against-warm too), and it persists well past the 128 ms window,
-            // so it is not the -16.6 dB smoother ramp either. **It is a separate finding again**,
-            // and it belongs with category 3's first-run column rather than here.
+            // **NOISE's row itself survives, and cut 5 is what restores it.** Warmed, the
+            // self-comparison is exactly 0.000000000 while 2048 differs by 0.009630475 over the
+            // whole render. Warm-up length is not a free variable either: 2048 samples and 98 304
+            // give the identical figure, and only the unwarmed arm is confounded.
+            //
+            // **Cut 6 localises it: the first ~20 ms of every render.** 0.009630 / 0.007679 /
+            // 0.002036 over the first three 8 ms slices, then exactly zero from 24 ms on. So it is
+            // a transient with a ~20 ms decay, re-armed by every `prepareToPlay` — which is the
+            // class that is strictly worse than first-run-only, because a host re-fires it on every
+            // sample-rate and buffer-size change rather than once per instance.
+            //
+            // **Cut 7 refutes the obvious candidate for it.** A ~20 ms transient re-armed on every
+            // prepare and gated on a generator being audible is exactly the shape
+            // `TapeModelEQ::activeModelIndex` has — a stored copy of a selection reset in prepare
+            // against a default the Program does not select — and `NoiseSource.cpp:142` carries the
+            // same construction. Driven at the constructed character and at two others, all three
+            // diverge: 0.009630 / 0.010797 / 0.004283, with every self-comparison exact. A
+            // stored-copy re-arm would have been exact at the constructed value. **Fifth refuted
+            // construction hypothesis in this hunt**, which is the argument for the stage bisection
+            // stated once more.
             //
             // **FAILURE is not block-size dependence at all: it is RENDER-TO-RENDER
             // NON-DETERMINISM.** Its self-comparison — same processor, same block size, same input,
@@ -1584,12 +1600,149 @@ public:
             // per-unit-rms constant to six digits at 1.7365). Cut 1's x2/x4 says the same thing MIX
             // always says. Cut 3's 3.279 / 5.451 are noisy because the quantity is stochastic.
             //
-            // **How every earlier figure in this hunt was inflated by the same thing.**
+            // ---- cut 5 · HOW MUCH warm-up? The earlier arms were not unwarmed — `rowsWith` and
+            //      the MIX block both call `warm()`, which is 2048 samples. This block's throwaway
+            //      render is 98 304. If those give different answers, the WARM-UP LENGTH is a free
+            //      variable nobody controlled, and every figure in the hunt depends on it.
+            //
+            //      Compared over the WHOLE render, no window skipped, so this is the same
+            //      comparison the headline figures were.
+            logMessage ("  --- cut 5: warm-up length, whole render compared ---");
+
+            const auto atWarmUp = [&] (const char* label,
+                                       const std::function<void (TapeRotAudioProcessor&)>& configure,
+                                       int warmUpSamples)
+            {
+                TapeRotAudioProcessor p;
+                configure (p);
+
+                if (warmUpSamples > 0)
+                {
+                    nf::testing::RenderSpec w;
+                    w.blockSize = 512;
+                    w.numBlocks = warmUpSamples / 512;
+                    nf::testing::render (p, w);
+                }
+
+                const auto reference = renderSteady (p, 64, 1.0f);
+
+                const auto wholeRender = [&reference] (const std::vector<std::vector<float>>& other)
+                {
+                    double worst = 0.0;
+
+                    for (size_t ch = 0; ch < juce::jmin (reference.size(), other.size()); ++ch)
+                        for (size_t i = 0; i < juce::jmin (reference[ch].size(), other[ch].size()); ++i)
+                            worst = juce::jmax (worst, (double) std::abs (reference[ch][i] - other[ch][i]));
+
+                    return worst;
+                };
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 30)
+                                + "self " + juce::String (wholeRender (renderSteady (p, 64, 1.0f)), 9)
+                                + "   2048 " + juce::String (wholeRender (renderSteady (p, 2048, 1.0f)), 9));
+            };
+
+            const auto noise100 = [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::noise, 100.0f); };
+
+            atWarmUp ("NOISE 100, no warm-up",     noise100,     0);
+            atWarmUp ("NOISE 100, warm() = 2048",  noise100,  2048);
+            atWarmUp ("NOISE 100, 98304 samples",  noise100, 98304);
+
+            // ---- cut 6 · WHERE in the first 128 ms. Cut 5 restores NOISE's row: warmed, the
+            //      self-comparison is exactly zero while 2048 differs by 0.009630475 over the whole
+            //      render — and cut 4 measured exactly zero for the same configuration after 128 ms.
+            //      So it is real block dependence, confined to the head of every render. Sliced at
+            //      8 ms so the shape is visible rather than inferred from two endpoints.
+            logMessage ("  --- cut 6: where in the first 128 ms, warmed ---");
+            {
+                TapeRotAudioProcessor p;
+                noise100 (p);
+
+                nf::testing::RenderSpec w;
+                w.blockSize = 512;
+                w.numBlocks = 4;
+                nf::testing::render (p, w);                // warm() — cut 5 shows 2048 is enough
+
+                const auto reference = renderSteady (p, 64, 1.0f);
+                const auto other     = renderSteady (p, 2048, 1.0f);
+
+                constexpr int sliceSamples = 384;          // 8 ms at 48 kHz
+                juce::String row, msRow;
+
+                for (int s = 0; s < 16; ++s)
+                {
+                    double worst = 0.0;
+
+                    for (size_t ch = 0; ch < juce::jmin (reference.size(), other.size()); ++ch)
+                        for (int i = s * sliceSamples; i < (s + 1) * sliceSamples; ++i)
+                            if ((size_t) i < juce::jmin (reference[ch].size(), other[ch].size()))
+                                worst = juce::jmax (worst, (double) std::abs (reference[ch][(size_t) i]
+                                                                           - other[ch][(size_t) i]));
+
+                    row   += juce::String (worst, 6).paddedLeft (' ', 10);
+                    msRow += juce::String (s * 8).paddedLeft (' ', 10);
+                }
+
+                logMessage ("  slice start (ms)  " + msRow);
+                logMessage ("  worst |delta|     " + row);
+            }
+
+            // ---- cut 7 · a ~20 ms transient re-armed on EVERY prepare, gated on the generator
+            //      being audible, is the shape `TapeModelEQ::activeModelIndex` already has in this
+            //      casting — a stored copy of a selection reset in prepare against a default the
+            //      Program does not select, whose branch runs a crossfade. NoiseSource carries the
+            //      same construction at NoiseSource.cpp:142.
+            //
+            //      **This is testable the same way that one was, without naming a line: drive the
+            //      selection at its CONSTRUCTED value and at another.** If the constructed value is
+            //      exact and the others are not, a stored-copy re-arm owns it. If both diverge, it
+            //      does not, and four refuted construction hypotheses say not to assume otherwise.
+            logMessage ("  --- cut 7: is it a stored-copy re-arm on the noise character? ---");
+
+            for (float character : { 0.0f, 1.0f, 2.0f })
+            {
+                TapeRotAudioProcessor p;
+                neutral (p);
+                setP (p, ParamIDs::noise, 100.0f);
+                setP (p, ParamIDs::noiseCharacter, character);
+
+                nf::testing::RenderSpec w;
+                w.blockSize = 512;
+                w.numBlocks = 4;
+                nf::testing::render (p, w);
+
+                const auto reference = renderSteady (p, 64, 1.0f);
+
+                const auto whole = [&reference] (const std::vector<std::vector<float>>& other)
+                {
+                    double worst = 0.0;
+
+                    for (size_t ch = 0; ch < juce::jmin (reference.size(), other.size()); ++ch)
+                        for (size_t i = 0; i < juce::jmin (reference[ch].size(), other[ch].size()); ++i)
+                            worst = juce::jmax (worst, (double) std::abs (reference[ch][i] - other[ch][i]));
+
+                    return worst;
+                };
+
+                logMessage ("  noise character " + juce::String ((int) character)
+                                + "               self " + juce::String (whole (renderSteady (p, 64, 1.0f)), 9)
+                                + "   2048 " + juce::String (whole (renderSteady (p, 2048, 1.0f)), 9));
+            }
+
+            // **What the self-comparison column changes about every earlier figure.**
             // `blockSizeInvariance` renders its reference first and then re-renders the front size,
-            // so its first row is render 1 against render 2 — cold against warm — and this sweep
-            // only ever read the MAX across the sweep. The self-comparison was folded in and
-            // invisible in every arm: 0.0019 at defaults, 0.019 at NOISE 100, 1.599 at FAILURE.
-            // The rows above are those same configurations measured warm.
+            // so its first row is render 1 against render 2, and this sweep only ever read the MAX
+            // across the sweep — folding the self-comparison in wherever it was non-zero. The arms
+            // that called `warm()` first are sound (0.019 at NOISE 100 is 0.0096 here over a longer
+            // render); **the arms this session added without warming are not**, which is where the
+            // 0.024 head and the 0.0003 tail both came from.
+            //
+            // The rule the column is worth keeping for: **report a driver's self-comparison beside
+            // every result, not once in a premise check.** This file opens with a premise-check
+            // block asserting exactly this property — at DEFAULT parameters, where FAILURE is low
+            // and the processor is reproducible. Reproducibility is not a property of the
+            // processor; it is a property of the processor IN A CONFIGURATION, and the one
+            // configuration where it was checked is the one where it holds.
             expect (true);   // locating
         }
 
