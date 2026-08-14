@@ -185,6 +185,34 @@ This panel set `ValueCase::wordsOnly` until 2026-08-13, when the designers ruled
 
 The three header buttons are sprites, not baked (delta v1.0.7 cleared both frames from the plate). **Their hit areas are the plate rects, not the sprite rects** — the sprites carry a 3 px shadow bleed that must not be clickable.
 
+### Silence in, silence out — a DECLARED property
+
+**TapeRot generates, deliberately, and is the one casting in the suite for which silence out would be
+the bug.** The noise bed and hum are the plugin, not a leak.
+
+**Measured 2026-08-14**, silence in, NOISE at 100 %:
+
+| GEN | peak | rms |
+|---|---|---|
+| 1 | 0.035 (−29.1 dB) | 0.009 (−40.8 dB) |
+| 4 | 0.107 (−19.4 dB) | 0.023 (−32.7 dB) |
+| 8 | **0.375 (−8.5 dB)** | 0.078 (−22.2 dB) |
+
+The rise with GEN is structural rather than incidental: from the second stage onward each
+`DegradationCore` applies `gentleSaturationDrive = 1.35f`, so eight generations carry roughly 8× of
+pre-saturation gain and the floor swells with the generation count. Eight generations of dubbing
+sounding like eight generations of dubbing is the point of the plugin.
+
+**The −8.5 dB figure at GEN 8 is recorded as a level question rather than a defect**, and it is the
+chief's to answer against the plugin rather than against the number. It is here so that it is a
+stated property nobody has to rediscover, and so the answer has something to be measured against.
+
+Note the transport gate is `wrapperType != wrapperType_Standalone`: the generated noise is silenced
+in a parked DAW session but not in the standalone, which has no transport for the gate to mean
+anything about. Live monitoring through a *stopped* DAW is silenced too, which is a known open
+question rather than a solved one — fixing it means gating the generated noise rather than the
+finished buffer.
+
 ### Metering taps
 
 The scope is fed by two read-only taps, both single-producer/single-consumer, lock-free, non-allocating, and both **drop rather than block** when full — an editor that is closed, stalled or repainting slowly costs the audio thread nothing.
