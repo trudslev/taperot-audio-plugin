@@ -171,6 +171,19 @@ public:
                 // tell was in the output: 2.00x, 3.00x ... 8.00x to two decimals, and independent
                 // sources cannot produce exact integers. A result more regular than its mechanism
                 // permits is a result about the fixture.
+                //
+                // **And "seed each stage" is NOT the fix, which this measurement already shows.**
+                // Seeded per stage it reads 7.96x against a correlated 8.00x — barely moved,
+                // because WowFlutter::wowRateHz is a static constexpr 0.5f shared by every stage.
+                // Two oscillators at exactly the same frequency with different phases do not
+                // decorrelate over time: they hold a fixed phase relationship and beat, so their
+                // sum still adds rather than RMS-summing.
+                //
+                // Real transports differ in RATE as well as phase — capstan diameter, motor
+                // regulation, belt wear. So the fix is a per-stage rate drawn around a nominal, and
+                // only rate variation makes the stages genuinely independent and produces sqrt(N).
+                // Recorded here because the obvious remedy is the seeding one and it is measured
+                // not to work.
                 double cents = 0.0;
                 {
                     const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
