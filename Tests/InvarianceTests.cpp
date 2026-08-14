@@ -1320,6 +1320,279 @@ public:
             expect (true);   // locating
         }
 
+        beginTest ("FAILURE — a SEPARATE finding, not the worst of three generator rows");
+        {
+            // **This is filed apart from the block-size section deliberately, and the reason is not
+            // its delta figure.** 0.914 in steady state against NOISE's 0.000225 and HUM's 0.000194
+            // is four orders of magnitude, but severity here comes from what it means musically:
+            // FAILURE is this plugin's most characterful control, and at full depth the same sample
+            // stream cut into different block sizes is a permanently different performance. Someone
+            // bouncing at 2048 and monitoring at 128 gets two different takes — and gets them
+            // because of a host setting that has nothing to do with the sound.
+            //
+            // The composite 1.599 hid that by ranking it as the largest of three rows in one table.
+            // A number in a column about invariance reads as a tolerance question. This is not one.
+            //
+            // ## Everything established for the small component was measured with NOISE
+            //
+            // Location upstream of the mix, proportionality to the through-signal, independence
+            // from generator level, and creation downstream of the GEN cascade — all four came from
+            // NOISE arms. **Assuming FAILURE shares them would inherit four constraints it has not
+            // earned**, which is exactly what re-deriving the MIX line on the steady window
+            // avoided. So the same three cuts are run against FAILURE before anything is bisected.
+            //
+            // Two hunts, which may converge and may not. FailureEngine is on the six-candidate list
+            // for the small component independently of this, so a shared cause is possible — but
+            // progress on the small one implies nothing about this one until these arms say so.
+            constexpr int steadySkip   = 6144;             // 128 ms at 48 kHz
+            constexpr int totalSamples = 512 * 192;        // ~2.05 s
+
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            const auto sampleAt = [] (int absoluteIndex, int channel) noexcept
+            {
+                uint32_t x = (uint32_t) (absoluteIndex * 2654435761u)
+                           ^ (uint32_t) (channel * 40503u) ^ 0x9e3779b9u;
+                x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+                return ((float) (x & 0xffffffu) / (float) 0x7fffff) - 1.0f;
+            };
+
+            struct Steady { double worst; double rms; };
+
+            // Same window and same construction as the NOISE block, so the two sets are comparable
+            // figure for figure rather than by argument.
+            const auto renderSteady = [sampleAt] (TapeRotAudioProcessor& p, int blockSize, float inputGain)
+            {
+                nf::testing::RenderSpec spec;
+                spec.blockSize = blockSize;
+                spec.numBlocks = totalSamples / blockSize;
+
+                if (inputGain != 1.0f)
+                    spec.fillInput = [inputGain, sampleAt] (juce::AudioBuffer<float>& b, int blockIndex)
+                    {
+                        const int absolute = blockIndex * b.getNumSamples();
+
+                        for (int ch = 0; ch < b.getNumChannels(); ++ch)
+                            for (int i = 0; i < b.getNumSamples(); ++i)
+                                b.setSample (ch, i, inputGain * sampleAt (absolute + i, ch));
+                    };
+
+                return nf::testing::render (p, spec);
+            };
+
+            const auto compareSteady = [] (const std::vector<std::vector<float>>& a,
+                                           const std::vector<std::vector<float>>& b)
+            {
+                double worst = 0.0, sumSq = 0.0;
+                int counted = 0;
+
+                for (size_t ch = 0; ch < juce::jmin (a.size(), b.size()); ++ch)
+                {
+                    const auto n = (int) juce::jmin (a[ch].size(), b[ch].size());
+
+                    for (int i = steadySkip; i < n; ++i)
+                    {
+                        worst = juce::jmax (worst, (double) std::abs (a[ch][(size_t) i] - b[ch][(size_t) i]));
+                        sumSq += (double) a[ch][(size_t) i] * (double) a[ch][(size_t) i];
+                        ++counted;
+                    }
+                }
+
+                return Steady { worst, counted > 0 ? std::sqrt (sumSq / counted) : 0.0 };
+            };
+
+            // **A SELF-COMPARISON RUNS BESIDE EVERY ARM, and it is not decoration.** The first
+            // version of this block rendered at 64 and then at 2048 on one processor and read the
+            // difference as block dependence. The 64-against-64 column of cut 4 came back at 0.914
+            // for FAILURE and 0.000225 for NOISE — **identical to the block-size figures** — which
+            // says those arms were measuring render-to-render non-reproducibility, not block size.
+            //
+            // Two mechanisms were folded together there: `render` prepares and resets, so the FIRST
+            // render of a fresh processor ramps its smoothers up from zero while every later one
+            // does not; and anything a `prepare` does not re-seed carries over between renders. So
+            // every arm compared a COLD render against a WARM one and attributed the whole
+            // difference to the container.
+            //
+            // The fix is one throwaway render before the reference, so both compared renders are
+            // warm — and the self-comparison stays reported, because a driver that cannot be shown
+            // to give zero on identical inputs cannot measure anything smaller than its own noise.
+            // `blockSizeInvariance` has the same first row and this sweep only ever read the MAX
+            // across its sweep, which folded the self-comparison in and hid it.
+            const auto steadyWith = [this, &renderSteady, &compareSteady]
+                                    (const char* label,
+                                     const std::function<void (TapeRotAudioProcessor&)>& configure,
+                                     float inputGain = 1.0f)
+            {
+                TapeRotAudioProcessor p;
+                configure (p);
+
+                renderSteady (p, 512, inputGain);          // discarded: spends the first-run ramp
+
+                const auto reference = renderSteady (p, 64, inputGain);
+                const auto self      = compareSteady (reference, renderSteady (p, 64, inputGain));
+                const auto s         = compareSteady (reference, renderSteady (p, 2048, inputGain));
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 30)
+                                + "steady |delta| " + juce::String (s.worst, 9)
+                                + "   (self " + juce::String (self.worst, 9)
+                                + ", rms " + juce::String (s.rms, 6) + ")");
+                return s;
+            };
+
+            const auto neutral = [&setP] (TapeRotAudioProcessor& p)
+            {
+                setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::gen, 1.0f);     setP (p, ParamIDs::model, 0.0f);
+                setP (p, ParamIDs::noise, 0.0f);   setP (p, ParamIDs::mix, 50.0f);
+            };
+
+            const auto withFailure = [&] (float amount, float mixPercent)
+            {
+                return [&, amount, mixPercent] (TapeRotAudioProcessor& p)
+                {
+                    neutral (p);
+                    setP (p, ParamIDs::failure, amount);
+                    setP (p, ParamIDs::mix, mixPercent);
+                };
+            };
+
+            logMessage ("  --- both directions on the window ---");
+            const auto control = steadyWith ("FAILURE 100 (must diverge)", withFailure (100.0f, 50.0f));
+            const auto blank   = steadyWith ("no generator (must be exact)", neutral);
+
+            expectGreaterThan (control.worst, 1.0e-9,
+                               "FAILURE did not diverge in the steady window, so every arm below "
+                               "is measuring nothing");
+
+            expectEquals (blank.worst, 0.0,
+                          "the generator-free chain diverged in this window, so the window is the "
+                          "difference rather than FAILURE");
+
+            // ---- cut 1 · MIX. Upstream of the mix, or not? NOISE said yes, exactly x2 and x4.
+            logMessage ("  --- cut 1: MIX ---");
+            const auto f25  = steadyWith ("FAILURE 100, MIX 25%",  withFailure (100.0f,  25.0f)).worst;
+            const auto f50  = steadyWith ("FAILURE 100, MIX 50%",  withFailure (100.0f,  50.0f)).worst;
+            const auto f100 = steadyWith ("FAILURE 100, MIX 100%", withFailure (100.0f, 100.0f)).worst;
+
+            if (f25 > 0.0)
+                logMessage ("  ratios against 25% -> 50%: x" + juce::String (f50 / f25, 3)
+                                + ", 100%: x" + juce::String (f100 / f25, 3)
+                                + "   (linear predicts x2.000 and x4.000)");
+
+            // ---- cut 2 · the through-signal. NOISE tracked it at a constant -67 dB ratio.
+            logMessage ("  --- cut 2: the through-signal ---");
+            const auto t0   = steadyWith ("FAILURE 100, silent input", withFailure (100.0f, 50.0f), 0.0f);
+            const auto t025 = steadyWith ("FAILURE 100, input x0.25",  withFailure (100.0f, 50.0f), 0.25f);
+            const auto t1   = steadyWith ("FAILURE 100, input x1",     withFailure (100.0f, 50.0f), 1.0f);
+            const auto t4   = steadyWith ("FAILURE 100, input x4",     withFailure (100.0f, 50.0f), 4.0f);
+
+            if (t025.worst > 0.0)
+                logMessage ("  delta ratios x0.25 -> x1: x" + juce::String (t1.worst / t025.worst, 3)
+                                + ", x4: x" + juce::String (t4.worst / t025.worst, 3)
+                                + "   (proportional predicts x4.000 and x16.000)");
+
+            logMessage ("  delta per unit rms: silent " + juce::String (t0.rms > 0.0 ? t0.worst / t0.rms : 0.0, 9)
+                            + ", x1 " + juce::String (t1.rms > 0.0 ? t1.worst / t1.rms : 0.0, 9)
+                            + ", x4 " + juce::String (t4.rms > 0.0 ? t4.worst / t4.rms : 0.0, 9));
+
+            // ---- cut 3 · its OWN level. NOISE's was unreadable because the knob barely moved the
+            //      rms; FAILURE's does move it — dropouts remove energy — so the rms column says
+            //      whether this arm can tell before its flatness or steepness is read.
+            logMessage ("  --- cut 3: FAILURE's own level ---");
+            const auto a25  = steadyWith ("FAILURE 25",  withFailure (25.0f, 50.0f));
+            const auto a50  = steadyWith ("FAILURE 50",  withFailure (50.0f, 50.0f));
+            const auto a100 = steadyWith ("FAILURE 100", withFailure (100.0f, 50.0f));
+
+            if (a25.worst > 0.0)
+                logMessage ("  delta ratios 25 -> 50: x" + juce::String (a50.worst / a25.worst, 3)
+                                + ", 100: x" + juce::String (a100.worst / a25.worst, 3)
+                                + "   (rms moved " + juce::String (a25.rms, 6) + " -> "
+                                + juce::String (a100.rms, 6) + ")");
+
+            // ---- cut 4 · block size, monotonic or not. **This is the one that separates a
+            //      per-block-advanced modulator from the other candidates**, and it needs no new
+            //      instrument: TapeStop and FilterSweep are time-varying by construction, and this
+            //      casting already carries the skip(numSamples)-then-apply-flat shape twice
+            //      (genSmoothed, transportGateSmoothed). A modulator stepped per block coarsens
+            //      with the buffer, so its divergence should grow monotonically with block size.
+            //      Anything event-driven or state-ordering-driven need not.
+            //
+            //      Filed as a CANDIDATE rather than a hypothesis with a line: nothing here names a
+            //      site, and the four refuted construction hypotheses are why.
+            logMessage ("  --- cut 4: does it track block size monotonically? ---");
+
+            const auto profile = [&] (const char* label, const std::function<void (TapeRotAudioProcessor&)>& configure)
+            {
+                TapeRotAudioProcessor p;
+                configure (p);
+
+                renderSteady (p, 512, 1.0f);               // discarded, as above
+
+                const auto reference = renderSteady (p, 64, 1.0f);
+                juce::String row;
+
+                // 64 leads deliberately: it is the self-comparison, and it must read zero before
+                // any figure to its right is a statement about block size.
+                for (int bs : { 64, 128, 511, 2048 })
+                    row += juce::String (compareSteady (reference, renderSteady (p, bs, 1.0f)).worst, 6)
+                               .paddedLeft (' ', 12);
+
+                logMessage ("  " + juce::String (label).paddedRight (' ', 22) + row);
+            };
+
+            logMessage ("  against the 64 reference   " + juce::String ("64").paddedLeft (' ', 12)
+                            + juce::String ("128").paddedLeft (' ', 12)
+                            + juce::String ("511").paddedLeft (' ', 12)
+                            + juce::String ("2048").paddedLeft (' ', 12));
+
+            profile ("FAILURE 100", withFailure (100.0f, 50.0f));
+            profile ("NOISE 100",   [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::noise, 100.0f); });
+            profile ("HUM 100",     [&] (TapeRotAudioProcessor& p) { neutral (p); setP (p, ParamIDs::hum, 100.0f); });
+            profile ("defaults",    [] (TapeRotAudioProcessor&) {});
+            profile ("defaults, GEN 8", [&] (TapeRotAudioProcessor& p) { setP (p, ParamIDs::gen, 8.0f); });
+
+            // ================= THE ARMS ABOVE OVERTURN THE ROWS THEY WERE RUN TO EXPLAIN =========
+            //
+            // **NOISE and HUM are EXACTLY ZERO at every block size once both renders are warm** —
+            // 64 included. The "steady component" of ~0.0002 that the previous run characterised as
+            // modulation does not exist as block dependence. It was a COLD render compared against a
+            // WARM one, and the four properties measured for it — upstream of the mix, proportional
+            // to the through-signal, indifferent to generator level, downstream of the cascade —
+            // are properties of a first-run difference, not of a block-size one.
+            //
+            // That first-run difference is still real and still requires a generator (no generator
+            // is exactly zero cold-against-warm too), and it persists well past the 128 ms window,
+            // so it is not the -16.6 dB smoother ramp either. **It is a separate finding again**,
+            // and it belongs with category 3's first-run column rather than here.
+            //
+            // **FAILURE is not block-size dependence at all: it is RENDER-TO-RENDER
+            // NON-DETERMINISM.** Its self-comparison — same processor, same block size, same input,
+            // warmed, two consecutive renders — is 0.914079, and 128 / 511 / 2048 come back
+            // 0.886955 / 0.920244 / 0.914071. The same magnitude everywhere including against
+            // itself, which is what a stochastic process that is never re-seeded looks like.
+            // `prepareToPlay` and `reset()` do not restore FailureEngine's stream, so replaying a
+            // session gives a different performance — the block size was never the variable.
+            //
+            // It also explains cut 2 exactly: dropouts multiply the through-signal, so the
+            // difference between two draws scales with what is passing through (x4.000, x16.000,
+            // per-unit-rms constant to six digits at 1.7365). Cut 1's x2/x4 says the same thing MIX
+            // always says. Cut 3's 3.279 / 5.451 are noisy because the quantity is stochastic.
+            //
+            // **How every earlier figure in this hunt was inflated by the same thing.**
+            // `blockSizeInvariance` renders its reference first and then re-renders the front size,
+            // so its first row is render 1 against render 2 — cold against warm — and this sweep
+            // only ever read the MAX across the sweep. The self-comparison was folded in and
+            // invisible in every arm: 0.0019 at defaults, 0.019 at NOISE 100, 1.599 at FAILURE.
+            // The rows above are those same configurations measured warm.
+            expect (true);   // locating
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
