@@ -556,6 +556,15 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         // the samples where genValue crosses an integer and running each span with its own
         // floor/ceil. The test asserts the property and FAILS, deliberately, rather than being
         // relaxed to what the code currently does.
+        //
+        // **When that half is written, it goes INSIDE nf::processInChunks, never instead of it.**
+        // The two subdivisions look interchangeable and are not: the chunk loop bounds span LENGTH
+        // (<= the prepared size, which is what keeps the oversampler in bounds) and the crossing
+        // loop bounds span CONTENT (one stage count per span). A buffer in which GEN happens not to
+        // cross an integer is ONE span, so the crossing loop cannot substitute for the chunk loop -
+        // it would hand the oversampler the whole over-delivered buffer and reinstate the
+        // out-of-bounds write, with a green suite, because nothing automates GEN in the test that
+        // would catch it. Inside each chunk the partitions are independent and both hold.
         const float startFraction = juce::jlimit(0.0f, 1.0f, genStart - (float) floorGen);
         const float fractionStep = numSamples > 1 ? (genFraction - startFraction) / (float) (numSamples - 1)
                                                   : 0.0f;
