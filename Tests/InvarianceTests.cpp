@@ -1948,6 +1948,36 @@ public:
                           "the driver is not reproducible against itself, so its span figure "
                           "measures non-determinism rather than block size");
 
+            // **SUSPECT: THIS ARM MAY BE MEASURING ITS OWN AUTOMATION, NOT THE PLUGIN.** Recorded
+            // here rather than acted on, because the answer changes what the assertion should be and
+            // that is not a decision to take while writing the note.
+            //
+            // The GEN crossing subdivision landed (PluginProcessor.cpp) and moved this figure from
+            // 2.820183516 to 2.820465088 — which is no change. The stage count is now constant
+            // within each sub-span and the sub-spans fall at absolute samples, so if the automation
+            // were identical at both block sizes the two renders should have converged.
+            //
+            // **They cannot converge, because the automation is not identical.** This driver calls
+            // `setP (p, ParamIDs::gen, genAt (absolute))` once per block, so `genSmoothed`'s TARGET
+            // steps every 64 samples in one arm and every 2048 in the other: 1.0000, 1.0091, 1.0182…
+            // against 1.00, 1.29, 1.58… The smoother is chasing two different target sequences, and
+            // no amount of correctness inside the DSP makes two different inputs produce one output.
+            //
+            // That is the withdrawn ×4 fixture's defect one level up — there the input differed
+            // between block sizes, here the AUTOMATION does — and it is the third time this file has
+            // met it.
+            //
+            // **And it may not be fixable, which is the part worth thinking about before editing.**
+            // A host delivers automation per block too, so "the same automation at two block sizes"
+            // may not be a physically meaningful thing to ask for. If so, the property this arm
+            // asserts is unachievable and the arm is wrong — not too strict, WRONG — and the guard
+            // for the subdivision has to be something else: static-parameter invariance, or a
+            // trajectory driven from a smoother the test owns rather than through the APVTS.
+            //
+            // **Left failing and unrelaxed in the meantime.** Loosening the bound would pin a defect;
+            // deleting the arm would lose the question. Neither is right while what it measures is
+            // undecided.
+            //
             // **IT FAILS, AND THAT IS THE RESULT: 2.820183516 at a peak of 1.941574.** The commit
             // that ramped the crossfade weight fixed the smaller half of this and its comment said
             // so — but it also claimed the remaining limit, floorGen/ceilGen taken from the block's

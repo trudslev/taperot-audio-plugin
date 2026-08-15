@@ -535,79 +535,108 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const int requestedGen = (size_t) model == noneModelIndex ? 1 : (int) std::round(genParam->load());
     genSmoothed.setTargetValue((float) juce::jlimit(1, maxGenerations, requestedGen));
 
-    // **The value at the START of the block is kept as well as the end, and that is the fix.**
-    // skip() advances the smoother across the whole span and getCurrentValue() then reports where
-    // it LANDED - so applying that single figure to every sample in the block draws the ramp as a
-    // staircase whose step size is the host's span size. A GEN move sounded different at 64
-    // samples and at 2048 for no reason having to do with the sound.
-    const float genStart = genSmoothed.getCurrentValue();
-    genSmoothed.skip(numSamples);
-    const float genValue = genSmoothed.getCurrentValue();
-
-    const int floorGen = juce::jlimit(1, maxGenerations, (int) std::floor(genValue));
-    const int ceilGen = juce::jlimit(1, maxGenerations, (int) std::ceil(genValue));
-    const float genFraction = genValue - (float) floorGen;
-    const bool genTransitioning = floorGen != ceilGen;
-
-    // Every active stage adds its realised deviation into one span, so the trace shows the whole
-    // cascade rather than one stage - which is what the GEN readout sitting beside it implies.
     float* const deviationAccum = pitchMeter.getScratch(numSamples);
 
-    for (int stage = 0; stage < ceilGen; ++stage)
+    // **THE GEN CROSSING SUBDIVISION, and it lives INSIDE nf::processInChunks rather than instead of
+    // it.** The two look interchangeable and are not: the chunker splits on a fixed length and
+    // bounds span LENGTH, which is what keeps the oversampler in bounds and is therefore a SAFETY
+    // property; this splits where genValue crosses an integer and bounds span CONTENT — one stage
+    // count per sub-span — which is correctness. A buffer in which GEN happens not to cross is ONE
+    // sub-span, so this loop cannot substitute for the chunker: it would hand the oversampler the
+    // whole over-delivered buffer and reinstate the out-of-bounds write, with a green suite,
+    // because nothing automates GEN in the test that would catch it.
+    //
+    // ## Why the previous fix was half a fix
+    //
+    // 65fb765 ramped the crossfade WEIGHT per sample and argued the block-end stage count was "the
+    // edge rather than the case". That was written from prediction; `InvarianceTests`' genSmoothed
+    // arm refuted it at 2.820183516. GEN swept 1 to 8 across 49152 samples moves 0.0091 per
+    // 64-sample block and 0.29 per 2048, so floorGen/ceilGen taken from the block's END value make
+    // the STAGE COUNT step with the buffer, and a per-sample weight cannot repair a per-block count.
+    //
+    // ## Why this is buffer-independent rather than merely finer
+    //
+    // The boundaries are read off the smoother's own trajectory, and `genSmoothed` advances by
+    // SAMPLE COUNT — so its value at a given absolute sample is the same however the stream is cut.
+    // The crossings therefore land at fixed absolute samples and the sub-spans are identical at
+    // every block size. There is no interval to choose and no free parameter to get wrong.
+    //
+    // The step is taken from a COPY of the smoother rather than derived: `SmoothedValue` owns the
+    // arithmetic, and reproducing it here would be a second copy to drift. Re-probed each sub-span
+    // because the step becomes zero once the ramp settles.
+    for (int done = 0; done < numSamples; )
     {
-        generationStages[(size_t) stage]->process(span, wow01, flutter01, model, clunkMode, noise01,
-                                                  noiseCharacter, deviationAccum);
+        const float genAtStart = genSmoothed.getCurrentValue();
 
-        if (genTransitioning && stage == floorGen - 1)
-            genFloorSnapshot.makeCopyOf(span, true);
-    }
+        auto probe = genSmoothed;
+        probe.skip(1);
+        const float perSample = probe.getCurrentValue() - genAtStart;
 
-    if (genTransitioning)
-    {
-        // **The crossfade WEIGHT ramps across the block; the stage COUNT does not.** Both cascades
-        // are already rendered over the whole span, so only the blend was flat - which is the
-        // cheap half to fix and the whole of the defect.
-        //
-        // **THE REMAINING LIMIT IS NOT AN EDGE CASE, AND THIS COMMENT SAID IT WAS.** floorGen and
-        // ceilGen still come from the block's END value, so a block in which GEN crosses an integer
-        // boundary clamps its start weight rather than switching stage counts mid-block. The first
-        // version of this note argued that was "the edge rather than the case" because the
-        // smoother's ramp is long against any span. That was written from the prediction, and
-        // `InvarianceTests`' genSmoothed arm refutes it: GEN swept 1 to 8 over 49152 samples moves
-        // 0.29 per 2048-sample block against 0.0091 per 64, so the STAGE COUNT steps with the
-        // span and the two renders differ by 2.820183516 at a peak of 1.941574 - larger than the
-        // signal.
-        //
-        // A per-sample weight cannot repair a per-block stage count. This is half the fix and is
-        // kept because it is correct as far as it goes; the other half is subdividing the block at
-        // the samples where genValue crosses an integer and running each span with its own
-        // floor/ceil. The test asserts the property and FAILS, deliberately, rather than being
-        // relaxed to what the code currently does.
-        //
-        // **When that half is written, it goes INSIDE nf::processInChunks, never instead of it.**
-        // The two subdivisions look interchangeable and are not: the chunk loop bounds span LENGTH
-        // (<= the prepared size, which is what keeps the oversampler in bounds) and the crossing
-        // loop bounds span CONTENT (one stage count per span). A span in which GEN happens not to
-        // cross an integer is ONE span, so the crossing loop cannot substitute for the chunk loop -
-        // it would hand the oversampler the whole over-delivered span and reinstate the
-        // out-of-bounds write, with a green suite, because nothing automates GEN in the test that
-        // would catch it. Inside each chunk the partitions are independent and both hold.
-        const float startFraction = juce::jlimit(0.0f, 1.0f, genStart - (float) floorGen);
-        const float fractionStep = numSamples > 1 ? (genFraction - startFraction) / (float) (numSamples - 1)
-                                                  : 0.0f;
+        int subSamples = numSamples - done;
 
-        for (int ch = 0; ch < numChannels; ++ch)
+        if (perSample != 0.0f)
         {
-            auto* wet = span.getWritePointer(ch);
-            const auto* floorTap = genFloorSnapshot.getReadPointer(ch);
+            // The next integer the value will reach, in whichever direction it is travelling.
+            const float boundary = perSample > 0.0f ? std::floor(genAtStart) + 1.0f
+                                                    : std::ceil(genAtStart) - 1.0f;
+            const int toBoundary = (int) std::ceil((boundary - genAtStart) / perSample);
 
-            for (int i = 0; i < numSamples; ++i)
+            if (toBoundary > 0)
+                subSamples = juce::jmin(subSamples, toBoundary);
+        }
+
+        genSmoothed.skip(subSamples);
+
+        const float genAtEnd = genSmoothed.getCurrentValue();
+
+        // Floor and ceil come from the sub-span, which is the whole point: within it the value
+        // stays inside one integer interval, so one stage count is correct for all of it.
+        const float genSpanValue = juce::jmax(genAtStart, genAtEnd);
+        const int floorGen = juce::jlimit(1, maxGenerations, (int) std::floor(juce::jmin(genAtStart, genAtEnd)));
+        const int ceilGen = juce::jlimit(1, maxGenerations, (int) std::ceil(genSpanValue));
+        const bool genTransitioning = floorGen != ceilGen;
+
+        juce::AudioBuffer<float> sub(span.getArrayOfWritePointers(), numChannels, done, subSamples);
+
+        for (int stage = 0; stage < ceilGen; ++stage)
+        {
+            generationStages[(size_t) stage]->process(sub, wow01, flutter01, model, clunkMode, noise01,
+                                                      noiseCharacter, deviationAccum + done);
+
+            if (genTransitioning && stage == floorGen - 1)
+                genFloorSnapshot.makeCopyOf(sub, true);
+        }
+
+        if (genTransitioning)
+        {
+            // The weight still ramps within the sub-span - the stage COUNT is now constant across
+            // it, but the blend between floorGen and ceilGen stages still travels.
+            const float startFraction = juce::jlimit(0.0f, 1.0f, genAtStart - (float) floorGen);
+            const float endFraction = juce::jlimit(0.0f, 1.0f, genAtEnd - (float) floorGen);
+            const float fractionStep = subSamples > 1 ? (endFraction - startFraction) / (float) (subSamples - 1)
+                                                      : 0.0f;
+
+            for (int ch = 0; ch < numChannels; ++ch)
             {
-                const float f = startFraction + fractionStep * (float) i;
-                wet[i] = floorTap[i] * (1.0f - f) + wet[i] * f;
+                auto* wet = sub.getWritePointer(ch);
+                const auto* floorTap = genFloorSnapshot.getReadPointer(ch);
+
+                for (int i = 0; i < subSamples; ++i)
+                {
+                    const float f = startFraction + fractionStep * (float) i;
+                    wet[i] = floorTap[i] * (1.0f - f) + wet[i] * f;
+                }
             }
         }
+
+        done += subSamples;
     }
+
+    // The block's settled generation count, for the dry-path compensation below. Read after the
+    // loop rather than carried through it: the loop advanced the smoother sub-span by sub-span, so
+    // this is the same value one skip(numSamples) would have left, and the compensation delay is a
+    // per-block quantity either way.
+    const float genValue = genSmoothed.getCurrentValue();
 
     hum.process(span, humEnabled);
 
