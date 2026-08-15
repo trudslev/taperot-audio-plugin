@@ -507,6 +507,13 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     // via genSmoothed, so entering/leaving NONE ramps rather than jumps).
     const int requestedGen = (size_t) model == noneModelIndex ? 1 : (int) std::round(genParam->load());
     genSmoothed.setTargetValue((float) juce::jlimit(1, maxGenerations, requestedGen));
+
+    // **The value at the START of the block is kept as well as the end, and that is the fix.**
+    // skip() advances the smoother across the whole buffer and getCurrentValue() then reports where
+    // it LANDED - so applying that single figure to every sample in the block draws the ramp as a
+    // staircase whose step size is the host's buffer size. A GEN move sounded different at 64
+    // samples and at 2048 for no reason having to do with the sound.
+    const float genStart = genSmoothed.getCurrentValue();
     genSmoothed.skip(numSamples);
     const float genValue = genSmoothed.getCurrentValue();
 
@@ -529,13 +536,34 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     }
 
     if (genTransitioning)
+    {
+        // **The crossfade WEIGHT ramps across the block; the stage COUNT does not.** Both cascades
+        // are already rendered over the whole buffer, so only the blend was flat - which is the
+        // cheap half to fix and the whole of the defect.
+        //
+        // Stated limit, because it is a real one rather than an oversight: floorGen and ceilGen come
+        // from the block's END value, so a block in which GEN crosses an integer boundary clamps its
+        // start weight to 0 or 1 rather than switching stage counts mid-block. Following the count
+        // per sample would mean re-deriving the cascade per sample, which is not what this costs.
+        // The smoother's ramp is long against any buffer, so a block spanning a boundary is the
+        // edge rather than the case, and at that edge this degrades to the old behaviour instead of
+        // glitching.
+        const float startFraction = juce::jlimit(0.0f, 1.0f, genStart - (float) floorGen);
+        const float fractionStep = numSamples > 1 ? (genFraction - startFraction) / (float) (numSamples - 1)
+                                                  : 0.0f;
+
         for (int ch = 0; ch < numChannels; ++ch)
         {
             auto* wet = buffer.getWritePointer(ch);
             const auto* floorTap = genFloorSnapshot.getReadPointer(ch);
+
             for (int i = 0; i < numSamples; ++i)
-                wet[i] = floorTap[i] * (1.0f - genFraction) + wet[i] * genFraction;
+            {
+                const float f = startFraction + fractionStep * (float) i;
+                wet[i] = floorTap[i] * (1.0f - f) + wet[i] * f;
+            }
         }
+    }
 
     hum.process(buffer, humEnabled);
 
@@ -588,8 +616,28 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
                 hostIsPlaying = position->getIsPlaying();
 
     transportGateSmoothed.setTargetValue(hostIsPlaying ? 1.0f : 0.0f);
-    transportGateSmoothed.skip(numSamples);
-    buffer.applyGain(transportGateSmoothed.getCurrentValue());
+
+    // **A gain ramp advanced per block and applied flat is a staircase on every transport start and
+    // stop, and it coarsens as the buffer grows.** skip() then applyGain() moved the whole block to
+    // the ramp's end value, so the fade in and out of a parked session was quantised to the host's
+    // buffer size - inaudible at 64, a step at 2048.
+    //
+    // Per sample only while it is actually moving: settled, current == target and one applyGain is
+    // both exact and cheaper.
+    if (transportGateSmoothed.isSmoothing())
+    {
+        for (int i = 0; i < numSamples; ++i)
+        {
+            const float gateGain = transportGateSmoothed.getNextValue();
+
+            for (int ch = 0; ch < numChannels; ++ch)
+                buffer.getWritePointer(ch)[i] *= gateGain;
+        }
+    }
+    else
+    {
+        buffer.applyGain(transportGateSmoothed.getCurrentValue());
+    }
 
     constexpr float displayTimeConstantSeconds = 0.15f;
     const float blockSeconds = (float) buffer.getNumSamples() / (float) displaySampleRate;
