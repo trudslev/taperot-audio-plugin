@@ -2,6 +2,8 @@
 
 #include <nf/UserProgramDirectory.h>
 #include "PluginEditor.h"
+
+#include <nf/BlockChunking.h>
 #include <algorithm>
 
 namespace
@@ -494,13 +496,38 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const float rampSeconds = rampParam->load();
     const bool clunkMode = switchModeParam->load() > 0.5f;
 
-    const int numSamples = buffer.getNumSamples();
-    const int numChannels = buffer.getNumChannels();
+    // **The over-delivery policy, and here it is LOAD-BEARING rather than tidy.** Saturator.cpp:29
+    // sizes the oversampler with initProcessing(maximumBlockSize) and Saturator.cpp:120 feeds
+    // processSamplesUp whatever arrives, unclamped - so any block larger than the prepared maximum
+    // writes OUT OF BOUNDS. That was once bisected as "survives 257, 300, 400, crashes by 450", and
+    // every figure in it was measured and meaningless: the writes corrupted adjacent heap and
+    // returned finite output, so the probe reported "survived, finite" truthfully and about
+    // nothing. 450 was not a threshold, only the first size that reached an unmapped page.
+    //
+    // Chunking removes it BY CONSTRUCTION: no span is longer than the prepared size, so
+    // processSamplesUp is never handed more than initProcessing allocated for.
+    //
+    // **THE BUS QUESTION, ASKED HERE.** Gatecrasher had to move its getBusBuffer calls inside the
+    // loop, because asking once outside hands every span the whole block's length and undoes the
+    // chunking while every assertion still passes. That does not arise here, and the reason is the
+    // one that matters rather than the verdict: **there is no getBusBuffer call anywhere in this
+    // file.** This casting reads the buffer directly and takes its channel count from
+    // buffer.getNumChannels(), which a span reports correctly for itself. The call site was looked
+    // for rather than inferred from the bus layout, because a casting can call getBusBuffer for its
+    // main bus without having a second one.
+    //
+    // ScopedNoDenormals, the IN meter and the parameter reads stay OUTSIDE. The guard is scoped;
+    // the IN meter is measured on the untouched input before the chain and would otherwise run per
+    // span on a buffer the chain has already modified; the parameter reads are per block by design.
+    nf::processInChunks(buffer, getBlockSize(), [&](juce::AudioBuffer<float>& span)
+    {
+    const int numSamples = span.getNumSamples();
+    const int numChannels = span.getNumChannels();
     dryBuffer.setSize(numChannels, numSamples, false, false, true);
     for (int ch = 0; ch < numChannels; ++ch)
-        dryBuffer.copyFrom(ch, 0, buffer, ch, 0, numSamples);
+        dryBuffer.copyFrom(ch, 0, span, ch, 0, numSamples);
 
-    saturator.process(buffer, drive01);
+    saturator.process(span, drive01);
 
     // NONE bypasses the tape-model/GEN system entirely: there's no model character to compound
     // across generations, so force a single pass regardless of the GEN control's position (still
@@ -509,9 +536,9 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     genSmoothed.setTargetValue((float) juce::jlimit(1, maxGenerations, requestedGen));
 
     // **The value at the START of the block is kept as well as the end, and that is the fix.**
-    // skip() advances the smoother across the whole buffer and getCurrentValue() then reports where
+    // skip() advances the smoother across the whole span and getCurrentValue() then reports where
     // it LANDED - so applying that single figure to every sample in the block draws the ramp as a
-    // staircase whose step size is the host's buffer size. A GEN move sounded different at 64
+    // staircase whose step size is the host's span size. A GEN move sounded different at 64
     // samples and at 2048 for no reason having to do with the sound.
     const float genStart = genSmoothed.getCurrentValue();
     genSmoothed.skip(numSamples);
@@ -522,33 +549,33 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     const float genFraction = genValue - (float) floorGen;
     const bool genTransitioning = floorGen != ceilGen;
 
-    // Every active stage adds its realised deviation into one buffer, so the trace shows the whole
+    // Every active stage adds its realised deviation into one span, so the trace shows the whole
     // cascade rather than one stage - which is what the GEN readout sitting beside it implies.
     float* const deviationAccum = pitchMeter.getScratch(numSamples);
 
     for (int stage = 0; stage < ceilGen; ++stage)
     {
-        generationStages[(size_t) stage]->process(buffer, wow01, flutter01, model, clunkMode, noise01,
+        generationStages[(size_t) stage]->process(span, wow01, flutter01, model, clunkMode, noise01,
                                                   noiseCharacter, deviationAccum);
 
         if (genTransitioning && stage == floorGen - 1)
-            genFloorSnapshot.makeCopyOf(buffer, true);
+            genFloorSnapshot.makeCopyOf(span, true);
     }
 
     if (genTransitioning)
     {
         // **The crossfade WEIGHT ramps across the block; the stage COUNT does not.** Both cascades
-        // are already rendered over the whole buffer, so only the blend was flat - which is the
+        // are already rendered over the whole span, so only the blend was flat - which is the
         // cheap half to fix and the whole of the defect.
         //
         // **THE REMAINING LIMIT IS NOT AN EDGE CASE, AND THIS COMMENT SAID IT WAS.** floorGen and
         // ceilGen still come from the block's END value, so a block in which GEN crosses an integer
         // boundary clamps its start weight rather than switching stage counts mid-block. The first
         // version of this note argued that was "the edge rather than the case" because the
-        // smoother's ramp is long against any buffer. That was written from the prediction, and
+        // smoother's ramp is long against any span. That was written from the prediction, and
         // `InvarianceTests`' genSmoothed arm refutes it: GEN swept 1 to 8 over 49152 samples moves
         // 0.29 per 2048-sample block against 0.0091 per 64, so the STAGE COUNT steps with the
-        // buffer and the two renders differ by 2.820183516 at a peak of 1.941574 - larger than the
+        // span and the two renders differ by 2.820183516 at a peak of 1.941574 - larger than the
         // signal.
         //
         // A per-sample weight cannot repair a per-block stage count. This is half the fix and is
@@ -560,9 +587,9 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         // **When that half is written, it goes INSIDE nf::processInChunks, never instead of it.**
         // The two subdivisions look interchangeable and are not: the chunk loop bounds span LENGTH
         // (<= the prepared size, which is what keeps the oversampler in bounds) and the crossing
-        // loop bounds span CONTENT (one stage count per span). A buffer in which GEN happens not to
+        // loop bounds span CONTENT (one stage count per span). A span in which GEN happens not to
         // cross an integer is ONE span, so the crossing loop cannot substitute for the chunk loop -
-        // it would hand the oversampler the whole over-delivered buffer and reinstate the
+        // it would hand the oversampler the whole over-delivered span and reinstate the
         // out-of-bounds write, with a green suite, because nothing automates GEN in the test that
         // would catch it. Inside each chunk the partitions are independent and both hold.
         const float startFraction = juce::jlimit(0.0f, 1.0f, genStart - (float) floorGen);
@@ -571,7 +598,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
         for (int ch = 0; ch < numChannels; ++ch)
         {
-            auto* wet = buffer.getWritePointer(ch);
+            auto* wet = span.getWritePointer(ch);
             const auto* floorTap = genFloorSnapshot.getReadPointer(ch);
 
             for (int i = 0; i < numSamples; ++i)
@@ -582,18 +609,18 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         }
     }
 
-    hum.process(buffer, humEnabled);
+    hum.process(span, humEnabled);
 
     failEnvelope.setEngaged(failAuxEnabled);
     failEnvelope.setRampSeconds(rampSeconds);
     const float failAuxValue = failEnvelope.advanceBlock(numSamples);
     const float effectiveFailure01 = juce::jmax(failure01, failAuxValue);
-    failureEngine.process(buffer, effectiveFailure01, dropouts, snags, crinkles, imbalance);
+    failureEngine.process(span, effectiveFailure01, dropouts, snags, crinkles, imbalance);
 
-    stereoSpread.process(buffer, spread);
-    toneFilters.process(buffer, lpHz, hpHz);
-    tapeStop.process(buffer, stopEnabled, rampSeconds);
-    filterSweep.process(buffer, filterAuxEnabled, rampSeconds);
+    stereoSpread.process(span, spread);
+    toneFilters.process(span, lpHz, hpHz);
+    tapeStop.process(span, stopEnabled, rampSeconds);
+    filterSweep.process(span, filterAuxEnabled, rampSeconds);
 
     // Re-time the dry copy to match the wet path's per-stage WowFlutter group delay (see the
     // dryCompensationDelay member comment in PluginProcessor.h) before MIX blends them.
@@ -610,7 +637,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         }
     }
 
-    outputStage.process(buffer, dryBuffer, mix01, outputDb);
+    outputStage.process(span, dryBuffer, mix01, outputDb);
 
     // The gate exists because this plugin generates sound of its own - hiss, hum, dropouts - which
     // would otherwise run forever in a session that is simply parked. Muting the output when the
@@ -624,7 +651,7 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     //
     // Live monitoring through a STOPPED DAW is still silenced, which is the same behaviour as
     // before and arguably still wrong - but changing it means gating the generated hiss rather than
-    // the finished buffer, which is a DSP change rather than a wrapper check. Flagged, not smuggled
+    // the finished span, which is a DSP change rather than a wrapper check. Flagged, not smuggled
     // in here.
     bool hostIsPlaying = true;
     if (wrapperType != wrapperType_Standalone)
@@ -635,9 +662,9 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     transportGateSmoothed.setTargetValue(hostIsPlaying ? 1.0f : 0.0f);
 
     // **A gain ramp advanced per block and applied flat is a staircase on every transport start and
-    // stop, and it coarsens as the buffer grows.** skip() then applyGain() moved the whole block to
+    // stop, and it coarsens as the span grows.** skip() then applyGain() moved the whole block to
     // the ramp's end value, so the fade in and out of a parked session was quantised to the host's
-    // buffer size - inaudible at 64, a step at 2048.
+    // span size - inaudible at 64, a step at 2048.
     //
     // Per sample only while it is actually moving: settled, current == target and one applyGain is
     // both exact and cheaper.
@@ -648,16 +675,16 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
             const float gateGain = transportGateSmoothed.getNextValue();
 
             for (int ch = 0; ch < numChannels; ++ch)
-                buffer.getWritePointer(ch)[i] *= gateGain;
+                span.getWritePointer(ch)[i] *= gateGain;
         }
     }
     else
     {
-        buffer.applyGain(transportGateSmoothed.getCurrentValue());
+        span.applyGain(transportGateSmoothed.getCurrentValue());
     }
 
     constexpr float displayTimeConstantSeconds = 0.15f;
-    const float blockSeconds = (float) buffer.getNumSamples() / (float) displaySampleRate;
+    const float blockSeconds = (float) span.getNumSamples() / (float) displaySampleRate;
     const float smoothingCoeff = 1.0f - std::exp(-blockSeconds / displayTimeConstantSeconds);
 
     auto smoothDisplay = [smoothingCoeff](std::atomic<float>& display, float target)
@@ -668,14 +695,21 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     smoothDisplay(failAuxDisplay, failAuxValue);
 
-    // OUT, measured on the finished buffer.
+    // OUT, measured on the finished span.
     for (int i = 0; i < numSamples; ++i)
     {
         float peak = 0.0f;
         for (int ch = 0; ch < numChannels; ++ch)
-            peak = juce::jmax(peak, std::abs(buffer.getReadPointer(ch)[i]));
+            peak = juce::jmax(peak, std::abs(span.getReadPointer(ch)[i]));
         outLevelSmoothed += (peak - outLevelSmoothed) * levelSmoothingCoeff;
     }
+
+    // Hand the SPAN's realised pitch deviation to the scope. Inside the loop, because
+    // deviationAccum is the scratch this span filled and numSamples is this span's length - the
+    // FIFO decimates and drops, so more, shorter pushes are a finer trace rather than a different
+    // one. Left outside it would have read one span's scratch as the whole block's.
+    pitchMeter.pushBlock(deviationAccum, numSamples);
+    });
 
     const auto toDb = [](float linear)
     {
@@ -684,10 +718,6 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     inputLevelDb.store(toDb(inLevelSmoothed), std::memory_order_relaxed);
     outputLevelDb.store(toDb(outLevelSmoothed), std::memory_order_relaxed);
-
-    // Hand the block's realised pitch deviation to the scope. Decimates and drops if the GUI is not
-    // draining; never blocks.
-    pitchMeter.pushBlock(deviationAccum, numSamples);
 }
 
 juce::AudioProcessorEditor* TapeRotAudioProcessor::createEditor()

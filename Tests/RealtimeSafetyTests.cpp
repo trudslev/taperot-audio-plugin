@@ -118,6 +118,70 @@ public:
                         finite = false;
 
             expect (finite, "non-finite output at the prepared block size");
+        }
+
+        beginTest ("Over-delivery is now SAFE TO DRIVE, and this is the only verification there is");
+        {
+            // **This arm could not exist before stage 1b.** Driving an over-delivered block used to
+            // write out of bounds, and a test that corrupts the process takes every later suite
+            // with it — the damage lands somewhere unrelated, which is a worse diagnostic than the
+            // defect. So the arm above documents and does not drive.
+            //
+            // `nf::processInChunks` makes it safe by construction: no span is longer than the
+            // prepared size, so processSamplesUp is never handed more than initProcessing allocated
+            // for. **And "by construction" is exactly the claim that needs a test**, because it is
+            // the kind of reasoning that is right until somebody moves the wrapper.
+            //
+            // **It is also the ONLY verification available for TapeRot's half of 1b.** The defect is
+            // an out-of-bounds WRITE, not an allocation, so no allocation detector was ever going to
+            // see it — and the suite's own detector is blind to `AudioBuffer` growth as well (it
+            // hooks `operator new`; `AudioBuffer` allocates through `HeapBlock` → `std::malloc`).
+            // There is no figure to compare before and after. There is only: does driving it
+            // survive, and is the output finite.
+            //
+            // If this ever segfaults, the wrapper stopped bounding span length — that is the whole
+            // signal, and it is a loud one.
+            TapeRotAudioProcessor p;
+            p.setRateAndBufferSizeDetails (48000.0, 256);
+            p.prepareToPlay (48000.0, 256);
+
+            juce::MidiBuffer midi;
+            bool allFinite = true;
+            double peak = 0.0;
+
+            // 257 is the first size the old bisect called "survived" while corrupting; 2048 is eight
+            // spans; 511 is prime and shares no factor with the prepared size, so its final span is
+            // short and the remainder path is exercised rather than assumed.
+            for (int driven : { 257, 511, 2048 })
+            {
+                juce::AudioBuffer<float> buffer (2, driven);
+
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < driven; ++i)
+                        buffer.setSample (ch, i, 0.25f * std::sin (0.01f * (float) i));
+
+                midi.clear();
+                p.processBlock (buffer, midi);
+
+                for (int ch = 0; ch < 2; ++ch)
+                    for (int i = 0; i < driven; ++i)
+                    {
+                        const float v = buffer.getSample (ch, i);
+                        allFinite = allFinite && std::isfinite (v);
+                        peak = juce::jmax (peak, (double) std::abs (v));
+                    }
+
+                logMessage ("  prepared 256, driven " + juce::String (driven).paddedLeft (' ', 4)
+                                + " -> survived, peak " + juce::String (peak, 6));
+            }
+
+            // The output check first: a configuration that produced silence would "survive" for the
+            // trivial reason and read as a pass.
+            expectGreaterThan (peak, 1.0e-4,
+                               "the over-delivered blocks produced no output, so surviving them "
+                               "means nothing");
+
+            expect (allFinite, "an over-delivered block produced non-finite output");
             logMessage ("  prepared 256, driven 256 -> finite (the only size exercised)");
             logMessage ("  ANY driven size > prepared writes OUT OF BOUNDS — see this test's comment");
         }
