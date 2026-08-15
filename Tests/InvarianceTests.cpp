@@ -1843,14 +1843,6 @@ public:
                 return ((float) (x & 0xffffffu) / (float) 0x7fffff) - 1.0f;
             };
 
-            // 1 -> 8 over the render, so it crosses SEVEN integer boundaries and is moving at every
-            // sample. The staircase only exists while the smoother is travelling.
-            const auto genAt = [] (int absolute) noexcept
-            {
-                const float t = juce::jlimit (0.0f, 1.0f, (float) absolute / (float) totalSamples);
-                return 1.0f + 7.0f * t;
-            };
-
             const auto renderAutomated = [&] (int blockSize)
             {
                 TapeRotAudioProcessor p;
@@ -1886,10 +1878,13 @@ public:
                 std::vector<std::vector<float>> out (2);
                 int absolute = 0;
 
+                // **Set ONCE, here, and never inside the block loop.** 1 -> 8 crosses seven integer
+                // boundaries; the smoother does the travelling and the driver does nothing per
+                // block that could differ between arms.
+                setP (p, ParamIDs::gen, 8.0f);
+
                 for (int b = 0; b < totalSamples / blockSize; ++b)
                 {
-                    setP (p, ParamIDs::gen, genAt (absolute));
-
                     for (int ch = 0; ch < 2; ++ch)
                         for (int i = 0; i < blockSize; ++i)
                             buffer.setSample (ch, i, sampleAt (absolute + i, ch));
@@ -1948,57 +1943,52 @@ public:
                           "the driver is not reproducible against itself, so its span figure "
                           "measures non-determinism rather than block size");
 
-            // **SUSPECT: THIS ARM MAY BE MEASURING ITS OWN AUTOMATION, NOT THE PLUGIN.** Recorded
-            // here rather than acted on, because the answer changes what the assertion should be and
-            // that is not a decision to take while writing the note.
+            // **REWRITTEN 2026-08-15. The first version automated GEN per block and measured its
+            // own automation.** It called `setP (p, ParamIDs::gen, ...)` once per block, so the
+            // TARGET stepped every 64 samples in one arm and every 2048 in the other — 1.0000,
+            // 1.0091, 1.0182… against 1.00, 1.29, 1.58… The smoother chased two different target
+            // sequences, and no correctness inside the DSP makes two different inputs produce one
+            // output. It read 2.820183516, and the GEN crossing subdivision moved it to
+            // 2.820465088, which is no change — the figure was never about the plugin.
             //
-            // The GEN crossing subdivision landed (PluginProcessor.cpp) and moved this figure from
-            // 2.820183516 to 2.820465088 — which is no change. The stage count is now constant
-            // within each sub-span and the sub-spans fall at absolute samples, so if the automation
-            // were identical at both block sizes the two renders should have converged.
+            // **What it found is true, unfixable, and NOT TapeRot's defect** — written down here so
+            // nobody re-hunts it. JUCE applies parameter changes at block boundaries, so a host's
+            // automation RESOLUTION IS ITS BUFFER SIZE. TapeRot's output under automation genuinely
+            // differs between buffer sizes in every host, because the automation does. No
+            // subdivision can remove that and none should try.
             //
-            // **They cannot converge, because the automation is not identical.** This driver calls
-            // `setP (p, ParamIDs::gen, genAt (absolute))` once per block, so `genSmoothed`'s TARGET
-            // steps every 64 samples in one arm and every 2048 in the other: 1.0000, 1.0091, 1.0182…
-            // against 1.00, 1.29, 1.58… The smoother is chasing two different target sequences, and
-            // no amount of correctness inside the DSP makes two different inputs produce one output.
+            // **The property the subdivision exists for needs no automation at all.** Set the target
+            // ONCE and let the smoother ramp: the target sequence is then identical in both arms
+            // because it is set once, the ramp is per sample, the integer crossings fall at absolute
+            // sample positions, and the stage count must follow them wherever the block boundaries
+            // land. Achievable, and it is what a user actually does — GEN is moved once, not swept
+            // every buffer.
             //
-            // That is the withdrawn ×4 fixture's defect one level up — there the input differed
-            // between block sizes, here the AUTOMATION does — and it is the third time this file has
-            // met it.
+            // **Static parameters would be the weaker option and are deliberately not used.** With
+            // GEN fixed the smoother sits on its target, no ramp exists, floorGen and ceilGen are
+            // constant, and this arm would pass without exercising anything.
             //
-            // **And it may not be fixable, which is the part worth thinking about before editing.**
-            // A host delivers automation per block too, so "the same automation at two block sizes"
-            // may not be a physically meaningful thing to ask for. If so, the property this arm
-            // asserts is unachievable and the arm is wrong — not too strict, WRONG — and the guard
-            // for the subdivision has to be something else: static-parameter invariance, or a
-            // trajectory driven from a smoother the test owns rather than through the APVTS.
+            // ## MEASURED, rewritten: 0.050745115 at a peak of 1.998125
             //
-            // **Left failing and unrelaxed in the meantime.** Loosening the bound would pin a defect;
-            // deleting the arm would lose the question. Neither is right while what it measures is
-            // undecided.
+            // **A 55x drop from 2.820465088, and still not zero.** The self-comparison is
+            // 0.000000000, the target is set once so both arms see identical automation, and the
+            // only variable left is the block size. So this is now a REAL block-size dependence in
+            // the GEN path, measured without the confound that was hiding its size — about -32 dB
+            // of the signal rather than the -3 dB the old arm reported.
             //
-            // **IT FAILS, AND THAT IS THE RESULT: 2.820183516 at a peak of 1.941574.** The commit
-            // that ramped the crossfade weight fixed the smaller half of this and its comment said
-            // so — but it also claimed the remaining limit, floorGen/ceilGen taken from the block's
-            // END value, was "the edge rather than the case". **That claim was written from the
-            // prediction and this measurement refutes it.**
-            //
-            // Under real automation the boundary crossing IS the case. GEN sweeping 1 to 8 across
-            // 49152 samples moves 0.0091 per 64-sample block and 0.29 per 2048-sample block, so at
-            // the larger buffer the STAGE COUNT itself steps in 2048-sample jumps. A per-sample
-            // weight cannot repair a per-block stage count, and the residual is larger than the
-            // signal.
-            //
-            // So this assertion is left FAILING rather than relaxed, which is what the sweep does
-            // with every other measured defect: the property is correct, the code does not meet it,
-            // and the figure is on the record. The remaining fix is to subdivide the block at the
-            // samples where genValue crosses an integer and run each span with its own floor/ceil —
-            // the same shape as 1b's chunking, for a different reason.
+            // **Candidate, not a claim, and it is the shape the subdivision itself introduces:**
+            // anything downstream that advances once per `process` CALL rather than per SAMPLE now
+            // sees a different number of calls per block, because a sub-span is truncated wherever a
+            // block boundary lands. `TapeModelEQ`'s crossfade is the first place to look — this arm
+            // runs at model 5 and `prepare` re-arms that switch every render (the 26.75 % / 97.55 %
+            // Lifecycle finding). Five refuted construction hypotheses in this file say to bisect by
+            // stage before testing that line.
             expectLessThan (span, 1.0e-6,
-                            "GEN moving across an integer boundary produces different audio at 64 "
-                            "and at 2048, so the cascade crossfade weight is being applied per "
-                            "block rather than per sample: " + juce::String (span, 9));
+                            "GEN ramping across integer boundaries produces different audio at 64 "
+                            "and at 2048. The target is set once, so the automation is identical in "
+                            "both arms and the only variable is the block size — which means the "
+                            "cascade's stage count or its crossfade weight is following the buffer "
+                            "rather than the smoother: " + juce::String (span, 9));
         }
 
         beginTest ("Offline against real-time");
