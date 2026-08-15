@@ -1798,6 +1798,179 @@ public:
             expect (true);   // locating
         }
 
+        beginTest ("genSmoothed — GEN MOVING across every integer boundary, two block sizes");
+        {
+            // **The defect this guards is LATENT in every other test in this file, which is why it
+            // needed its own.** `genSmoothed.skip (numSamples)` advanced the smoother across the
+            // whole buffer and its END value was applied flat to every sample, so a GEN move was
+            // quantised to the host's buffer size. Nothing else here automates GEN, so the smoother
+            // sits on its target and the staircase never expresses — the block-size rows are
+            // byte-identical with the defect present and with it fixed.
+            //
+            // **A fix whose test does not exist is not a fix that passed one.** This is that test.
+            //
+            // ## The corrections `render()` carries, checked one at a time
+            //
+            // This driver is hand-rolled, because `RenderSpec` has no per-block parameter hook — and
+            // a correction is only as portable as the call site it sits behind, so each is restated
+            // rather than assumed:
+            //
+            //   prepare + reset once per run                       — below
+            //   input determined by ABSOLUTE sample position       — `sampleAt`, not a per-block seed
+            //   the AUTOMATION also determined by absolute position — `genAt`, same reason
+            //   equal total samples at both block sizes            — `totalSamples` fixed
+            //   warm-up before anything is compared                — GEN parked at 1 until settled
+            //   the self-comparison reported beside the result     — the 64-against-64 arm
+            //
+            // The automation trajectory is the one that matters most. Driving GEN from a per-BLOCK
+            // counter would hand 64 and 2048 different automation, which is the fixture defect this
+            // file already withdrew a finding for.
+            constexpr double fs = 48000.0;
+            constexpr int totalSamples = 512 * 96;      // ~1 s
+            constexpr int warmSamples  = 512 * 16;
+
+            const auto setP = [] (TapeRotAudioProcessor& p, const char* id, float physical)
+            {
+                if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                    param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+            };
+
+            const auto sampleAt = [] (int absoluteIndex, int channel) noexcept
+            {
+                uint32_t x = (uint32_t) (absoluteIndex * 2654435761u)
+                           ^ (uint32_t) (channel * 40503u) ^ 0x9e3779b9u;
+                x ^= x << 13; x ^= x >> 17; x ^= x << 5;
+                return ((float) (x & 0xffffffu) / (float) 0x7fffff) - 1.0f;
+            };
+
+            // 1 -> 8 over the render, so it crosses SEVEN integer boundaries and is moving at every
+            // sample. The staircase only exists while the smoother is travelling.
+            const auto genAt = [] (int absolute) noexcept
+            {
+                const float t = juce::jlimit (0.0f, 1.0f, (float) absolute / (float) totalSamples);
+                return 1.0f + 7.0f * t;
+            };
+
+            const auto renderAutomated = [&] (int blockSize)
+            {
+                TapeRotAudioProcessor p;
+
+                setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+                setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+                setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+                setP (p, ParamIDs::noise, 0.0f);   setP (p, ParamIDs::mix, 100.0f);
+
+                // A real model, NOT NONE: NONE forces a single pass regardless of GEN, so the
+                // cascade never transitions and the arm would measure nothing.
+                setP (p, ParamIDs::model, 5.0f);
+
+                p.setRateAndBufferSizeDetails (fs, blockSize);
+                p.prepareToPlay (fs, blockSize);
+                p.reset();
+
+                juce::AudioBuffer<float> buffer (2, blockSize);
+                juce::MidiBuffer midi;
+
+                // Warm-up with GEN parked at 1, so the smoother is SETTLED at the same value in both
+                // arms before the ramp starts. Without it the two runs begin mid-ramp at different
+                // points and the comparison measures the warm-up rather than the block size.
+                setP (p, ParamIDs::gen, 1.0f);
+
+                for (int done = 0; done < warmSamples; done += blockSize)
+                {
+                    buffer.clear();
+                    midi.clear();
+                    p.processBlock (buffer, midi);
+                }
+
+                std::vector<std::vector<float>> out (2);
+                int absolute = 0;
+
+                for (int b = 0; b < totalSamples / blockSize; ++b)
+                {
+                    setP (p, ParamIDs::gen, genAt (absolute));
+
+                    for (int ch = 0; ch < 2; ++ch)
+                        for (int i = 0; i < blockSize; ++i)
+                            buffer.setSample (ch, i, sampleAt (absolute + i, ch));
+
+                    midi.clear();
+                    p.processBlock (buffer, midi);
+
+                    for (int ch = 0; ch < 2; ++ch)
+                    {
+                        const auto* read = buffer.getReadPointer (ch);
+                        out[(size_t) ch].insert (out[(size_t) ch].end(), read, read + blockSize);
+                    }
+
+                    absolute += blockSize;
+                }
+
+                return out;
+            };
+
+            const auto worst = [] (const std::vector<std::vector<float>>& a,
+                                   const std::vector<std::vector<float>>& b)
+            {
+                double w = 0.0;
+
+                for (size_t ch = 0; ch < juce::jmin (a.size(), b.size()); ++ch)
+                    for (size_t i = 0; i < juce::jmin (a[ch].size(), b[ch].size()); ++i)
+                        w = juce::jmax (w, (double) std::abs (a[ch][i] - b[ch][i]));
+
+                return w;
+            };
+
+            const auto at64   = renderAutomated (64);
+            const auto at64b  = renderAutomated (64);
+            const auto at2048 = renderAutomated (2048);
+
+            double peak = 0.0;
+            for (const auto& ch : at64)
+                for (float v : ch)
+                    peak = juce::jmax (peak, (double) std::abs (v));
+
+            const auto self = worst (at64, at64b);
+            const auto span = worst (at64, at2048);
+
+            logMessage ("  peak " + juce::String (peak, 6)
+                            + ", self-comparison " + juce::String (self, 9)
+                            + ", 64 against 2048 " + juce::String (span, 9));
+
+            // KNOWN CASE, both directions. The arm must produce OUTPUT — a silent configuration
+            // compares equal for the trivial reason — and it must be reproducible, or the span
+            // figure is non-determinism rather than block dependence.
+            expectGreaterThan (peak, 1.0e-3,
+                               "the automated arm produced no output, so an exact span would mean "
+                               "nothing");
+
+            expectEquals (self, 0.0,
+                          "the driver is not reproducible against itself, so its span figure "
+                          "measures non-determinism rather than block size");
+
+            // **IT FAILS, AND THAT IS THE RESULT: 2.820183516 at a peak of 1.941574.** The commit
+            // that ramped the crossfade weight fixed the smaller half of this and its comment said
+            // so — but it also claimed the remaining limit, floorGen/ceilGen taken from the block's
+            // END value, was "the edge rather than the case". **That claim was written from the
+            // prediction and this measurement refutes it.**
+            //
+            // Under real automation the boundary crossing IS the case. GEN sweeping 1 to 8 across
+            // 49152 samples moves 0.0091 per 64-sample block and 0.29 per 2048-sample block, so at
+            // the larger buffer the STAGE COUNT itself steps in 2048-sample jumps. A per-sample
+            // weight cannot repair a per-block stage count, and the residual is larger than the
+            // signal.
+            //
+            // So this assertion is left FAILING rather than relaxed, which is what the sweep does
+            // with every other measured defect: the property is correct, the code does not meet it,
+            // and the figure is on the record. The remaining fix is to subdivide the block at the
+            // samples where genValue crosses an integer and run each span with its own floor/ceil —
+            // the same shape as 1b's chunking, for a different reason.
+            expectLessThan (span, 1.0e-6,
+                            "GEN moving across an integer boundary produces different audio at 64 "
+                            "and at 2048, so the cascade crossfade weight is being applied per "
+                            "block rather than per sample: " + juce::String (span, 9));
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;

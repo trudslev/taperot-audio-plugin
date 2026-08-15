@@ -541,13 +541,21 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
         // are already rendered over the whole buffer, so only the blend was flat - which is the
         // cheap half to fix and the whole of the defect.
         //
-        // Stated limit, because it is a real one rather than an oversight: floorGen and ceilGen come
-        // from the block's END value, so a block in which GEN crosses an integer boundary clamps its
-        // start weight to 0 or 1 rather than switching stage counts mid-block. Following the count
-        // per sample would mean re-deriving the cascade per sample, which is not what this costs.
-        // The smoother's ramp is long against any buffer, so a block spanning a boundary is the
-        // edge rather than the case, and at that edge this degrades to the old behaviour instead of
-        // glitching.
+        // **THE REMAINING LIMIT IS NOT AN EDGE CASE, AND THIS COMMENT SAID IT WAS.** floorGen and
+        // ceilGen still come from the block's END value, so a block in which GEN crosses an integer
+        // boundary clamps its start weight rather than switching stage counts mid-block. The first
+        // version of this note argued that was "the edge rather than the case" because the
+        // smoother's ramp is long against any buffer. That was written from the prediction, and
+        // `InvarianceTests`' genSmoothed arm refutes it: GEN swept 1 to 8 over 49152 samples moves
+        // 0.29 per 2048-sample block against 0.0091 per 64, so the STAGE COUNT steps with the
+        // buffer and the two renders differ by 2.820183516 at a peak of 1.941574 - larger than the
+        // signal.
+        //
+        // A per-sample weight cannot repair a per-block stage count. This is half the fix and is
+        // kept because it is correct as far as it goes; the other half is subdividing the block at
+        // the samples where genValue crosses an integer and running each span with its own
+        // floor/ceil. The test asserts the property and FAILS, deliberately, rather than being
+        // relaxed to what the code currently does.
         const float startFraction = juce::jlimit(0.0f, 1.0f, genStart - (float) floorGen);
         const float fractionStep = numSamples > 1 ? (genFraction - startFraction) / (float) (numSamples - 1)
                                                   : 0.0f;
