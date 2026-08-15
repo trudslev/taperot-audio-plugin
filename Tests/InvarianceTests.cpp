@@ -1976,6 +1976,20 @@ public:
             // the GEN path, measured without the confound that was hiding its size — about -32 dB
             // of the signal rather than the -3 dB the old arm reported.
             //
+            // **THE SUBDIVISION INTRODUCED THIS, AND IT IS A COST RATHER THAN A REGRESSION.** Read
+            // without that sentence, "0.0507 block-size dependence, introduced at 09618e7" says the
+            // subdivision was wrong. It was not: it fixed a larger defect — a per-block stage count
+            // that made GEN's staircase follow the buffer — and the price is that a sub-span is
+            // truncated wherever a block boundary lands, so anything advancing once per `process`
+            // CALL rather than per SAMPLE now sees a different number of calls per block. That is
+            // the trade, it was made knowingly, and the residue is a tenth of what it replaced.
+            //
+            // **Worth checking whether the same property reached the other five**, because
+            // `nf::processInChunks` truncates identically and 1b landed it everywhere. **Elmer is
+            // the known case again:** it measured byte-identical after 1b, so if anything there
+            // advances per call it did not move — which bounds how large this class can be
+            // elsewhere before anyone goes looking.
+            //
             // **Candidate, not a claim, and it is the shape the subdivision itself introduces:**
             // anything downstream that advances once per `process` CALL rather than per SAMPLE now
             // sees a different number of calls per block, because a sub-span is truncated wherever a
@@ -1983,6 +1997,16 @@ public:
             // runs at model 5 and `prepare` re-arms that switch every render (the 26.75 % / 97.55 %
             // Lifecycle finding). Five refuted construction hypotheses in this file say to bisect by
             // stage before testing that line.
+            //
+            // **AND TWO FINDINGS SIT ON THAT ONE MEMBER, which is where an attribution error is
+            // cheapest to make.** `TapeModelEQ::activeModelIndex` is already filed for stage 2 —
+            // re-arming a model switch on every prepare, 26.75 % FADE and 97.55 % CLUNK. Fixing that
+            // might move this 0.0507 or might not, and measuring the residue *after* that fix
+            // without noticing would hand the wrong change the credit.
+            //
+            // **So: measure this residue BEFORE stage 2 touches TapeModelEQ, or state that it was
+            // not.** The figure above is the pre-stage-2 measurement and is dated by the commit that
+            // produced it.
             expectLessThan (span, 1.0e-6,
                             "GEN ramping across integer boundaries produces different audio at 64 "
                             "and at 2048. The target is set once, so the automation is identical in "
