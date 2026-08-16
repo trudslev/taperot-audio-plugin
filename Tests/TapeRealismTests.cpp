@@ -129,6 +129,140 @@ public:
                             "measurement is not tracing the modulation");
         }
 
+        beginTest ("THE WEIGHT VECTOR, measured per stage — what the accumulation gap actually is");
+        {
+            /*  **One run that produces the corrected weights rather than rejecting a hypothesis.**
+
+                CASSETTE I accumulates +2.2 dB across GEN 1..8 against a computed weighted power sum
+                of +4.56. Three candidates are refuted — peak-against-power (the rms reads LOWER
+                than the peak), the +9 dB target itself (withdrawn: these are not eight equal
+                independent sources), and the cascade saturation (made transparent, and the column
+                came back identical to the printed digit, which `tanh` being linear 40 dB down says
+                it had to).
+
+                `noiseAmount01` is a per-CALL argument, so a hand-built cascade can enable hiss at
+                exactly one stage and read what arrives. Eight runs give the weight vector directly
+                instead of a fourth explanation.
+
+                **The shape of the disagreement names the cause:**
+
+                  - every weight scaled by one factor -> the BASE is wrong: the eight stages do not
+                    inject at equal level. `NoiseSource` takes a per-stage seed, and the level comes
+                    from one shared `noiseAmount01` — an assumption, never measured.
+                  - decays faster than predicted -> the per-stage surviving fraction is
+                    over-modelled. Either the hiss spectrum (modelled as a single 2 kHz one-pole
+                    from `tapeHighpassHz`) or a per-stage attenuation missing from the model. The
+                    leading one is the WOW DELAY LINE: every later stage's fractional-delay
+                    interpolator is a lowpass, worst near Nyquist, and the hiss is high-passed at
+                    2 kHz so it sits exactly where that bites. Eight stages compound it, and it
+                    suppresses the EARLIER generations specifically.
+                  - only the eighth is off -> the cascade blends floor/ceil chains at integer GEN,
+                    which the stage-1 subdivision makes worth confirming rather than assuming.
+
+                Stage index 7 is the last generation: its hiss passes through nothing after it and
+                is 1.000 by construction, so it is the normaliser rather than a measurement. */
+            const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
+            constexpr int totalStages = 8;
+            constexpr int model = 5;                 // CASSETTE I, matching the accumulation table
+
+            const auto powerFromStage = [&spec] (int liveStage, float depth)
+            {
+                std::vector<std::unique_ptr<DegradationCore>> stages;
+
+                for (int i = 0; i < totalStages; ++i)
+                {
+                    stages.push_back (std::make_unique<DegradationCore> (i));
+                    stages.back()->prepare (spec, model, i == liveStage ? 1.0f : 0.0f);
+                }
+
+                juce::AudioBuffer<float> buffer (2, 512);
+                double sumSq = 0.0;
+                juce::int64 n = 0;
+
+                for (int block = 0; block < 48; ++block)
+                {
+                    buffer.clear();                  // silence in: the output IS the hiss
+
+                    for (int i = 0; i < totalStages; ++i)
+                        stages[(size_t) i]->process (buffer, depth, depth, model, false,
+                                                     i == liveStage ? 1.0f : 0.0f, NoiseSource::tape);
+
+                    if (block < 16)
+                        continue;                    // let the smoothers and delay lines fill
+
+                    for (int ch = 0; ch < 2; ++ch)
+                        for (int i = 0; i < 512; ++i)
+                        {
+                            const double v = buffer.getSample (ch, i);
+                            sumSq += v * v;
+                            ++n;
+                        }
+                }
+
+                return n > 0 ? sumSq / (double) n : 0.0;
+            };
+
+            const std::array<double, 8> predicted { 0.132, 0.152, 0.178, 0.214, 0.269, 0.363, 0.554, 1.000 };
+
+            /*  **Two depths, and the second is what names the missing term.**
+
+                `WowFlutter::centerDelayMs` is 25 ms, which at 48 kHz is exactly 1200 samples — an
+                INTEGER. So at zero wow and flutter the fractional-delay interpolator sits at offset
+                zero and is transparent; driven, it sits at a moving fractional offset and is a
+                lowpass whose loss is worst near Nyquist. The hiss is high-passed at 2 kHz, so it
+                lives exactly where that bites.
+
+                A per-stage attenuation nowhere in the weight model, and it acts only on the
+                generations that have later stages to pass through. If the driven and undriven
+                weight vectors differ, the interpolator is the term; if they agree, it is not and
+                something else is. */
+            std::array<double, 8> driven {}, still {};
+
+            for (int k = 0; k < totalStages; ++k)
+            {
+                driven[(size_t) k] = powerFromStage (k, 1.0f);
+                still[(size_t) k]  = powerFromStage (k, 0.0f);
+            }
+
+            const double normD = driven[7] > 0.0 ? driven[7] : 1.0;
+            const double normS = still[7]  > 0.0 ? still[7]  : 1.0;
+
+            logMessage ("  stage later  driven  ratio    still  ratio   predicted");
+
+            double drivenSum = 0.0, stillSum = 0.0, predictedSum = 0.0;
+
+            for (int k = 0; k < totalStages; ++k)
+            {
+                const double fd = driven[(size_t) k] / normD;
+                const double fs = still[(size_t) k] / normS;
+                const double pr = predicted[(size_t) k];
+
+                drivenSum += fd; stillSum += fs; predictedSum += pr;
+
+                logMessage ("    " + juce::String (k)
+                                + juce::String (7 - k).paddedLeft (' ', 6)
+                                + juce::String (fd, 4).paddedLeft (' ', 9)
+                                + juce::String (fd / pr, 3).paddedLeft (' ', 7)
+                                + juce::String (fs, 4).paddedLeft (' ', 9)
+                                + juce::String (fs / pr, 3).paddedLeft (' ', 7)
+                                + juce::String (pr, 4).paddedLeft (' ', 11));
+            }
+
+            logMessage ("  sums: driven " + juce::String (drivenSum, 4)
+                            + " (" + juce::String (10.0 * std::log10 (juce::jmax (1.0e-9, drivenSum)), 2)
+                            + " dB), still " + juce::String (stillSum, 4)
+                            + " (" + juce::String (10.0 * std::log10 (juce::jmax (1.0e-9, stillSum)), 2)
+                            + " dB), predicted " + juce::String (predictedSum, 4)
+                            + " (" + juce::String (10.0 * std::log10 (predictedSum), 2) + " dB)");
+
+            const auto measured = driven;
+
+            // Reported, not asserted: this is a measurement that produces the corrected weights.
+            // Pinning any of these figures would be pinning numbers nobody has explained yet.
+            expect (measured[7] > 0.0, "the last stage produced no hiss, so every ratio above is "
+                                        "divided by nothing and the run says nothing");
+        }
+
         beginTest ("HF loss per MODEL across GEN 1..8 — the whole curve, not its endpoint");
         {
             /*  **An endpoint does not say whether a control is usable along its length.** GEN 8 at
