@@ -1072,6 +1072,35 @@ public:
 
                 /*  Render length alone, shipping defaults, harness input — the one item the
                     enumeration above leaves standing. 48 is this block's, 64 is the main suite's. */
+                /*  ## THE DEFAULTS CONFOUND — refuted by reading before it was measured
+
+                    The worry: WOW's stored 30 was 30 % of range under the old linear taper and would
+                    be 1.87 % of depth under skew 0.3, so the before figure would have been measured
+                    on a chain modulating fifteen times harder and the comparison would be invalid.
+
+                    **It does not apply.** 1.87 % is what knob POSITION 0.30 maps to; the default is
+                    declared as a PLAIN value — `AudioParameterFloat (id, name, range, 30.0f, ...)` —
+                    and JUCE normalises it through the range on construction. So the default depth is
+                    30 % before and after, and only the knob's resting position moved, from 30 % of
+                    travel to 70 %.
+
+                    Same shape as the migration premise, and settled the same way: Programs and
+                    defaults both carry the plain value, so a taper change moves where a control sits
+                    and never what it means. Printed rather than argued, because this is the second
+                    time this exact confusion has come up. */
+                {
+                    TapeRotAudioProcessor d;
+                    const auto physical = [&d] (const char* id)
+                    {
+                        auto* q = dynamic_cast<juce::RangedAudioParameter*> (d.apvts.getParameter (id));
+                        return q != nullptr ? q->convertFrom0to1 (q->getValue()) : -1.0f;
+                    };
+
+                    logMessage ("  default depths after the taper change -> WOW "
+                                    + juce::String (physical (ParamIDs::wow), 2) + " %, FLUTTER "
+                                    + juce::String (physical (ParamIDs::flutter), 2) + " %");
+                }
+
                 logMessage ("  --- render length alone, shipping defaults, harness input ---");
 
                 for (int blocks : { 16, 32, 48, 64, 96, 128 })

@@ -98,7 +98,7 @@ inline constexpr std::array<TapeModel, 9> kTapeModels{{
         {EQBandType::HighShelf, 14000.0f, -2.5f, 0.707f},
         {EQBandType::Peak, 60.0f, 1.5f, 1.0f},
         {}
-    }}, 2, -0.11f, 14000.0f},   // Type I in a good deck: -3 dB at 12-14 kHz per copy
+    }}, 2, -0.11f, 14000.0f},   // Type I in a good deck: -3 dB at 12-14 kHz per copy: -3 dB at 12-14 kHz per copy
     {"CASSETTE II", {{
         {EQBandType::HighShelf, 16000.0f, -1.0f, 0.707f},
         {EQBandType::LowShelf, 80.0f, -1.0f, 0.707f},
