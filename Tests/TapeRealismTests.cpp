@@ -149,7 +149,7 @@ public:
                                 + "  (-3 dB per copy at "
                                 + juce::String (kTapeModels[(size_t) model].generationLossHz, 0)
                                 + " Hz)");
-                logMessage ("    GEN     5k       10k       15k");
+                logMessage ("    GEN     5k       10k       15k     noise rms");
 
                 for (float gen = 1.0f; gen <= 8.0f; gen += 1.0f)
                 {
@@ -158,10 +158,45 @@ public:
 
                     const auto rows = nf::testing::measureProcessorMagnitudeResponse (p, 48000.0, 512, hfProbes);
 
+                    /*  **Noise rms per model, which is what settles the accumulation shortfall.**
+
+                        Step 1 measured +2.6 dB peak across eight generations against a predicted
+                        +9, and the rms came back at +2.3 — LOWER — so the peak-against-power
+                        hypothesis is refuted rather than confirmed. The remaining candidate is that
+                        the prediction counted only the generation loss: an earlier generation's
+                        hiss passes through every later stage's MODEL EQ as well, and that was not
+                        in the integration.
+
+                        If that is the cause, accumulation must vary BY MODEL and in the direction
+                        of each machine's total HF cut. A model-independent figure refutes it. */
+                    double noiseSumSq = 0.0;
+                    juce::int64 noiseCount = 0;
+                    {
+                        TapeRotAudioProcessor np;
+                        configure (np, gen);
+                        if (auto* mp = dynamic_cast<juce::RangedAudioParameter*> (np.apvts.getParameter (ParamIDs::model)))
+                            mp->setValueNotifyingHost (mp->getNormalisableRange().convertTo0to1 ((float) model));
+
+                        nf::testing::RenderSpec ns;
+                        ns.blockSize = 512;
+                        ns.numBlocks = 32;
+                        ns.fillInput = [] (juce::AudioBuffer<float>& b, int) { b.clear(); };
+
+                        for (const auto& ch : nf::testing::render (np, ns))
+                            for (float v : ch)
+                            {
+                                noiseSumSq += (double) v * v;
+                                ++noiseCount;
+                            }
+                    }
+
+                    const double nrms = noiseCount > 0 ? std::sqrt (noiseSumSq / (double) noiseCount) : 0.0;
+
                     logMessage ("     " + juce::String ((int) gen)
                                     + juce::String (rows[0].gainDb, 2).paddedLeft (' ', 9)
                                     + juce::String (rows[1].gainDb, 2).paddedLeft (' ', 10)
-                                    + juce::String (rows[2].gainDb, 2).paddedLeft (' ', 10));
+                                    + juce::String (rows[2].gainDb, 2).paddedLeft (' ', 10)
+                                    + juce::String (20.0 * std::log10 (juce::jmax (1.0e-9, nrms)), 1).paddedLeft (' ', 11));
                 }
             }
         }
@@ -194,12 +229,31 @@ public:
                 **The metric was the thing that could not express the answer**, not the code. Tuning
                 the rate spread until the PEAK read 2.83 would have been fitting a control to a
                 number, and would have made the plugin less like eight transports rather than more. */
-                logMessage ("  GEN   noise dBFS    pitch cents pk   cents rms    HF 5k      10k       15k");
+                logMessage ("  GEN  noise pk  noise rms   pitch cents pk   cents rms    HF 5k      10k       15k");
 
             for (float gen = 1.0f; gen <= 8.0f; gen += 1.0f)
             {
                 // --- noise floor: silence in ------------------------------------------------
-                double noisePeak = 0.0;
+                /*  **Peak AND rms, because the LAW is a power sum and the column measured a peak.**
+
+                    Step 1 measured +2.6 dB of noise accumulation across eight generations against a
+                    predicted +9. The hiss ordering was confirmed correct by reading — the hiss goes
+                    in after its own stage's loss, so generation 8 arrives full-bandwidth and
+                    generation 1 passes through the seven losses after it — and integrating the
+                    one-pole cascade over the band gives +5.95 dB for white noise, +5.3 weighted by
+                    the hiss's own 2 kHz highpass. Still well above what was measured.
+
+                    A peak is not a power. Independent sources power-sum; a peak of a sum of
+                    independent noises is a sample of an extreme-value distribution, and cascading
+                    low-passes makes the noise progressively more correlated sample-to-sample, which
+                    changes the peak-to-rms ratio as well as the power. So the column could not
+                    express the quantity the law is about — the third arm in this stage with that
+                    shape, after the pitch peak and the HF column reading hiss.
+
+                    Both are reported. The rms is the law's own quantity; the peak is what a limiter
+                    downstream would meet. */
+                double noisePeak = 0.0, noiseSumSq = 0.0;
+                juce::int64 noiseCount = 0;
                 {
                     TapeRotAudioProcessor p;
                     configure (p, gen);
@@ -211,7 +265,11 @@ public:
 
                     for (const auto& ch : nf::testing::render (p, spec))
                         for (float v : ch)
+                        {
                             noisePeak = juce::jmax (noisePeak, (double) std::abs (v));
+                            noiseSumSq += (double) v * v;
+                            ++noiseCount;
+                        }
                 }
 
                 // --- pitch deviation -----------------------------------------------------------
@@ -293,9 +351,11 @@ public:
                 const auto rows = nf::testing::measureProcessorMagnitudeResponse (p, 48000.0, 512, hfProbes);
 
                 const double centsRms = centsCount > 0 ? std::sqrt (centsSumSq / (double) centsCount) : 0.0;
+                const double noiseRms = noiseCount > 0 ? std::sqrt (noiseSumSq / (double) noiseCount) : 0.0;
 
                 logMessage ("   " + juce::String ((int) gen)
-                                + "   " + juce::String (20.0 * std::log10 (juce::jmax (1.0e-9, noisePeak)), 1).paddedLeft (' ', 8)
+                                + "   " + juce::String (20.0 * std::log10 (juce::jmax (1.0e-9, noisePeak)), 1).paddedLeft (' ', 7)
+                                + juce::String (20.0 * std::log10 (juce::jmax (1.0e-9, noiseRms)), 1).paddedLeft (' ', 9)
                                 + "   " + juce::String (cents, 2).paddedLeft (' ', 12)
                                 + "   " + juce::String (centsRms, 4).paddedLeft (' ', 10)
                                 + "   " + juce::String (rows[0].gainDb, 2).paddedLeft (' ', 8)
