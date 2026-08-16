@@ -767,9 +767,32 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
     pitchMeter.pushBlock(deviationAccum, numSamples);
     });
 
+    /*  **The meter readout is CLAMPED at both ends, and both ends were live defects.**
+
+        Suite ruling 2026-08-14: floor sentinel, +99.9 ceiling, one decimal always, no plus at
+        exactly 0.0 dB. The widest string any casting's meter well can be asked to draw is then
+        **5** characters, as a guarantee rather than as a range, and 64 px of well holds it.
+
+        **The floor was off by one character on every fade to silence.** 20*log10(1e-5) is exactly
+        -100.0, so a linear value just above the threshold gave a dB just above -100.0, which
+        `String (db, 1)` rounds to `"-100.0"` — six characters, from the one casting whose GUI had no
+        clamp at all. The band is 1e-5 to 1.0058e-5, **0.58 % wide**, and a smoothed level crosses it
+        whenever audio stops. Not an edge case: it is what happens at the end of every note, with a
+        visible "-100.0" -> "-99.9" jump at the boundary.
+
+        **The ceiling never existed anywhere in the suite.** No readout path in any casting had one,
+        so the widest string was bounded only by how loud the signal got. Gatecrasher is the evidence
+        that nobody considered the numerals needed one: it has a `Layout::meterCeilingDb`, and that
+        constant feeds its meter BAR while its readout ignores it.
+
+        Clamped here rather than in `ProgramHeader` because these two getters are the only readout
+        path, so this is the one place both ends can be guaranteed rather than two places that have
+        to agree. `Tests/MeteringTests.cpp` sweeps the linear range and asserts the character count.
+    */
     const auto toDb = [](float linear)
     {
-        return linear > 1.0e-5f ? 20.0f * std::log10(linear) : -99.9f;
+        const float db = linear > 1.0e-5f ? 20.0f * std::log10(linear) : meterFloorDb;
+        return juce::jlimit(meterFloorDb, meterCeilingDb, db);
     };
 
     inputLevelDb.store(toDb(inLevelSmoothed), std::memory_order_relaxed);

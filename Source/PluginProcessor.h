@@ -188,6 +188,16 @@ public:
     }
     float getWowRateHz() const noexcept { return wowRateDisplay.load(std::memory_order_relaxed); }
     float getFlutterRateHz() const noexcept { return flutterRateDisplay.load(std::memory_order_relaxed); }
+    /*  The meter readout's two bounds, public because the test asserts against these rather than
+        against transcribed copies of them — a fixture built from its own literals agrees with itself
+        and says nothing about what the panel draws.
+
+        Suite ruling 2026-08-14: floor sentinel, +99.9 ceiling, one decimal always. Both were live
+        defects here — see `toDb` in the .cpp for the 0.58 %-wide band that printed "-100.0" on every
+        fade to silence, and for why no casting had a ceiling at all. */
+    static constexpr float meterFloorDb = -99.9f;
+    static constexpr float meterCeilingDb = 99.9f;
+
     float getInputLevelDb() const noexcept { return inputLevelDb.load(std::memory_order_relaxed); }
     float getOutputLevelDb() const noexcept { return outputLevelDb.load(std::memory_order_relaxed); }
 

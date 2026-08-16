@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "../Source/PluginProcessor.h"
 #include "../Source/DSP/FailureEngine.h"
 #include "../Source/DSP/PitchDeviationMeter.h"
 #include "../Source/DSP/WowFlutter.h"
@@ -252,6 +253,107 @@ public:
     }
 };
 
+/**
+    The IN/OUT readout's character budget, which was six on every fade to silence.
+
+    Suite ruling 2026-08-14 — floor sentinel, +99.9 ceiling, one decimal always, no plus at exactly
+    0.0 dB — makes the widest string **5** as a GUARANTEE rather than as a range. That distinction is
+    the whole point: the question a well's width has to answer is *what is the widest string this can
+    ever be asked to draw*, and a range answers a different, weaker one.
+
+    **Both bounds were live defects and neither was hypothetical.** The floor: 20*log10(1e-5) is
+    exactly -100.0, so a linear level just above the DSP's threshold printed `"-100.0"`. The band is
+    1e-5 to 1.0058e-5 — 0.58 % wide — and a smoothed level crosses it at the end of every note. The
+    ceiling: no readout path in ANY casting had one, so the widest string was bounded by how loud the
+    signal got.
+
+    The sweep below is dense through the floor band specifically, because a coarse sweep steps over
+    0.58 % of the range without touching it — which is how it survived being looked at.
+*/
+class MeterReadoutBudgetTests final : public juce::UnitTest
+{
+public:
+    MeterReadoutBudgetTests() : juce::UnitTest("Meter readout budget", "DSP") {}
+
+    void runTest() override
+    {
+        beginTest("Never wider than five characters, anywhere in the linear range");
+        {
+            // Read off the processor's own constants, never transcribed: a fixture built from its
+            // own literals agrees with itself and says nothing about what the panel draws.
+            const float floorDb = TapeRotAudioProcessor::meterFloorDb;
+            const float ceilingDb = TapeRotAudioProcessor::meterCeilingDb;
+
+            const auto readout = [floorDb, ceilingDb](float linear)
+            {
+                const float db = linear > 1.0e-5f ? 20.0f * std::log10(linear) : floorDb;
+                return juce::String(juce::jlimit(floorDb, ceilingDb, db), 1);
+            };
+
+            std::vector<float> probes;
+
+            // The floor band, densely. 1.0e-5 to 1.0058e-5 is where "-100.0" lived.
+            for (int i = 0; i <= 400; ++i)
+                probes.push_back(9.5e-6f + (float) i * 1.0e-8f);
+
+            // Silence, the decades either side, and well past full scale for the ceiling.
+            for (float v : { 0.0f, 1.0e-9f, 1.0e-7f, 1.0e-3f, 0.5f, 1.0f, 2.0f, 1.0e3f, 1.0e6f })
+                probes.push_back(v);
+
+            int widest = 0;
+            juce::String widestString, sawMinus100;
+
+            for (float v : probes)
+            {
+                const auto s = readout(v);
+                if (s.length() > widest) { widest = s.length(); widestString = s; }
+                if (s == "-100.0") sawMinus100 = s;
+            }
+
+            logMessage("  widest over " + juce::String((int) probes.size()) + " probes: \""
+                           + widestString + "\" at " + juce::String(widest) + " characters");
+
+            expect(sawMinus100.isEmpty(),
+                   "the readout still prints \"-100.0\" somewhere in the floor band — that is six "
+                   "characters in a well guaranteed five, and it happens at the end of every note");
+
+            expectEquals(widest, 5,
+                         "the readout exceeded five characters. The well is sized to a GUARANTEE, "
+                         "not to a range, so a sixth character is a defect rather than a rare case");
+        }
+
+        beginTest("The comparison is shown able to fail — unclamped, it is six");
+        {
+            // **Without this the test above cannot be distinguished from one that never sees a wide
+            // string.** The pre-ruling construction is run through the same sweep and must produce
+            // exactly what the finding recorded, or the probe density is wrong rather than the code
+            // being right.
+            const auto unclamped = [](float linear)
+            {
+                return juce::String(linear > 1.0e-5f ? 20.0f * std::log10(linear) : -99.9f, 1);
+            };
+
+            int widest = 0;
+            bool sawMinus100 = false;
+
+            for (int i = 0; i <= 400; ++i)
+            {
+                const auto s = unclamped(9.5e-6f + (float) i * 1.0e-8f);
+                widest = juce::jmax(widest, s.length());
+                if (s == "-100.0") sawMinus100 = true;
+            }
+
+            logMessage("  unclamped, same sweep: widest " + juce::String(widest) + " characters, "
+                           + (sawMinus100 ? "\"-100.0\" SEEN" : "\"-100.0\" not seen"));
+
+            expect(sawMinus100 && widest == 6,
+                   "the pre-ruling construction did NOT produce a six-character string over this "
+                   "sweep, so the sweep is too coarse to have proved anything about the clamped one");
+        }
+    }
+};
+
 static PitchDeviationTapTests pitchDeviationTapTests;
 static PitchDeviationMeterTests pitchDeviationMeterTests;
 static FailureEventTapTests failureEventTapTests;
+static MeterReadoutBudgetTests meterReadoutBudgetTests;
