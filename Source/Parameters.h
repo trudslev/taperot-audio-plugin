@@ -241,7 +241,23 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::wow, 1}, "WOW",
-        juce::NormalisableRange<float>(0.0f, 100.0f), 30.0f, percentAttrs));
+        // **Skew 0.2, matching FLUTTER, and the maximum is deliberately unchanged.**
+        //
+        // WOW was the only one of the pair with a LINEAR taper, so half travel was half of range:
+        // 22.44 cents rms = 1.30 %, past "a dying transport". A good deck at 0.05-0.08 % needed
+        // roughly 2-3 % of travel - the bottom sliver of the knob, which is the exact shape
+        // FLUTTER's skew exists to avoid. Two adjacent controls, same section, same units, opposite
+        // tapers, and nothing had chosen that.
+        //
+        // **Re-tapering rather than capping, because capping would cost a sound.** 2.59 % is a
+        // warped-record wobble and a legitimate extreme for a degradation effect; lowering the
+        // maximum to fix the middle would throw away the top to repair the bottom. The skew moves
+        // where the travel spends its time without removing anywhere it can reach.
+        //
+        // FLUTTER's own skew was deliberate and confirmed and is untouched - the earlier rule
+        // "fix the maximum, not the taper" was about that control, where re-tapering would have
+        // undone a decision made for its own reasons. WOW has no taper to undo.
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.2f), 30.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::flutter, 1}, "FLUTTER",

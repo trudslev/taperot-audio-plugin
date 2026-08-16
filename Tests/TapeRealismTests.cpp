@@ -129,6 +129,114 @@ public:
                             "measurement is not tracing the modulation");
         }
 
+        beginTest ("THE WOW CASCADE, per stage — 0.91x is below the floor for any accumulation law");
+        {
+            /*  **Adding sources cannot reduce rms.** Independent ones RMS-sum, correlated ones add,
+                and neither gives less than one source alone. WOW at 100 % measured 44.87 cents rms
+                at GEN 1 and 41.06 at GEN 8 — a ratio of 0.91, below the floor. So this is not wow
+                accumulating differently from flutter; either the later stages contribute nothing or
+                the metric is not measuring the chain.
+
+                Driven at exactly one stage at a time, eight runs, the same way the noise weights
+                were measured — a measurement that returns the corrected values rather than one that
+                rejects a hypothesis.
+
+                  flat contributions  -> the metric reads one stage rather than the chain
+                  first stage only    -> wow never reaches the later stages
+                  a decaying series   -> something attenuates it per stage
+
+                And the quadrature check beside it: if the eight are independent, all-driven rms
+                must equal the root of the sum of their squares. A large shortfall against that says
+                they are not merely correlated but CANCELLING, which no accumulation law produces
+                either. */
+            const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
+            constexpr int totalStages = 8;
+
+            const auto deviationRms = [&spec] (int liveStage, int blocks)   // -1 drives every stage
+            {
+                std::vector<WowFlutter> stages;
+                stages.reserve (totalStages);
+
+                for (int i = 0; i < totalStages; ++i)
+                    stages.emplace_back (i, DegradationCore::wowRateMultiplierFor (i));
+
+                for (auto& s : stages)
+                    s.prepare (spec);
+
+                juce::AudioBuffer<float> buffer (2, 512);
+                std::vector<float> accum (512, 0.0f);
+
+                double sumSq = 0.0;
+                juce::int64 n = 0;
+
+                for (int block = 0; block < blocks; ++block)
+                {
+                    buffer.clear();
+                    std::fill (accum.begin(), accum.end(), 0.0f);
+
+                    for (int i = 0; i < totalStages; ++i)
+                        stages[(size_t) i].process (buffer,
+                                                    (liveStage < 0 || i == liveStage) ? 1.0f : 0.0f,
+                                                    0.0f, accum.data());
+
+                    if (block < 8)
+                        continue;
+
+                    for (float v : accum)
+                    {
+                        sumSq += (double) v * v;
+                        ++n;
+                    }
+                }
+
+                return n > 0 ? std::sqrt (sumSq / (double) n) : 0.0;
+            };
+
+            /*  **Two windows, because the first one cannot answer the question.**
+
+                Wow runs at 0.5 Hz. 200 blocks of 512 at 48 kHz is 2.13 seconds — about ONE wow
+                period. Over one period the rms of a sum of eight near-identical-frequency sinusoids
+                with independent phases is not its asymptotic value: it is one realisation of a
+                random phasor sum, which can land anywhere between zero and eight times a single
+                source. Neither 0.91x nor 0.345 is a law; both are one draw.
+
+                **This is the sample-size question, not an accumulation question**, and it is
+                answerable from the design rather than from the output: ask whether the window
+                contains enough cycles to distinguish the two answers. It does not. Flutter runs at
+                ~9.5 Hz and got about twenty cycles in the same window, which is why its 2.18x came
+                back clean and looked like a law — the two controls were never measured on comparable
+                terms.
+
+                The long window is 3000 blocks, 32 seconds, about 16 wow cycles. */
+            for (int blocks : { 200, 3000 })
+            {
+                logMessage ("  --- window " + juce::String (blocks * 512 / 48000.0, 1) + " s, ~"
+                                + juce::String (blocks * 512 / 48000.0 * 0.5, 1) + " wow cycles ---");
+                logMessage ("  stage   rate x   deviation rms");
+
+                double quadrature = 0.0;
+
+                for (int k = 0; k < totalStages; ++k)
+                {
+                    const double r = deviationRms (k, blocks);
+                    quadrature += r * r;
+
+                    logMessage ("    " + juce::String (k)
+                                    + juce::String (DegradationCore::wowRateMultiplierFor (k), 4).paddedLeft (' ', 10)
+                                    + juce::String (r, 3).paddedLeft (' ', 16));
+                }
+
+                const double all = deviationRms (-1, blocks);
+
+                logMessage ("  all eight -> " + juce::String (all, 3)
+                                + ";  quadrature -> " + juce::String (std::sqrt (quadrature), 3)
+                                + ";  ratio " + juce::String (all / juce::jmax (1.0e-9, std::sqrt (quadrature)), 3));
+
+                expect (all > 0.0, "the all-driven arm produced no deviation, so the ratio above is "
+                                    "divided by nothing");
+            }
+        }
+
         beginTest ("DEPTH RANGES — cents at the knob positions, before any range is touched");
         {
             /*  **Step 2 opens with a measurement, because the ranges may already be right.**
@@ -182,7 +290,15 @@ public:
                 double peak = 0.0, sumSq = 0.0;
                 juce::int64 n = 0;
 
-                for (int block = 0; block < 200; ++block)
+                /*  **1500 blocks = 16 s, about EIGHT wow cycles, and 200 was not enough.**
+
+                    Wow runs at 0.5 Hz, so the 200 blocks this used to run was 2.1 seconds — 1.1
+                    cycles. Over one cycle the rms of a sum of near-identical-frequency sinusoids
+                    with independent phases is one realisation of a random phasor sum, not its
+                    asymptotic value, so every wow figure measured that way was a single draw.
+                    Flutter at ~9.5 Hz got twenty cycles in the same window and was fine, which is
+                    why only the wow rows looked strange. */
+                for (int block = 0; block < 1500; ++block)
                 {
                     buffer.clear();
                     std::fill (accum.begin(), accum.end(), 0.0f);
