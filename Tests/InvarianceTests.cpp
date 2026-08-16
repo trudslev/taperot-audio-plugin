@@ -1026,6 +1026,37 @@ public:
                     return worst;
                 };
 
+                /*  **ENUMERATED before bisecting.** Everything either fixture sets, listed rather
+                    than recalled, because four comparisons in this stage have been between things
+                    that were not comparable and the arms were individually sound every time:
+
+                      sample rate      48000 both (RenderSpec default, neither overrides)
+                      channels         2 both (RenderSpec default)
+                      block sizes      { 64, 128, 511, 2048 } both, first compared against itself
+                      reference size   spec.blockSize = 512 both
+                      warm-up          warm(p), one discarded 4-block render, both
+                      configuration    shipping defaults on the driven arm, which is what the main
+                                       suite uses — the driven arm does not call `neutral` at all
+                      input            harness default on the arms below, and the fillInput rows
+                                       prove the two are interchangeable at exactly 1.000
+                      RENDER LENGTH    48 blocks here, 64 in the main suite   <- the only difference
+
+                    So the sweep below varies render length ALONE.
+
+                    ## IT DOES NOT SURVIVE, AND NEITHER DOES THE DISCREPANCY
+
+                    Render length is irrelevant: 0.125078112 at 16, 32, 48, 64, 96 and 128 blocks,
+                    identical to nine digits. And in the SAME run the main suite reads 0.028964698 /
+                    0.125078112 / 0.125078112 — the same figure.
+
+                    **The two fixtures agree exactly. There was no 65x between them.** The 0.0002 to
+                    0.0019 those rows were compared against came from a log taken BEFORE stage 4's
+                    changes: a current measurement compared against a remembered one.
+
+                    Fifth pairing failure in this stage and the worst, because the other four
+                    compared two live measurements and this compared a live one against history. The
+                    check is the same either way — establish that two figures are comparable before
+                    comparing them — and a remembered number has no fixture attached at all. */
                 logMessage ("  --- the same two configurations through both input paths ---");
                 const auto nd = cross ("neutral, harness default input", false, false);
                 const auto nf_ = cross ("neutral, this block's fillInput", false, true);
@@ -1038,6 +1069,28 @@ public:
                 logMessage ("  => default/fillInput ratio: neutral "
                                 + juce::String (nd / juce::jmax (1.0e-12, nf_), 3)
                                 + ", driven " + juce::String (dd / juce::jmax (1.0e-12, df), 3));
+
+                /*  Render length alone, shipping defaults, harness input — the one item the
+                    enumeration above leaves standing. 48 is this block's, 64 is the main suite's. */
+                logMessage ("  --- render length alone, shipping defaults, harness input ---");
+
+                for (int blocks : { 16, 32, 48, 64, 96, 128 })
+                {
+                    TapeRotAudioProcessor p;
+                    warm (p);
+
+                    nf::testing::RenderSpec s;
+                    s.blockSize = 512;
+                    s.numBlocks = blocks;
+
+                    double worst = 0.0;
+                    for (const auto& r : nf::testing::blockSizeInvariance (p, s, { 64, 128, 511, 2048 }))
+                        worst = juce::jmax (worst, r.maxAbsDifference);
+
+                    logMessage ("  " + juce::String (blocks).paddedLeft (' ', 5) + " blocks ("
+                                    + juce::String (blocks * 512 / 48000.0, 2) + " s) -> "
+                                    + juce::String (worst, 9));
+                }
 
                 /*  ## MEASURED, and the premise it was testing is refuted twice over
 
