@@ -251,7 +251,42 @@ public:
                     shape, after the pitch peak and the HF column reading hiss.
 
                     Both are reported. The rms is the law's own quantity; the peak is what a limiter
-                    downstream would meet. */
+                    downstream would meet.
+
+                    ## The +9 dB target is WITHDRAWN, and what replaces it
+
+                    +9 was the prediction for eight EQUAL, independent, unmodified sources. These are
+                    not equal: generation 8's hiss passes through nothing and generation 1's through
+                    seven model EQs, seven per-stage makeups and seven generation losses. The number
+                    to compare against is a per-model WEIGHTED power sum — each generation's hiss
+                    power weighted by the net transfer of the stages after it, integrated over the
+                    hiss spectrum.
+
+                    Computed for CASSETTE I (HighShelf 14 k -2.5 dB, Peak 60 Hz +1.5 dB, makeup
+                    -0.11 dB, loss 14 k, hiss highpassed at 2 kHz): surviving fractions 1.000, 0.554,
+                    0.363, 0.269, 0.214, 0.178, 0.152, 0.132 — a weighted sum of 2.86, or
+                    **+4.56 dB**. Measured **+2.2 dB**. A 2.36 dB gap, and it is real rather than a
+                    wrong target.
+
+                    ## The saturation candidate is REFUTED, and could not have worked
+
+                    Each generation's hiss is injected after its own stage's soft clipper and passes
+                    through every later one, and eight stages of compression on an accumulating floor
+                    would suppress it in exactly this direction. Probed by making the cascade
+                    saturation transparent (`gentleSaturationDrive` to 0.001, so `tanh(x*d)/d` is
+                    linear) and re-running: the noise column came back **identical at every
+                    generation to the printed digit** — -40.7 / -39.5 / -39.1 / -38.7 / -38.7 / -38.5
+                    / -38.5 / -38.4, unchanged.
+
+                    **And the reason is arithmetic that was available before the run**: `tanh` is
+                    linear for small arguments, the hiss sits 40 dB down, so `tanh(0.0135)/1.35`
+                    differs from unity by 6 parts in 100000. A soft clipper cannot compress a signal
+                    that never leaves its linear region. The candidate fitted the DIRECTION of the
+                    gap, which is what made it worth probing and also what makes it a warning: an
+                    explanation that merely fits is what produced the /tanh exclusion earlier in this
+                    stage.
+
+                    The gap is open. It is not the metric, not the target, and not the saturation. */
                 double noisePeak = 0.0, noiseSumSq = 0.0;
                 juce::int64 noiseCount = 0;
                 {
