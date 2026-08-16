@@ -114,8 +114,8 @@ juce_add_plugin(TapeRot
     # clean 1024 and 256 entries. JUCE builds the .icns and .ico at CONFIGURE time and these PNGs are
     # not configure dependencies - after changing the artwork, re-run cmake -B build or the previous
     # icon ships silently.
-    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot_icon_1024.png"
-    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icon/taperot_icon_256.png"
+    ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/design/icons/taperot-icon-1024.png"
+    ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/design/icons/taperot-icon-256.png"
     # Without this the Standalone cannot get audio INPUT on macOS, and fails silently doing it.
     # An app with no NSMicrophoneUsageDescription is never granted capture access - the OS does not
     # prompt and does not error, the input stream simply delivers zeros. On an effect that reads as
