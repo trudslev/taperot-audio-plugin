@@ -1134,6 +1134,99 @@ public:
                     **The shape is reported and the mechanism is NOT named.** Three candidates in
                     this stage fitted the direction of their gap and were wrong, and this is the
                     counterintuitive one where a fitting explanation is most tempting. */
+                /*  ## TWO DISCRIMINATORS, and the shape is not a clean step
+
+                    Re-read: the 128 column is flat at 0.000200262 from 960 samples up and then
+                    jumps, while the 511 and 2048 columns DECAY — 0.125 / 0.041 / 0.011 / 0.001 —
+                    and reach floor only at 1080. Different columns hit the floor at different
+                    centres, which a single boundary crossing does not produce. Something scales
+                    with block size AND has a floor.
+
+                    **Sample rate** separates a sample-domain property from a time-domain one. The
+                    centre is 15 ms = 720 samples at 48 k and 1440 at 96 k. A boundary that stays
+                    near 1000 SAMPLES means a buffer, pointer or index relationship, and 96 k should
+                    come back clean. One that stays near 21 MS means a property of the delay line in
+                    time, and 96 k should diverge exactly as 48 k does.
+
+                    **Depth** separates the modulator from the line. WARM CASSETTE's depths are
+                    small; at maximum the downward excursion is 618 samples, so if the boundary
+                    tracks centre-minus-excursion rather than centre, the mechanism is about how
+                    close the read pointer gets to something.
+
+                    **Zero depth is the stronger arm.** A STATIC delay line diverging across block
+                    sizes is a finding in its own right and would exonerate the modulator entirely. */
+                logMessage ("  --- depth and sample rate at the current 15 ms centre ---");
+
+                for (double rate : { 48000.0, 96000.0 })
+                    for (auto depth : { std::pair<const char*, float> { "zero", 0.0f },
+                                        std::pair<const char*, float> { "WARM CASSETTE", -1.0f },
+                                        std::pair<const char*, float> { "maximum", 100.0f } })
+                    {
+                        TapeRotAudioProcessor p;
+
+                        if (depth.second >= 0.0f)
+                        {
+                            setP (p, ParamIDs::wow, depth.second);
+                            setP (p, ParamIDs::flutter, depth.second);
+                        }
+
+                        nf::testing::RenderSpec s;
+                        s.sampleRate = rate;
+                        s.blockSize = 512;
+                        s.numBlocks = 48;
+
+                        nf::testing::render (p, s);      // warm
+
+                        double c128 = 0.0, c511 = 0.0, c2048 = 0.0;
+                        const auto rows = nf::testing::blockSizeInvariance (p, s, { 64, 128, 511, 2048 });
+                        if (rows.size() >= 4)
+                        {
+                            c128 = rows[1].maxAbsDifference;
+                            c511 = rows[2].maxAbsDifference;
+                            c2048 = rows[3].maxAbsDifference;
+                        }
+
+                        logMessage ("  " + juce::String (rate / 1000.0, 0) + " kHz, depth "
+                                        + juce::String (depth.first).paddedRight (' ', 15)
+                                        + "(centre " + juce::String (juce::roundToInt (15.0 * rate / 1000.0))
+                                        + " samples) -> " + juce::String (c128, 9)
+                                        + "  " + juce::String (c511, 9)
+                                        + "  " + juce::String (c2048, 9));
+                    }
+
+                /*  ## MEASURED — and the boundary framing is refuted, so the bisection is not run
+
+                      48 kHz  zero            (720)   0.049608290  0.098989755  0.098989755
+                      48 kHz  WARM CASSETTE   (720)   0.028964698  0.125078112  0.125078112
+                      48 kHz  maximum         (720)   0.037982941  0.195574939  0.355001271
+                      96 kHz  zero           (1440)   0.068237662  0.271299407  0.304790836
+                      96 kHz  WARM CASSETTE  (1440)   0.065034419  0.242564114  0.418667771
+                      96 kHz  maximum        (1440)   0.061560512  0.276057541  0.766958475
+
+                    **ZERO DEPTH DIVERGES.** A static delay line — no wow, no flutter, a constant
+                    read offset — is block-size dependent at 0.0496 / 0.0990 / 0.0990. The modulator
+                    is exonerated entirely, and this is a finding in its own right rather than a step
+                    toward one: nothing about a fixed delay should care how the stream is cut.
+
+                    **96 kHz is WORSE, not better**, and that kills the boundary. At 96 k the centre
+                    is 1440 samples — well above the ~1000 the sweep suggested — and zero depth reads
+                    0.068 / 0.271 / 0.305 against 48 k's 0.050 / 0.099 / 0.099. A sample-count
+                    boundary predicts clean; the figures are three times dirtier.
+
+                    Nor is it simply time: 15 ms is dirty at both rates and 25 ms was clean at 48 k,
+                    which fits a time-domain threshold, but a time-domain threshold does not also
+                    predict 96 k being three times worse at the SAME 15 ms. Two properties, not one.
+
+                    **The bisection between 960 and 1080 samples is deliberately NOT run.** It was
+                    scoped to find a boundary these arms say is not there, and bisecting a refuted
+                    framing is the waste this stage has already paid for three times. The decisive
+                    missing cell is 25 ms at 96 kHz: clean would make the threshold time-domain with
+                    a separate rate-dependent magnitude, dirty would rule the centre out as the
+                    variable altogether.
+
+                    **No mechanism is named.** Three candidates this stage fitted the direction of
+                    their gap and were wrong, and a static delay line that is not block-invariant
+                    invites a confident story more than any of them. */
                 logMessage ("  --- render length alone, WARM CASSETTE (the constructor's Program), harness input ---");
 
                 for (int blocks : { 16, 32, 48, 64, 96, 128 })
