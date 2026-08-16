@@ -1058,6 +1058,9 @@ public:
                     check is the same either way — establish that two figures are comparable before
                     comparing them — and a remembered number has no fixture attached at all. */
                 logMessage ("  --- the same two configurations through both input paths ---");
+                // NOTE: the \"driven\" arm is factory Program 01 WARM CASSETTE, applied by the
+                // constructor — WOW 20.00 %, FLUTTER 6.70 % — not the parameter defaults of 30/25.
+                // Every figure it produces is that Program's.
                 const auto nd = cross ("neutral, harness default input", false, false);
                 const auto nf_ = cross ("neutral, this block's fillInput", false, true);
                 const auto dd = cross ("driven,  harness default input", true,  false);
@@ -1101,7 +1104,37 @@ public:
                                     + juce::String (physical (ParamIDs::flutter), 2) + " %");
                 }
 
-                logMessage ("  --- render length alone, shipping defaults, harness input ---");
+                /*  ## THE CENTRE SWEEP — a STEP, not a decay
+
+                    `nominalDelayMs` swept 15 / 17.5 / 20 / 22.5 / 25 ms, same configuration, same
+                    fixture, one rebuild per point (the constant is `constexpr`):
+
+                      15.0 ms   720 samples   0.028964698  0.125078112  0.125078112
+                      17.5 ms   840 samples   0.020706356  0.040588230  0.040588275
+                      20.0 ms   960 samples   0.000200262  0.011024952  0.011025012
+                      22.5 ms  1080 samples   0.000200262  0.001022242  0.001926094
+                      25.0 ms  1200 samples   0.000200262  0.001022242  0.001926094
+
+                    **22.5 and 25.0 are IDENTICAL to nine digits**, so there is a floor rather than a
+                    slope, and the chain's residual block dependence at those centres is whatever it
+                    always was. The 128 column is flat at 0.000200262 for 20.0, 22.5 and 25.0 and
+                    then steps.
+
+                    A monotonic decay would have meant a continuous property of the centre and a
+                    search for a mechanism that scales with it. **A floor with a step above it means
+                    something crosses a boundary between 1080 and 960 samples** — which is a much
+                    narrower question, and a boundary is the kind of thing a fix can move without
+                    moving the centre.
+
+                    So this is a defect the centre EXPOSES rather than a price it charges, which is
+                    what the physical argument said it should be: every block-dependence mechanism
+                    this sweep has found scales with how much happens per block, and a shorter centre
+                    reduces all of them.
+
+                    **The shape is reported and the mechanism is NOT named.** Three candidates in
+                    this stage fitted the direction of their gap and were wrong, and this is the
+                    counterintuitive one where a fitting explanation is most tempting. */
+                logMessage ("  --- render length alone, WARM CASSETTE (the constructor's Program), harness input ---");
 
                 for (int blocks : { 16, 32, 48, 64, 96, 128 })
                 {
