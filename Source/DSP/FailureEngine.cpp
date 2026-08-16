@@ -19,6 +19,31 @@ void FailureEngine::prepare(const juce::dsp::ProcessSpec& spec)
     crinkleHpfPrevInput.assign((size_t) numChannels, 0.0f);
     crinkleHpfCoeff = 1.0f - std::exp(-juce::MathConstants<float>::twoPi * crinkleHpfHz / (float) sampleRate);
 
+    /*  **HERE, and not in `reset()`, and that placement is a ruling rather than a preference.**
+
+        `random` was seeded once at construction and nowhere else, which made this the only generator
+        in the suite that failed even the *prepare* premise: two renders of the same audio through
+        one instance were different performances, measured at a self-comparison of **0.914** with
+        FAILURE at 100. Every block-size figure taken in that configuration was that number wearing a
+        different name.
+
+        Nothing was affected while FAILURE defaulted to 0 and no audio test applied a Program - and
+        both halves of that stop being true at the same moment, because `FactoryPrograms.h:77` carries
+        a non-zero `failurePercent` and the realism work ends in rewriting the bank. The first audio
+        test written against the rewritten Programs would have read as non-deterministic for a reason
+        nobody would connect to a generator seed, and the symptom would have looked like the Program
+        rewrite breaking something. That is why it lands ahead of it.
+
+        **A `reset()` owes a cleared tail, not a rewound generator** - it is a transport event rather
+        than an instantiation, and a stream rewound by it replays identical crinkle on every lap of a
+        loop. `nf::testing::reproducibleAcrossReset` measures the difference across all six castings;
+        this engine now matches the other four rather than Chorus-60's former superset.
+
+        An earlier note in the root CLAUDE.md said to seed `FailureEngine::reset()`. That predates the
+        driver and is superseded by it.
+    */
+    random = juce::Random(generatorSeed);
+
     reset();
 }
 

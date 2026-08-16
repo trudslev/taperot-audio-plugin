@@ -106,7 +106,11 @@ private:
 
     EventState dropoutState, snagState, crinkleState, wobbleState;
 
-    juce::Random random{(juce::int64) 0x9E3779B97F4A7C15LL};
+    // Re-seeded in prepare(), NOT in reset() — the ruling and its figures are beside that line.
+    // It was seeded here at construction and nowhere else, which made two renders of the same audio
+    // through one instance different performances: a measured self-comparison of 0.914 at FAILURE 100.
+    static constexpr juce::int64 generatorSeed = (juce::int64) 0x9E3779B97F4A7C15LL;
+    juce::Random random{generatorSeed};
     double sampleRate = 44100.0;
     juce::int64 samplePosition = 0;
     float crinkleHpfCoeff = 0.0f;

@@ -1320,8 +1320,28 @@ public:
             expect (true);   // locating
         }
 
-        beginTest ("FAILURE — a DETERMINISM defect, and the line is FailureEngine::reset()");
+        beginTest ("FAILURE — a determinism defect, FIXED, and the block-size question with it");
         {
+            /*  **CLOSED 2026-08-16. `FailureEngine::prepare` seeds `random`, and the whole of this
+                block changed meaning.**
+
+                The finding below stands exactly as written and its fix is one line. What is worth
+                reading first is what the fix did to the *rest* of this block: FAILURE 100 in the
+                steady window now measures **0.000000000 with a self-comparison of 0.000000000**,
+                where it measured 0.914. **It was never block dependent.** Every cut beneath the
+                control — MIX, the through-signal, FAILURE's own level, block-size monotonicity — was
+                bisecting a divergence that does not exist, and each now reads zero. They are kept
+                and left reporting because a row of zeros where a hunt used to be is the clearest
+                statement that the hunt is over.
+
+                **Seeded in `prepare` and NOT in `reset`**, which is the suite ruling: a reset owes a
+                cleared tail, not a rewound generator. The note that used to sit in the root
+                CLAUDE.md saying to seed `reset()` predates `nf::testing::reproducibleAcrossReset`
+                and is superseded by it.
+
+                The original finding follows, unchanged.
+
+                ## RECLASSIFIED TWICE. It is not an invariance finding at all. */
             // **RECLASSIFIED TWICE. It is not an invariance finding at all.**
             //
             // First it was "the worst of three generator rows" in a block-size table; then its own
@@ -1506,13 +1526,64 @@ public:
                 };
             };
 
+            /*  **The control INVERTED when the seed fix landed, and that is the defect closing
+                rather than an assertion being relaxed.**
+
+                It read `expectGreaterThan (control.worst, 1e-9)` — FAILURE must diverge, or every
+                arm below is measuring nothing. That was a vacuity guard, and it was correct while
+                the divergence it depended on was the **0.914 non-determinism**. With `random`
+                seeded in `prepare`, FAILURE at 100 is sample-exact across block sizes, so the guard
+                now asserts the presence of a defect that has been fixed. Third time this session
+                that an assertion turned out to state the SYMPTOM rather than the property.
+
+                So it is inverted — and the vacuity it guarded against has to be rebuilt from
+                something else. **Which turned out to be harder than expected, and the attempt is
+                worth recording.**
+
+                The obvious replacement was NOISE, which the block above measures at 0.000224769 in
+                a window built from the same two constants. Run through THIS block's helper it comes
+                back **0.000000000**. The configurations are identical line for line; the helpers
+                are not — this one discards a 512 render before measuring and reports a
+                self-comparison, and the one above does neither. So the two figures differ by the
+                warm-up, which is the confound this file has already been corrected for once.
+
+                **That leaves this window with no processor-level positive control at all**, and the
+                honest reading is that it agrees with what the hunt concluded: the divergence is
+                confined to the first ~20 ms of every render and is exactly zero from 24 ms, so a
+                window skipping 128 ms should find nothing. Every row here reading zero is the
+                expected answer rather than a broken fixture — but "expected" is not "shown", so the
+                COMPARISON is proved able to fail directly instead, with `nf::testing::perturbByOneLsb`
+                on a sample inside the window. That proves what can be proved here and does not
+                dress it up as more. */
             logMessage ("  --- both directions on the window ---");
-            const auto control = steadyWith ("FAILURE 100 (must diverge)", withFailure (100.0f, 50.0f));
+            const auto control = steadyWith ("FAILURE 100 (now exact)", withFailure (100.0f, 50.0f));
             const auto blank   = steadyWith ("no generator (must be exact)", neutral);
 
-            expectGreaterThan (control.worst, 1.0e-9,
-                               "FAILURE did not diverge in the steady window, so every arm below "
-                               "is measuring nothing");
+            {
+                TapeRotAudioProcessor p;
+                neutral (p);
+                renderSteady (p, 512, 1.0f);
+
+                const auto reference = renderSteady (p, 64, 1.0f);
+                auto perturbed = reference;
+                nf::testing::perturbByOneLsb (perturbed, 0, (size_t) steadySkip + 1000);
+
+                const auto seen = compareSteady (reference, perturbed);
+                logMessage ("  one-LSB control (must differ)  steady |delta| "
+                                + juce::String (seen.worst, 12));
+
+                expectGreaterThan (seen.worst, 0.0,
+                                   "compareSteady reported a one-LSB perturbation INSIDE its own "
+                                   "window as identical, so every 0.000000000 in this block is a "
+                                   "comparison that cannot fail rather than a chain that does not "
+                                   "diverge");
+            }
+
+            expectEquals (control.worst, 0.0,
+                          "FAILURE diverged with block size in the steady window. It measured 0.914 "
+                          "before FailureEngine::prepare seeded `random` and 0.000000000 after, so "
+                          "the whole of that figure was non-determinism rather than block "
+                          "dependence — a difference here means the seed is not reaching it");
 
             expectEquals (blank.worst, 0.0,
                           "the generator-free chain diverged in this window, so the window is the "
@@ -2023,21 +2094,18 @@ public:
                 check by construction. Prepare once, then `reset()`, render, `reset()`, render is a
                 different question, and a host asks it on every transport locate.
 
-                **MEASURED AND REPORTED, not asserted.** `NoiseSource`'s three generators per channel
-                and `WowFlutter`'s one per channel are all seeded in `prepare` and nowhere else, so a
-                host `reset()` leaves every stream running — *predicted* to make this differ. Whether
-                that is a defect or the correct contract is an open ruling, and it is the same ruling
-                that decides how `FailureEngine::reset()` gets seeded when that scheduled fix lands
-                ahead of the Program rewrite. **The measurement comes first.**
+                **RULED: a reset owes a cleared tail, not a rewound generator**, so this row asserts
+                that every stream DOES continue. `NoiseSource`'s three generators per channel and
+                `WowFlutter`'s one per channel are seeded in `prepare` and nowhere else, and that is
+                correct rather than merely current: a reset is a transport event rather than an
+                instantiation, and a rewound stream replays identical hiss on every lap of a loop.
 
-                **FAILURE IS HELD AT 0, and that is not tidying.** `FailureEngine::random` is seeded
-                at construction and nowhere else, so with FAILURE engaged this processor is
-                irreproducible across *prepare* too — measured at a self-comparison of 0.914. An arm
-                that drove it would fail the reset row for a reason this driver is not asking about,
-                and the premise line above would be the only thing saying so.
+                The measurement came before the ruling — all six driven through this driver, this
+                casting the largest at 0.702730507 — and it is the same ruling that settled how
+                `FailureEngine` gets seeded. See the arm below, which that fix made possible.
 
-                NOISE and WOW/FLUTTER at full, because a generator turned down reports reset-clean
-                whatever `reset()` does. */
+                **FAILURE is at 0 HERE, and the arm below is the one that drives it.** Splitting them
+                keeps this row about the two generators it names. */
             TapeRotAudioProcessor processor;
 
             const auto setP = [&processor] (const juce::String& id, float value)
@@ -2063,10 +2131,93 @@ public:
                     "this processor is not reproducible across prepare with FAILURE at 0, so its "
                     "reset row means nothing: " + r.acrossPrepare.describe());
 
-            logMessage (juce::String ("  => ") + (r.acrossReset.sampleExact
-                            ? "reset() restores the generator streams — CONTRADICTS the prediction"
-                            : "reset() leaves the generator streams running, as predicted from where "
-                              "they are seeded. Awaiting the ruling, not filed as a defect."));
+            expect (! r.acrossReset.sampleExact,
+                    "reset() rewound the generator streams. RULED: a reset owes a cleared tail, not "
+                    "a rewound generator — NoiseSource and WowFlutter seed in prepare and must not "
+                    "also seed in reset: " + r.acrossReset.describe());
+        }
+
+        beginTest ("FAILURE at 100 is now reproducible from prepare, which it never was");
+        {
+            /*  **This configuration could not be measured at all until `FailureEngine::prepare`
+                seeded its generator.** `random` was seeded once at construction and nowhere else, so
+                two renders of the same audio through one instance were different performances: a
+                measured self-comparison of **0.914**. Every block-size figure ever taken with FAILURE
+                engaged was that number wearing a different name, and one of them was written up as a
+                block-size finding before the self-comparison rule caught it.
+
+                **Nothing was affected while FAILURE defaulted to 0 and no audio test applied a
+                Program — and both halves stop being true at the same moment.** `FactoryPrograms.h:77`
+                carries a non-zero `failurePercent`, and the realism work ends in rewriting the bank,
+                so the first audio test written against the rewritten Programs would have read as
+                non-deterministic for a reason nobody would connect to a generator seed. The symptom
+                would have looked like the Program rewrite breaking something. That is why the fix
+                landed ahead of it rather than beside it.
+
+                The reset row is asserted to DIFFER for the same reason as the arm above: seeded in
+                `prepare`, not in `reset`, matching the suite's other four generators.
+
+                ## TEN SECONDS, and the first version of this arm ran 0.17 and reported nothing
+
+                The four event rates sum to **3.75/sec at full** (`FailureEngine.h:76-79`), so 16
+                blocks of 512 is **0.64 expected events** — most renders fire none, both arms produce
+                identical audio, and the row comes back sample-exact for the trivial reason. It did.
+                That is this sweep's own *can the sample size distinguish the two answers* tell,
+                walked into on the arm written to demonstrate the sibling rule.
+
+                940 blocks is 10.0 s, so ~38 events. The control below is what makes that checkable
+                rather than argued: **FAILURE 100 must differ from FAILURE 0 through this exact
+                configuration.** If it does not, the engine is not reaching the output and every
+                figure in this block is about something else. */
+            nf::testing::RenderSpec spec;
+            spec.blockSize = 512;
+            spec.numBlocks = 940;                // 10.0 s at 48 k — see above, 0.17 s reported nothing
+
+            const auto configure = [] (TapeRotAudioProcessor& p, float failurePercent)
+            {
+                const auto setP = [&p] (const juce::String& id, float value)
+                {
+                    if (auto* q = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                        q->setValueNotifyingHost (q->getNormalisableRange().convertTo0to1 (value));
+                };
+
+                setP (ParamIDs::failure, failurePercent);
+                setP (ParamIDs::noise, 0.0f);    // FAILURE alone, so a difference names one engine
+                setP (ParamIDs::wow, 0.0f);
+                setP (ParamIDs::flutter, 0.0f);
+                setP (ParamIDs::mix, 100.0f);
+            };
+
+            // The control first, so a dead arm cannot be read as a clean one.
+            {
+                TapeRotAudioProcessor off, on;
+                configure (off, 0.0f);
+                configure (on, 100.0f);
+
+                const auto engaged = nf::testing::compareRenders (nf::testing::render (off, spec),
+                                                                  nf::testing::render (on, spec));
+                logMessage ("  CONTROL FAILURE 0 vs 100 -> " + engaged.describe());
+
+                expect (! engaged.sampleExact,
+                        "FAILURE at 100 produced identical audio to FAILURE at 0 over 10 seconds, so "
+                        "this engine is not reaching the output and both rows below are about "
+                        "something else entirely");
+            }
+
+            TapeRotAudioProcessor processor;
+            configure (processor, 100.0f);
+
+            const auto r = nf::testing::reproducibleAcrossReset (processor, spec);
+            logMessage ("  " + r.describe());
+
+            expect (r.premiseHeld(),
+                    "FAILURE at 100 is still irreproducible across prepare. FailureEngine::prepare "
+                    "seeds `random` precisely so this holds — it was 0.914 before that line existed: "
+                        + r.acrossPrepare.describe());
+
+            expect (! r.acrossReset.sampleExact,
+                    "reset() rewound FailureEngine's generator. RULED: seeded in prepare, not in "
+                    "reset: " + r.acrossReset.describe());
         }
 
         beginTest ("Offline against real-time");
