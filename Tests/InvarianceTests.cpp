@@ -1991,6 +1991,111 @@ public:
             const auto at64b  = renderAutomated (64);
             const auto at2048 = renderAutomated (2048);
 
+            /*  ## LOCALISATION, run BEFORE stage 2 touches TapeModelEQ
+
+                The ordering matters and is the whole reason this block exists here rather than
+                after. `TapeModelEQ` carries **two** findings — the every-prepare `activeModelIndex`
+                re-arm that stage 2 fixes, and being the first candidate for this residue — and two
+                findings on one member is exactly where the wrong change collects the credit. So the
+                residue is characterised while that member is untouched.
+
+                Two variations, each answering one question, both reported rather than asserted:
+
+                  - **A longer warm-up** spends anything armed by `prepare` and stepped per block.
+                    `TapeModelEQ`'s crossfade is precisely that shape, and so is `NoiseSource`'s
+                    character crossfade. If the residue is unchanged at 4x the warm-up, neither is
+                    what this measures.
+                  - **One boundary against seven.** The subdivision splits a span at every integer
+                    GEN crossing, so its own cost should scale with how many crossings the ramp
+                    makes. A residue flat in the number of boundaries is not the subdivision's.
+
+                Neither variation can be run after `TapeModelEQ` changes and still mean this. */
+            const auto residueWith = [&] (int warmMultiplier, float genTarget)
+            {
+                const auto render = [&] (int blockSize)
+                {
+                    TapeRotAudioProcessor p;
+
+                    setP (p, ParamIDs::drive, 0.0f);   setP (p, ParamIDs::wow, 0.0f);
+                    setP (p, ParamIDs::flutter, 0.0f); setP (p, ParamIDs::failure, 0.0f);
+                    setP (p, ParamIDs::hum, 0.0f);     setP (p, ParamIDs::spread, 0.0f);
+                    setP (p, ParamIDs::noise, 0.0f);   setP (p, ParamIDs::mix, 100.0f);
+                    setP (p, ParamIDs::model, 5.0f);
+
+                    p.setRateAndBufferSizeDetails (fs, blockSize);
+                    p.prepareToPlay (fs, blockSize);
+                    p.reset();
+
+                    juce::AudioBuffer<float> buffer (2, blockSize);
+                    juce::MidiBuffer midi;
+
+                    setP (p, ParamIDs::gen, 1.0f);
+
+                    for (int done = 0; done < warmSamples * warmMultiplier; done += blockSize)
+                    {
+                        buffer.clear();
+                        midi.clear();
+                        p.processBlock (buffer, midi);
+                    }
+
+                    std::vector<std::vector<float>> out (2);
+                    int absolute = 0;
+
+                    setP (p, ParamIDs::gen, genTarget);
+
+                    for (int b = 0; b < totalSamples / blockSize; ++b)
+                    {
+                        for (int ch = 0; ch < 2; ++ch)
+                            for (int i = 0; i < blockSize; ++i)
+                                buffer.setSample (ch, i, sampleAt (absolute + i, ch));
+
+                        midi.clear();
+                        p.processBlock (buffer, midi);
+
+                        for (int ch = 0; ch < 2; ++ch)
+                        {
+                            const auto* read = buffer.getReadPointer (ch);
+                            out[(size_t) ch].insert (out[(size_t) ch].end(), read, read + blockSize);
+                        }
+
+                        absolute += blockSize;
+                    }
+
+                    return out;
+                };
+
+                const auto a = render (64);
+                const auto selfCheck = worst (a, render (64));
+                const auto span = worst (a, render (2048));
+
+                logMessage ("  warm x" + juce::String (warmMultiplier)
+                                + ", GEN 1 -> " + juce::String (genTarget, 0)
+                                + juce::String (genTarget < 10.0f ? " " : "")
+                                + "  residue " + juce::String (span, 9)
+                                + "   (self " + juce::String (selfCheck, 9) + ")");
+                return span;
+            };
+
+            logMessage ("  --- localisation, TapeModelEQ UNTOUCHED ---");
+            const auto warm1 = residueWith (1, 8.0f);
+            const auto warm4 = residueWith (4, 8.0f);
+            const auto oneBoundary = residueWith (1, 2.0f);
+
+            logMessage (juce::String ("  => warm-up: ")
+                            + (std::abs (warm4 - warm1) < 1.0e-9
+                                   ? "UNCHANGED at 4x, so nothing armed by prepare and stepped per "
+                                     "block is what this measures — TapeModelEQ's crossfade and "
+                                     "NoiseSource's character crossfade are both excluded"
+                                   : "MOVED at 4x, so something armed by prepare is still expressing "
+                                     "when the measurement starts"));
+            logMessage (juce::String ("  => boundaries: one crossing gives ")
+                            + juce::String (oneBoundary, 9) + " against seven at "
+                            + juce::String (warm1, 9)
+                            + (oneBoundary > 1.0e-9
+                                   ? " — present at a single crossing, so it is per-crossing rather "
+                                     "than cumulative"
+                                   : " — ABSENT at a single crossing, so it needs more than one"));
+
             double peak = 0.0;
             for (const auto& ch : at64)
                 for (float v : ch)
