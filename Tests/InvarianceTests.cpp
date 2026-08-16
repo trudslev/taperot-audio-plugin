@@ -846,6 +846,22 @@ public:
                     for (size_t i = 0; i < juce::jmin (viaDefault[ch].size(), viaFill[ch].size()); ++i)
                         worst = juce::jmax (worst, (double) std::abs (viaDefault[ch][i] - viaFill[ch][i]));
 
+                /*  **THIS CHECK IS WHAT SETTLED THE STAGE-4 FAILURE, and it settled it against the
+                    fixture's own predecessor.**
+
+                    The gain-1 arm below began failing at 0.090253919 after step 1's generator
+                    changes and step 3's centre re-sizing, and nothing distinguished "the fixture
+                    moved" from "the chain moved" — both landed between the last green and the red.
+
+                    This row does distinguish them, and it reads **exactly 0.000000000**: the
+                    transcribed generator reproduces the harness's own bit for bit, so the two paths
+                    are fed an identical signal. The divergence below is therefore the PROCESSOR,
+                    not the fixture.
+
+                    That is the rebuilt control earning its place twice over. Its predecessor was
+                    guarded `if (inputGain != 1.0f)` and never installed the path under test — it
+                    ran, passed, and could not have failed. This one refuses to certify a fixture
+                    whose path has diverged, and when the alarm went off it also said which side. */
                 logMessage ("  transcription check, default against fillInput at gain 1 -> "
                                 + juce::String (worst, 9));
 
