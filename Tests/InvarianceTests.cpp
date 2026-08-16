@@ -2015,6 +2015,60 @@ public:
                             "rather than the smoother: " + juce::String (span, 9));
         }
 
+        beginTest ("Reproducible across reset() ALONE, with the generators driven and FAILURE held off");
+        {
+            /*  **A path nothing in this suite could reach until `nf::testing::renderBlocks` existed.**
+                `render` calls `prepareToPlay` on every invocation, so every premise check in this
+                file — including the one this hunt spent three sessions relying on — is a *prepare*
+                check by construction. Prepare once, then `reset()`, render, `reset()`, render is a
+                different question, and a host asks it on every transport locate.
+
+                **MEASURED AND REPORTED, not asserted.** `NoiseSource`'s three generators per channel
+                and `WowFlutter`'s one per channel are all seeded in `prepare` and nowhere else, so a
+                host `reset()` leaves every stream running — *predicted* to make this differ. Whether
+                that is a defect or the correct contract is an open ruling, and it is the same ruling
+                that decides how `FailureEngine::reset()` gets seeded when that scheduled fix lands
+                ahead of the Program rewrite. **The measurement comes first.**
+
+                **FAILURE IS HELD AT 0, and that is not tidying.** `FailureEngine::random` is seeded
+                at construction and nowhere else, so with FAILURE engaged this processor is
+                irreproducible across *prepare* too — measured at a self-comparison of 0.914. An arm
+                that drove it would fail the reset row for a reason this driver is not asking about,
+                and the premise line above would be the only thing saying so.
+
+                NOISE and WOW/FLUTTER at full, because a generator turned down reports reset-clean
+                whatever `reset()` does. */
+            TapeRotAudioProcessor processor;
+
+            const auto setP = [&processor] (const juce::String& id, float value)
+            {
+                if (auto* p = dynamic_cast<juce::RangedAudioParameter*> (processor.apvts.getParameter (id)))
+                    p->setValueNotifyingHost (p->getNormalisableRange().convertTo0to1 (value));
+            };
+
+            setP (ParamIDs::noise, 100.0f);
+            setP (ParamIDs::wow, 100.0f);
+            setP (ParamIDs::flutter, 100.0f);
+            setP (ParamIDs::failure, 0.0f);      // see above — not tidying
+            setP (ParamIDs::mix, 100.0f);
+
+            nf::testing::RenderSpec spec;
+            spec.blockSize = 512;
+            spec.numBlocks = 16;
+
+            const auto r = nf::testing::reproducibleAcrossReset (processor, spec);
+            logMessage ("  " + r.describe());
+
+            expect (r.premiseHeld(),
+                    "this processor is not reproducible across prepare with FAILURE at 0, so its "
+                    "reset row means nothing: " + r.acrossPrepare.describe());
+
+            logMessage (juce::String ("  => ") + (r.acrossReset.sampleExact
+                            ? "reset() restores the generator streams — CONTRADICTS the prediction"
+                            : "reset() leaves the generator streams running, as predicted from where "
+                              "they are seeded. Awaiting the ruling, not filed as a defect."));
+        }
+
         beginTest ("Offline against real-time");
         {
             TapeRotAudioProcessor processor;
