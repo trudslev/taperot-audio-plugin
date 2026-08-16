@@ -59,7 +59,11 @@ public:
         {
             auto stage0 = makeCascadeStage(0, spec);
 
-            WowFlutter wow;
+            // **Stage 0's own rate multiplier, not the default 1.0f.** `wowRateMultiplierFor` is a
+            // draw now rather than `1.0 + index * ramp`, so stage 0 is no longer 1.0 and a
+            // default-constructed WowFlutter is a different transport. Read from the function the
+            // cascade calls — the same correction the pitch fixture needed.
+            WowFlutter wow { 0, DegradationCore::wowRateMultiplierFor(0) };
             wow.prepare(spec);
             TapeModelEQ eq;
             eq.prepare(spec, 0);
@@ -70,12 +74,39 @@ public:
             auto actual = input;
             auto expected = input;
 
+            /*  **The parts list gained an element, and that is the point of this test.** Every
+                generation now applies its own HF loss — the law GEN is supposed to express and the
+                one that was missing — so a cascade stage is wow -> model EQ -> GENERATION LOSS ->
+                noise. Without the loss here this asserted the cascade equals a chain the plugin no
+                longer runs, and it did: 2054 sample-by-sample failures, one per sample, which is
+                what a structural change to the chain looks like through this fixture.
+
+                The coefficient comes from `DegradationCore::generationLossCoeffFor` rather than
+                being transcribed. This test rebuilds the parts by nature, so a copied number would
+                let the two drift apart while it kept passing — the check whose input derives from
+                somewhere other than the thing it checks. */
+            const float lossCoeff = DegradationCore::generationLossCoeffFor(spec.sampleRate);
+            std::vector<float> lossState((size_t) numChannels, 0.0f);
+
             for (int block = 0; block < 5; ++block)
             {
                 stage0->process(actual, 0.5f, 0.3f, 2, false, 0.4f, NoiseSource::tape);
 
                 wow.process(expected, 0.5f, 0.3f);
                 eq.process(expected, 2, false);
+
+                for (int ch = 0; ch < numChannels; ++ch)
+                {
+                    auto* data = expected.getWritePointer(ch);
+                    auto& state = lossState[(size_t) ch];
+
+                    for (int i = 0; i < blockSize; ++i)
+                    {
+                        state += lossCoeff * (data[i] - state);
+                        data[i] = state;
+                    }
+                }
+
                 noise.process(expected, 0.4f, NoiseSource::tape);
             }
 

@@ -58,6 +58,20 @@ private:
         // Metering only: last block's final delay, so the derivative is continuous across
         // block boundaries instead of showing a spurious spike on the first sample.
         float previousDelaySamples = 0.0f;
+
+        /*  **Primed on the first sample after a reset, rather than guessed at reset time.**
+
+            The pitch tap is the DERIVATIVE of the delay line, so it needs a previous value. Reset
+            used to seed that with the centre delay, which is right only while the modulation also
+            starts at its centre — true when every wow oscillator started at phase 0, and false as
+            soon as they start at independent phases. Seeded wrong, the first sample reports a full
+            step as a derivative: measured at 797317 cents against a real 400.
+
+            Reset cannot compute the right value, because the delay depends on the wow and flutter
+            depths and those arrive as process arguments. So the first sample after a reset takes
+            whatever the delay actually is and reports zero deviation for it — which is what a
+            derivative with no predecessor honestly is. */
+        bool deviationPrimed = false;
         juce::Random random;
     };
 

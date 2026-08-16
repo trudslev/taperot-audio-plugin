@@ -27,15 +27,31 @@ void WowFlutter::reset()
     delayLine.reset();
     for (auto& c : channels)
     {
-        c.wowPhase = 0.0;
-        c.flutterPhase = 0.0;
+        /*  **An independent starting phase per stage, and it used to be zero for every one.**
+
+            The rate spread is what keeps eight transports apart over time; the starting phase is
+            what separates them at t = 0. With every wow oscillator starting at phase 0 and running
+            at nearly the same rate, eight generations were phase-coherent from the first sample and
+            their deviations added — measured 7.96x at GEN 8 against 8.00x for perfect correlation.
+
+            **Rate alone was not enough, and the measurement said so rather than the reasoning.**
+            With a +/-25 % rate spread and a common start, GEN 8 came back at 6.98x: over a two-second
+            passage, which is about one wow period, a 25 % rate difference has not yet pulled the
+            phases apart. The two mechanisms do different jobs and both are needed.
+
+            Derived from the same per-stage stream as everything else here, so it stays
+            deterministic. */
+        c.wowPhase = (double) c.random.nextFloat() * juce::MathConstants<double>::twoPi;
+        c.flutterPhase = (double) c.random.nextFloat() * juce::MathConstants<double>::twoPi;
         c.wowRandomLpfState = 0.0f;
         c.flutterNoiseLpfState = 0.0f;
         c.flutterNoiseHpfState = 0.0f;
         c.flutterNoisePrevInput = 0.0f;
-        // Seeded at the centre, not zero: the first sample's derivative is then 0 rather than a
-        // full centre-delay step, which would otherwise draw a spike into the scope on every reset.
+        // Not seeded to a guess any more — see `deviationPrimed`. The first sample after a reset
+        // adopts whatever the delay actually is and reports zero deviation, which is both correct
+        // and independent of where the modulation happens to start.
         c.previousDelaySamples = centerDelaySamples;
+        c.deviationPrimed = false;
     }
 }
 
@@ -92,9 +108,12 @@ void WowFlutter::process(juce::AudioBuffer<float>& buffer, float wowDepth01, flo
                 constexpr float centsPerSampleSlope = -1200.0f / 0.6931472f;   // -1200/ln2
 
                 if (deviationCentsAccum != nullptr)
-                    deviationCentsAccum[i] += centsPerSampleSlope * (delaySamples - c.previousDelaySamples);
+                    deviationCentsAccum[i] += c.deviationPrimed
+                                                ? centsPerSampleSlope * (delaySamples - c.previousDelaySamples)
+                                                : 0.0f;
 
                 c.previousDelaySamples = delaySamples;
+                c.deviationPrimed = true;
             }
 
             delayLine.pushSample(ch, data[i]);

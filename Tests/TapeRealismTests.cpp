@@ -1,6 +1,7 @@
 #include "../Source/PluginProcessor.h"
 #include "../Source/Parameters.h"
 #include "../Source/DSP/WowFlutter.h"
+#include "../Source/DSP/DegradationCore.h"
 
 #include <nf/testing/ProcessorHarness.h>
 
@@ -144,7 +145,19 @@ public:
             // it is a design decision, and these numbers are what make it one.
             const std::vector<double> hfProbes { 5000.0, 10000.0, 15000.0 };
 
-            logMessage ("  GEN   noise dBFS    pitch cents pk    HF 5k      10k       15k");
+            /*  **Peak AND rms, because the law predicts one of them and the column measured the other.**
+
+                Independent transport instabilities RMS-sum, so eight of them is sqrt(8) = 2.83x. A
+                PEAK does not obey that: eight sinusoids at similar rates drift in and out of
+                alignment, and over a window a peak catches the moments they align, which is why the
+                peak column reads 5.48x where the rms reads what the law says. Neither is wrong —
+                the peak is what a listener meets at the worst moment and the rms is the quantity
+                the accumulation law is about.
+
+                **The metric was the thing that could not express the answer**, not the code. Tuning
+                the rate spread until the PEAK read 2.83 would have been fitting a control to a
+                number, and would have made the plugin less like eight transports rather than more. */
+                logMessage ("  GEN   noise dBFS    pitch cents pk   cents rms    HF 5k      10k       15k");
 
             for (float gen = 1.0f; gen <= 8.0f; gen += 1.0f)
             {
@@ -184,7 +197,8 @@ public:
                 // only rate variation makes the stages genuinely independent and produces sqrt(N).
                 // Recorded here because the obvious remedy is the seeding one and it is measured
                 // not to work.
-                double cents = 0.0;
+                double cents = 0.0, centsSumSq = 0.0;
+                juce::int64 centsCount = 0;
                 {
                     const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
                     // **Seeded PER STAGE, as the processor seeds them.** The first version
@@ -193,8 +207,23 @@ public:
                     std::vector<WowFlutter> stages;
                     stages.reserve ((size_t) (int) gen);
 
+                    /*  **`wowRateMultiplierFor (i)`, and this argument was hard-coded to 1.0f.**
+
+                        The fixture rebuilds what `DegradationCore`'s constructor does, and it got
+                        one of the two arguments wrong: the seed was corrected once already — the
+                        earlier note above records that every stage used to be default-constructed —
+                        and the RATE multiplier beside it was left at a literal. So this column
+                        measured eight transports running at identical rates, which is a
+                        configuration the plugin does not have.
+
+                        It happened to be right while the processor's own spread was 1.3 % per stage,
+                        because 1.3 % does not decorrelate a 0.5 Hz oscillation either. It stopped
+                        being right the moment the spread became real, and it reported the old figure
+                        unchanged to two decimal places — a fixture agreeing with itself.
+
+                        Read from the function the processor calls, never a transcribed value. */
                     for (int i = 0; i < (int) gen; ++i)
-                        stages.emplace_back (i, 1.0f);
+                        stages.emplace_back (i, DegradationCore::wowRateMultiplierFor (i));
 
                     for (auto& s : stages)
                         s.prepare (spec);
@@ -211,7 +240,11 @@ public:
                             s.process (buffer, 1.0f, 1.0f, accum.data());
 
                         for (float v : accum)
+                        {
                             cents = juce::jmax (cents, (double) std::abs (v));
+                            centsSumSq += (double) v * v;
+                            ++centsCount;
+                        }
                     }
                 }
 
@@ -220,9 +253,12 @@ public:
                 configure (p, gen);
                 const auto rows = nf::testing::measureProcessorMagnitudeResponse (p, 48000.0, 512, hfProbes);
 
+                const double centsRms = centsCount > 0 ? std::sqrt (centsSumSq / (double) centsCount) : 0.0;
+
                 logMessage ("   " + juce::String ((int) gen)
                                 + "   " + juce::String (20.0 * std::log10 (juce::jmax (1.0e-9, noisePeak)), 1).paddedLeft (' ', 8)
                                 + "   " + juce::String (cents, 2).paddedLeft (' ', 12)
+                                + "   " + juce::String (centsRms, 4).paddedLeft (' ', 10)
                                 + "   " + juce::String (rows[0].gainDb, 2).paddedLeft (' ', 8)
                                 + juce::String (rows[1].gainDb, 2).paddedLeft (' ', 10)
                                 + juce::String (rows[2].gainDb, 2).paddedLeft (' ', 10));

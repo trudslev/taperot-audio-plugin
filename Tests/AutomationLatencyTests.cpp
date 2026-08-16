@@ -161,6 +161,7 @@ public:
 
             // --- wow and flutter extremes, predicted irrelevant -----------------------------
             int modLo = 1 << 30, modHi = -1;
+            int atZeroDepth = -1;
 
             for (float depth : { 0.0f, 100.0f })
             {
@@ -172,6 +173,9 @@ public:
 
                 modLo = juce::jmin (modLo, measured);
                 modHi = juce::jmax (modHi, measured);
+
+                if (depth == 0.0f)
+                    atZeroDepth = measured;
                 logMessage ("  wow+flutter " + juce::String (depth, 0) + "% -> "
                                 + juce::String (measured) + " samples");
             }
@@ -205,9 +209,23 @@ public:
             // about what the declaration must say rather than a fault to fix.
             logMessage ("  NOTE: the spread across wow/flutter is the modulation itself. The "
                         "declarable figure is the centre, measured at zero depth: "
-                            + juce::String (modLo) + " samples.");
+                            + juce::String (atZeroDepth) + " samples.");
 
-            expectWithinAbsoluteError (modLo, 1200, 32,
+            /*  **`atZeroDepth`, not `modLo` — the assertion said "at zero depth" and read the
+                MINIMUM across the sweep.** The two were the same figure for as long as every wow
+                oscillator started at phase 0: the impulse then always met the delay line at the
+                centre of its modulation, so depth 100 measured what depth 0 did.
+
+                Giving each stage an independent starting phase — part of fixing the accumulation
+                law — removed that. The impulse now lands at a random point in the wow cycle, so at
+                depth 100 the delay can be well below centre and `modLo` fell to 785 samples, about
+                8.6 ms under the 25 ms centre and consistent with the known 11.5 ms of downward
+                excursion.
+
+                **Nothing regressed; a mislabelled quantity stopped being accidentally equal to the
+                one it was named after.** The spread is still reported from modLo/modHi, which is
+                what it is for. */
+            expectWithinAbsoluteError (atZeroDepth, 1200, 32,
                                        "at zero modulation depth the latency should be exactly one "
                                        "stage's 25 ms centre delay — 1200 samples at 48 kHz. It is "
                                        + juce::String (modLo) + ", so the centre is not where "
