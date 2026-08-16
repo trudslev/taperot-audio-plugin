@@ -1,8 +1,9 @@
 #include "StereoSpread.h"
 
-void StereoSpread::prepare(const juce::dsp::ProcessSpec& spec)
+void StereoSpread::prepare(const juce::dsp::ProcessSpec& spec, bool initiallyEnabled)
 {
     amountSmoothed.reset(spec.sampleRate, 0.03);
+    amountSmoothed.setCurrentAndTargetValue(initiallyEnabled ? 1.0f : 0.0f);
     reset();
 }
 

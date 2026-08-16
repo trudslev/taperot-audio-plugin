@@ -20,7 +20,8 @@ public:
 
     /** `initialModelIndex` is threaded through to TapeModelEQ — see its prepare for why it is an
         argument rather than something set afterwards. */
-    void prepare(const juce::dsp::ProcessSpec& spec, int initialModelIndex);
+    void prepare(const juce::dsp::ProcessSpec& spec, int initialModelIndex,
+                 float initialNoiseAmount01);
     void reset();
     // deviationCentsAccum is passed straight through to WowFlutter - see its comment. Null for any
     // stage whose modulation should not reach the scope.

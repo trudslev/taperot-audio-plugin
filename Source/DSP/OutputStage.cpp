@@ -1,10 +1,12 @@
 #include "OutputStage.h"
 #include <array>
 
-void OutputStage::prepare(const juce::dsp::ProcessSpec& spec)
+void OutputStage::prepare(const juce::dsp::ProcessSpec& spec, float initialMix01, float initialOutputDb)
 {
     mixSmoothed.reset(spec.sampleRate, 0.02);
     gainSmoothed.reset(spec.sampleRate, 0.02);
+    mixSmoothed.setCurrentAndTargetValue(initialMix01);
+    gainSmoothed.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(initialOutputDb));
     reset();
 }
 

@@ -16,7 +16,7 @@ public:
         beginTest("Exact null at drive = 0");
         {
             Saturator sat;
-            sat.prepare(spec);
+            sat.prepare(spec, 0.0f);
 
             auto input = generatePinkNoise(numChannels, blockSize, 42);
             auto buffer = input;
@@ -34,7 +34,7 @@ public:
         beginTest("Bounded, finite output with added harmonics at drive = 100%");
         {
             Saturator sat;
-            sat.prepare(spec);
+            sat.prepare(spec, 0.0f);
 
             auto buffer = generatePinkNoise(numChannels, blockSize, 7);
 

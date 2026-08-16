@@ -1,10 +1,11 @@
 #include "Hum.h"
 
-void Hum::prepare(const juce::dsp::ProcessSpec& spec)
+void Hum::prepare(const juce::dsp::ProcessSpec& spec, bool initiallyEnabled)
 {
     sampleRate = spec.sampleRate;
     phaseInc = juce::MathConstants<double>::twoPi * fundamentalHz / sampleRate;
     gainSmoothed.reset(sampleRate, 0.02);
+    gainSmoothed.setCurrentAndTargetValue(initiallyEnabled ? 1.0f : 0.0f);
     reset();
 }
 

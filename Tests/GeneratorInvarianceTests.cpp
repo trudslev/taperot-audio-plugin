@@ -102,7 +102,7 @@ public:
                 Hum hum;
                 return runAtBlockSize (blockSize,
                     [&hum] (juce::AudioBuffer<float>& b) { hum.process (b, true); },
-                    [&hum] (int bs) { hum.prepare ({ fs, (juce::uint32) bs, 2 }); });
+                    [&hum] (int bs) { hum.prepare ({ fs, (juce::uint32) bs, 2 }, true); });
             };
 
             const auto at64 = runFresh (64);
@@ -123,7 +123,7 @@ public:
                 NoiseSource noise;      // fresh per block size — see the note in the Hum arm
                 return runAtBlockSize (blockSize,
                     [&noise] (juce::AudioBuffer<float>& b) { noise.process (b, 1.0f, 0); },
-                    [&noise] (int bs) { noise.prepare ({ fs, (juce::uint32) bs, 2 }); });
+                    [&noise] (int bs) { noise.prepare ({ fs, (juce::uint32) bs, 2 }, 1.0f); });
             };
 
             const auto at64 = runFresh (64);
@@ -149,7 +149,7 @@ public:
                     NoiseSource fresh;
                     return runAtBlockSize (blockSize,
                         [&fresh, character] (juce::AudioBuffer<float>& b) { fresh.process (b, 1.0f, character); },
-                        [&fresh] (int bs) { fresh.prepare ({ fs, (juce::uint32) bs, 2 }); });
+                        [&fresh] (int bs) { fresh.prepare ({ fs, (juce::uint32) bs, 2 }, 1.0f); });
                 };
 
                 const auto w = compare ((juce::String ("NoiseSource ch") + juce::String (character)).toRawUTF8(),

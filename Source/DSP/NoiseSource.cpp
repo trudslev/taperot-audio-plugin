@@ -1,6 +1,6 @@
 #include "NoiseSource.h"
 
-void NoiseSource::prepare(const juce::dsp::ProcessSpec& spec)
+void NoiseSource::prepare(const juce::dsp::ProcessSpec& spec, float initialNoiseAmount01)
 {
     sampleRate = spec.sampleRate;
     const int numChannels = (int) spec.numChannels;
@@ -28,6 +28,16 @@ void NoiseSource::prepare(const juce::dsp::ProcessSpec& spec)
     tapeGainSmoothed.reset(sampleRate, 0.02);
     noiseAmountSmoothed.reset(sampleRate, 0.02);
     crossfadeMix.reset(sampleRate, crossfadeSeconds);
+
+    tapeGainSmoothed.setCurrentAndTargetValue(initialNoiseAmount01 * tapeHissLevel);
+    noiseAmountSmoothed.setCurrentAndTargetValue(initialNoiseAmount01);
+
+    // **A LITERAL, and the only one of the eight that should be.** The other seven track a
+    // parameter and take its value; this is a character crossfade, whose settled state is 1.0 —
+    // fully arrived at the current character, nothing pending. Snapping it to a stale target is
+    // what left it mid-fade on the first block, which is half of the block-size row this casting
+    // still carries: "its character crossfade is started per prepare and stepped per block".
+    crossfadeMix.setCurrentAndTargetValue(1.0f);
 
     reset();
 }

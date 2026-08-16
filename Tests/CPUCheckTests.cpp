@@ -24,7 +24,7 @@ public:
             Saturator sat;
             WowFlutter wow;
             TapeModelEQ eq;
-            sat.prepare(spec);
+            sat.prepare(spec, 0.0f);
             wow.prepare(spec);
             eq.prepare(spec, 0);
 
@@ -54,7 +54,7 @@ public:
             for (int i = 0; i < 8; ++i)
             {
                 stages[(size_t) i] = std::make_unique<DegradationCore>(i);
-                stages[(size_t) i]->prepare(spec, 0);
+                stages[(size_t) i]->prepare(spec, 0, 0.0f);
             }
 
             auto buffer = generatePinkNoise(numChannels, blockSize, 4111);
@@ -85,7 +85,7 @@ public:
             for (int i = 0; i < 8; ++i)
             {
                 stages[(size_t) i] = std::make_unique<DegradationCore>(i);
-                stages[(size_t) i]->prepare(spec, 0);
+                stages[(size_t) i]->prepare(spec, 0, 0.0f);
             }
 
             auto buffer = generatePinkNoise(numChannels, blockSize, 8811);

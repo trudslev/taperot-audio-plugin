@@ -6,7 +6,8 @@
 class Hum
 {
 public:
-    void prepare(const juce::dsp::ProcessSpec& spec);
+    /** `initiallyEnabled` — see Saturator::prepare for why this is an argument. */
+    void prepare(const juce::dsp::ProcessSpec& spec, bool initiallyEnabled);
     void reset();
     void process(juce::AudioBuffer<float>& buffer, bool humEnabled);
 

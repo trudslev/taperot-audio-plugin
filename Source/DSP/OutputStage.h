@@ -5,7 +5,8 @@
 class OutputStage
 {
 public:
-    void prepare(const juce::dsp::ProcessSpec& spec);
+    /** Initial mix and output level — see Saturator::prepare for why these are arguments. */
+    void prepare(const juce::dsp::ProcessSpec& spec, float initialMix01, float initialOutputDb);
     void reset();
 
     // dryBuffer must hold the untouched input captured before the rest of the signal chain ran.

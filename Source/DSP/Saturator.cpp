@@ -15,12 +15,13 @@ void Saturator::buildCoefficientCache()
     }
 }
 
-void Saturator::prepare(const juce::dsp::ProcessSpec& spec)
+void Saturator::prepare(const juce::dsp::ProcessSpec& spec, float initialDrive01)
 {
     sampleRate = spec.sampleRate;
     numChannels = (int) spec.numChannels;
 
     driveSmoothed.reset(sampleRate, 0.02);
+    driveSmoothed.setCurrentAndTargetValue(initialDrive01);
 
     oversampling = std::make_unique<juce::dsp::Oversampling<float>>(
         (size_t) numChannels, 1,

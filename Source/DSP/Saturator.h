@@ -5,7 +5,23 @@
 class Saturator
 {
 public:
-    void prepare(const juce::dsp::ProcessSpec& spec);
+    /*  **Initial values are ARGUMENTS, because `reset (rate, seconds)` does not set one.**
+
+        It is `setCurrentAndTargetValue (this->target)` internally: it sets the ramp LENGTH and snaps
+        the value to whatever target the smoother last held — zero on a constructed object. So a
+        stage prepared without being told where its control sits glides up from nothing across the
+        first block of an instance's first playback. Measured on this casting at **-16.6 dB over the
+        first 5 ms**, which is the release blocker of the eleven.
+
+        And the value must come from the CALLER. Several of these sites carried
+        `setCurrentAndTargetValue (getTargetValue())`, which is character for character what
+        `reset (rate, seconds)` already did — a guard that reads the stale target back and writes it
+        in. It reads as guarded, which is worse than nothing being there, and it is why the count was
+        first reported as fourteen-in-four and is really twelve-in-three.
+
+        An argument makes the omission unexpressible rather than something the next edit has to
+        remember, which is the form Elmer's `OutputStage::prepare` took earlier in this stage. */
+    void prepare(const juce::dsp::ProcessSpec& spec, float initialDrive01);
     void reset();
     void process(juce::AudioBuffer<float>& buffer, float driveTarget01);
 

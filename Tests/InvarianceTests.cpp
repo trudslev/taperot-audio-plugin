@@ -1175,14 +1175,59 @@ public:
 
             const auto blank = steadyWith ("no generator (must be exact)", neutral);
 
-            expectGreaterThan (control.worst, 1.0e-9,
-                               "the steady window does not diverge even with a generator running, "
-                               "so every zero below is zero for the trivial reason");
+            /*  **THE STEADY COMPONENT IS CLOSED, and the fix was the unguarded smoothers.**
+
+                This whole sub-hunt existed because NOISE 100 diverged by 0.000224769 in a window
+                that skips the first 128 ms — a *steady* block-size dependence, distinct from the
+                ~20 ms transient the whole-render rows carry and never explained. Every row below is
+                0.000000000 now, and what changed is that `NoiseSource`, `Hum`, `OutputStage`,
+                `StereoSpread` and `Saturator` are told at prepare where their controls sit instead
+                of snapping their smoothers to a stale target.
+
+                So it was never mysterious: a smoother that begins each render somewhere different
+                takes a different path through the block, and how a ramp is cut across blocks depends
+                on the block size. The finding was filed as localised-not-explained, and the
+                explanation turned out to be an item already on the fix list for another reason.
+
+                **The control inverted with it** — sixth vacuity guard in this stage. It read
+                `expectGreaterThan (control.worst, 1e-9)`, proving the arms below were measuring
+                something, and it rested on the defect.
+
+                **And there is no processor-level replacement for this window**, which is the same
+                position the FAILURE block reached: nothing in this chain diverges in the steady
+                window any more, so a positive control has to come from the comparison rather than
+                from the plugin. `perturbByOneLsb` inside the window is what can honestly be proved,
+                and the missing half is stated rather than dressed up. */
+            expectEquals (control.worst, 0.0,
+                          "the steady window diverges again with a generator running. It was "
+                          "0.000224769 before the unguarded SmoothedValue::reset sites were given "
+                          "their initial values at prepare, and every arm below assumes it is zero");
 
             expectEquals (blank.worst, 0.0,
                           "the generator-free chain diverged in the steady window, which the "
                           "block-size sweep measures as exactly zero — the window is the "
                           "difference, not the plugin");
+
+            {
+                // The comparison, proved able to report a difference INSIDE its own window. Two
+                // vectors identical everywhere except one sample past `steadySkip`; if the window
+                // logic ever drifts past the data, or the skip swallows the whole render, this
+                // returns zero and every 0.000000000 above becomes meaningless.
+                std::vector<float> a ((size_t) totalSamples, 0.5f), b = a;
+                b[(size_t) steadySkip + 1000] = std::nextafter (0.5f, 1.0f);
+
+                double seen = 0.0;
+                for (int i = steadySkip; i < totalSamples; ++i)
+                    seen = juce::jmax (seen, (double) std::abs (a[(size_t) i] - b[(size_t) i]));
+
+                logMessage ("  one-LSB control (must differ)  steady |delta| "
+                                + juce::String (seen, 12));
+
+                expectGreaterThan (seen, 0.0,
+                                   "the steady window reported a one-LSB difference inside itself as "
+                                   "identical, so every zero above is a comparison that cannot fail "
+                                   "rather than a chain that does not diverge");
+            }
 
             // ---- 1 · the MIX line, RE-DERIVED on the steady component ----
             logMessage ("  --- MIX, re-derived without the ramp ---");

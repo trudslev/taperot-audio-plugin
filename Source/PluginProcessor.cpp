@@ -407,7 +407,7 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     juce::dsp::ProcessSpec spec{sampleRate, (juce::uint32) samplesPerBlock,
                                  (juce::uint32) getTotalNumOutputChannels()};
 
-    saturator.prepare(spec);
+    saturator.prepare(spec, driveParam->load() * 0.01f);
 
     /*  **Every stage is prepared knowing which model is selected**, rather than being prepared to
         NONE and discovering the real one on its first block.
@@ -423,15 +423,15 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     const int initialModel = (int) modelParam->load();
 
     for (auto& stage : generationStages)
-        stage->prepare(spec, initialModel);
-    hum.prepare(spec);
+        stage->prepare(spec, initialModel, noiseParam->load() * 0.01f);
+    hum.prepare(spec, humParam->load() > 0.5f);
     failureEngine.prepare(spec);
-    stereoSpread.prepare(spec);
+    stereoSpread.prepare(spec, spreadParam->load() > 0.5f);
     toneFilters.prepare(spec);
     tapeStop.prepare(spec);
     filterSweep.prepare(spec);
     failEnvelope.setSampleRate(sampleRate);
-    outputStage.prepare(spec);
+    outputStage.prepare(spec, mixParam->load() * 0.01f, outputParam->load());
 
     genSmoothed.reset(sampleRate, 0.04);
     genSmoothed.setCurrentAndTargetValue(genParam->load());

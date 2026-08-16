@@ -19,7 +19,8 @@ public:
 
     explicit NoiseSource(juce::uint64 seedOffset = 0) noexcept : instanceSeedOffset(seedOffset) {}
 
-    void prepare(const juce::dsp::ProcessSpec& spec);
+    /** Initial noise amount — see Saturator::prepare for why this is an argument. */
+    void prepare(const juce::dsp::ProcessSpec& spec, float initialNoiseAmount01);
     void reset();
     void process(juce::AudioBuffer<float>& buffer, float noiseAmount01, int character);
 

@@ -62,7 +62,7 @@ public:
             for (int i = 0; i < 8; ++i)
             {
                 stages.push_back (std::make_unique<DegradationCore> (i));
-                stages.back()->prepare (spec, 0);
+                stages.back()->prepare (spec, 0, 0.0f);
             }
 
             juce::AudioBuffer<float> buffer (2, 512);

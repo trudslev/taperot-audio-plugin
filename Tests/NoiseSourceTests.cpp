@@ -65,7 +65,7 @@ public:
         beginTest("TAPE character nulls against the pre-refactor hiss algorithm");
         {
             NoiseSource source;
-            source.prepare(spec);
+            source.prepare(spec, 0.0f);
 
             ReferenceTapeHiss reference;
             reference.prepare(sampleRate, numChannels);
@@ -93,7 +93,7 @@ public:
             for (int character = 0; character < 3; ++character)
             {
                 NoiseSource source;
-                source.prepare(spec);
+                source.prepare(spec, 0.0f);
 
                 juce::AudioBuffer<float> buffer(numChannels, blockSize);
                 bool allFinite = true;
@@ -127,7 +127,7 @@ public:
                 for (int character = 0; character < 3; ++character)
                 {
                     NoiseSource source;
-                    source.prepare(spec);
+                    source.prepare(spec, 0.0f);
 
                     juce::AudioBuffer<float> buffer(numChannels, blockSize);
                     double sumSquares = 0.0;
