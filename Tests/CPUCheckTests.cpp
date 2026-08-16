@@ -26,7 +26,7 @@ public:
             TapeModelEQ eq;
             sat.prepare(spec);
             wow.prepare(spec);
-            eq.prepare(spec);
+            eq.prepare(spec, 0);
 
             auto buffer = generatePinkNoise(numChannels, blockSize, 2024);
 
@@ -54,7 +54,7 @@ public:
             for (int i = 0; i < 8; ++i)
             {
                 stages[(size_t) i] = std::make_unique<DegradationCore>(i);
-                stages[(size_t) i]->prepare(spec);
+                stages[(size_t) i]->prepare(spec, 0);
             }
 
             auto buffer = generatePinkNoise(numChannels, blockSize, 4111);
@@ -85,7 +85,7 @@ public:
             for (int i = 0; i < 8; ++i)
             {
                 stages[(size_t) i] = std::make_unique<DegradationCore>(i);
-                stages[(size_t) i]->prepare(spec);
+                stages[(size_t) i]->prepare(spec, 0);
             }
 
             auto buffer = generatePinkNoise(numChannels, blockSize, 8811);

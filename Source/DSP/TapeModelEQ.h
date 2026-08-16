@@ -14,7 +14,22 @@
 class TapeModelEQ
 {
 public:
-    void prepare(const juce::dsp::ProcessSpec& spec);
+    /*  **`initialModelIndex` is an argument, and that is the fix rather than a convenience.**
+
+        This used to set `activeModelIndex = 0` — NONE — on every prepare, while the default Program
+        selects 5 (CASSETTE I). So the first block after ANY prepare found the requested model
+        different from the stored one and started a transition nobody asked for: measured at 26.75 %
+        of peak in FADE and **97.55 % in CLUNK**, which is the mute dip.
+
+        It is worse than a first-run defect because a host re-fires `prepareToPlay` on every
+        sample-rate and buffer-size change, not once per instance — and category 3's
+        cold-against-warmed comparison is structurally blind to it, since both its arms prepare.
+
+        **Passing the value in is what makes the defect unexpressible.** Setting it afterwards
+        through a setter would work equally well today and would be a line somebody has to remember,
+        which is the shape of the Reflect-84 disarm that shipped with zero call sites. Elmer's
+        `OutputStage::prepare` took the same form in this stage for the same reason. */
+    void prepare(const juce::dsp::ProcessSpec& spec, int initialModelIndex);
     void reset();
     void process(juce::AudioBuffer<float>& buffer, int modelIndex, bool clunkMode);
 

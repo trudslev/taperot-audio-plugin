@@ -38,7 +38,7 @@ namespace
     std::unique_ptr<DegradationCore> makeCascadeStage(int index, const juce::dsp::ProcessSpec& spec)
     {
         auto stage = std::make_unique<DegradationCore>(index);
-        stage->prepare(spec);
+        stage->prepare(spec, 0);
         return stage;
     }
 }
@@ -62,7 +62,7 @@ public:
             WowFlutter wow;
             wow.prepare(spec);
             TapeModelEQ eq;
-            eq.prepare(spec);
+            eq.prepare(spec, 0);
             NoiseSource noise;
             noise.prepare(spec);
 

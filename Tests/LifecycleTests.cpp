@@ -1,4 +1,6 @@
 #include "../Source/PluginProcessor.h"
+#include <array>
+#include <cmath>
 #include "../Source/DSP/TapeModelEQ.h"
 #include "../Source/Parameters.h"
 
@@ -72,7 +74,18 @@ public:
             // three previous attempts ended.
             const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
 
-            const auto firstBlockAgainstSettled = [&spec] (int modelIndex, bool clunk)
+            /*  **FIXED, and the old defect's own measurement is the positive control now.**
+                `TapeModelEQ::prepare` takes the model it is being prepared FOR, so a prepare no
+                longer contradicts the configuration. Both arms below prepare at the model they will
+                be asked for, which is what the processor does.
+
+                That leaves nothing here able to fail — the same shape as three other metrics this
+                stage, where fixing the last failing case took the instrument's only proof that it
+                could report one. So the third arm prepares at NONE and requests 5, which is a
+                GENUINE model change and must still crossfade. It reproduces what the defect
+                measured, because it is the same measurement; the difference is that a real switch
+                is supposed to do this and a prepare is not. */
+            const auto firstBlockAgainstSettled = [&spec] (int preparedModel, int modelIndex, bool clunk)
             {
                 const auto makeInput = [&spec] (juce::AudioBuffer<float>& b)
                 {
@@ -88,14 +101,14 @@ public:
 
                 // Arm A — one block immediately after prepare.
                 TapeModelEQ fresh;
-                fresh.prepare (spec);
+                fresh.prepare (spec, preparedModel);
                 juce::AudioBuffer<float> a (2, (int) spec.maximumBlockSize);
                 a.makeCopyOf (reference);
                 fresh.process (a, modelIndex, clunk);
 
                 // Arm B — the same block, after the chain has fully settled at the same model.
                 TapeModelEQ settled;
-                settled.prepare (spec);
+                settled.prepare (spec, preparedModel);
                 juce::AudioBuffer<float> scratch (2, (int) spec.maximumBlockSize);
 
                 for (int block = 0; block < 40; ++block)     // 40 x 512 = 427 ms, well past 60 ms
@@ -120,14 +133,18 @@ public:
                 return peak > 0.0 ? worst / peak : 0.0;
             };
 
+            std::array<double, 2> liveByMode {}, genuineByMode {};
+
             for (bool clunk : { false, true })
             {
-                const auto control = firstBlockAgainstSettled (0, clunk);
-                const auto live    = firstBlockAgainstSettled (5, clunk);
+                const auto control  = firstBlockAgainstSettled (0, 0, clunk);
+                const auto live     = firstBlockAgainstSettled (5, 5, clunk);
+                const auto genuine  = firstBlockAgainstSettled (0, 5, clunk);
 
                 logMessage (juce::String (clunk ? "  CLUNK" : "  FADE ")
-                                + " -> model 0 (control) " + juce::String (control, 9)
-                                + ", model 5 " + juce::String (live, 9)
+                                + " -> prepared 0/asked 0 (control) " + juce::String (control, 9)
+                                + ", prepared 5/asked 5 " + juce::String (live, 9)
+                                + ", prepared 0/asked 5 (must switch) " + juce::String (genuine, 9)
                                 + "   (relative to the settled block's own peak)");
 
                 expect (control < 1.0e-6,
@@ -135,12 +152,52 @@ public:
                         "possible — this instrument does not isolate the switch either: "
                             + juce::String (control, 9));
 
-                expect (live < 1.0e-6,
-                        "prepare() re-armed a model switch the Program never asked for: the first "
-                        "block after prepare differs from the settled chain by "
-                            + juce::String (live * 100.0, 2) + "% of peak. TapeModelEQ.cpp:82 sets "
-                            "activeModelIndex = 0 (NONE) on EVERY prepare while the default is 5.");
+                expect (genuine > 1.0e-3,
+                        "**THIS INSTRUMENT CANNOT SEE A MODEL SWITCH.** Prepared at NONE and asked "
+                        "for 5 is a genuine change and must cross-fade, so the clean rows above are "
+                        "a measurement that only ever reports clean: " + juce::String (genuine, 9));
+
+                liveByMode[clunk ? 1 : 0] = live;
+                genuineByMode[clunk ? 1 : 0] = genuine;
             }
+
+            /*  **The residue is NOT the crossfade, and the two modes agreeing is what says so.**
+
+                Fixing `prepare` took FADE from 26.75 % to 13.02 % and CLUNK from **97.55 %** to
+                13.04 %. Not zero — and the interesting part is that the two remainders agree to four
+                decimal places when the thing they used to measure differed between them by a factor
+                of nearly four.
+
+                FADE and CLUNK are completely different transitions: a parallel-chain crossfade
+                against a hard coefficient swap under a mute dip. Any cause routed through the switch
+                MUST differ between them, and the "prepared 0 / asked 5" arm shows exactly that —
+                0.267 against 0.976. A cause that does not differ between them is not going through
+                the switch at all.
+
+                What is left is the filters' own startup: a fresh biquad cascade has no history, and
+                one block through it differs from one block through the same cascade after 427 ms of
+                signal. That is ordinary and unavoidable — a chain cannot be born settled — and it is
+                why the model-0 control reads exactly zero, since NONE runs no bands to have history.
+
+                So the assertion is MODE INDEPENDENCE rather than a magnitude. It fails if a switch
+                is being re-armed, and it does not pretend a cold filter is a defect. Pinning 0.130
+                would be pinning a number nobody had explained. */
+            const double modeSpread = std::abs (liveByMode[0] - liveByMode[1]);
+            const double genuineSpread = std::abs (genuineByMode[0] - genuineByMode[1]);
+
+            logMessage ("  residue FADE vs CLUNK -> " + juce::String (modeSpread, 9)
+                            + "; a genuine switch spreads " + juce::String (genuineSpread, 9));
+
+            expect (modeSpread < 1.0e-3,
+                    "the first block after prepare differs between FADE and CLUNK, so what remains "
+                    "IS routed through the model switch and prepare is still re-arming one. A cold "
+                    "filter cascade cannot know which switch mode it is in: " 
+                        + juce::String (modeSpread, 9));
+
+            expect (genuineSpread > 1.0e-2,
+                    "**THE MODE-INDEPENDENCE TEST CANNOT FAIL.** A genuine switch must differ "
+                    "between a crossfade and a hard swap under a mute dip, and it did not — so the "
+                    "row above is not evidence of anything: " + juce::String (genuineSpread, 9));
         }
 
         beginTest ("A second prepare re-fires the MODEL switch, with no fade-in to hide it");

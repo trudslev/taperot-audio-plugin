@@ -1991,25 +1991,45 @@ public:
             const auto at64b  = renderAutomated (64);
             const auto at2048 = renderAutomated (2048);
 
-            /*  ## LOCALISATION, run BEFORE stage 2 touches TapeModelEQ
+            /*  ## LOCALISATION — run before TapeModelEQ changed, and its CONCLUSION WAS WRONG
 
-                The ordering matters and is the whole reason this block exists here rather than
-                after. `TapeModelEQ` carries **two** findings — the every-prepare `activeModelIndex`
-                re-arm that stage 2 fixes, and being the first candidate for this residue — and two
-                findings on one member is exactly where the wrong change collects the credit. So the
-                residue is characterised while that member is untouched.
+                Kept in full, because how a sound measurement produced a false exclusion is the part
+                worth carrying.
 
-                Two variations, each answering one question, both reported rather than asserted:
+                The residue was 0.050745115. Two variations were run while `TapeModelEQ` was
+                untouched: identical at four times the warm-up (0.050745115 to nine digits), and
+                present at a single integer crossing (0.000631385). From the first of those the
+                conclusion was drawn that **anything armed by `prepare` and stepped per block had
+                spent itself before the measurement began**, so `TapeModelEQ`'s crossfade was
+                excluded — by measurement, it said.
 
-                  - **A longer warm-up** spends anything armed by `prepare` and stepped per block.
-                    `TapeModelEQ`'s crossfade is precisely that shape, and so is `NoiseSource`'s
-                    character crossfade. If the residue is unchanged at 4x the warm-up, neither is
-                    what this measures.
-                  - **One boundary against seven.** The subdivision splits a span at every integer
-                    GEN crossing, so its own cost should scale with how many crossings the ramp
-                    makes. A residue flat in the number of boundaries is not the subdivision's.
+                **Then the fix landed and the residue went to 0.000000000.** It was `TapeModelEQ` the
+                whole time.
 
-                Neither variation can be run after `TapeModelEQ` changes and still mean this. */
+                ## Why the warm-up argument was invalid
+
+                The warm-up runs at **GEN 1**, so it spends the crossfade of the ONE stage that is
+                running. Stages 2 to 8 are prepared and idle. As GEN ramps 1 -> 8 each of them enters
+                the cascade for the first time *during the measurement*, carrying its own
+                `activeModelIndex = 0` from prepare against a requested model of 5 — and fires its
+                own crossfade the moment it joins. No amount of warm-up at GEN 1 can spend those,
+                because they are not running to be spent.
+
+                So the arm tested "state armed at prepare and spent by the warm-up" and the defect
+                was "state armed at prepare and spent only when a stage first runs". Same words, and
+                the second class is invisible to the first.
+
+                **The 1 -> 2 row was the answer and was read as something else.** 0.000631385 for one
+                boundary is one newly-engaged stage firing one crossfade; 0.050745115 for seven is
+                seven of them, each behind more accumulated saturation gain than the last. That was
+                written up as the subdivision's per-crossing truncation cost, which sounded right and
+                predicted the same shape. **Two mechanisms predicting the same shape is not evidence
+                for either** — and the one that was ruled out by an unsound argument was the one that
+                turned out to be true.
+
+                The general form, and it is not new here: an exclusion is a claim and needs the same
+                evidence as an inclusion. This one had a measurement behind it and still failed,
+                because the measurement answered a narrower question than the words it was given. */
             const auto residueWith = [&] (int warmMultiplier, float genTarget)
             {
                 const auto render = [&] (int blockSize)
@@ -2083,18 +2103,16 @@ public:
 
             logMessage (juce::String ("  => warm-up: ")
                             + (std::abs (warm4 - warm1) < 1.0e-9
-                                   ? "UNCHANGED at 4x, so nothing armed by prepare and stepped per "
-                                     "block is what this measures — TapeModelEQ's crossfade and "
-                                     "NoiseSource's character crossfade are both excluded"
+                                   ? "unchanged at 4x. **This is NOT an exclusion.** The warm-up runs "
+                                     "at GEN 1, so it only spends the crossfade of the stage that is "
+                                     "running — stages 2-8 arm at prepare and fire when they JOIN"
                                    : "MOVED at 4x, so something armed by prepare is still expressing "
                                      "when the measurement starts"));
             logMessage (juce::String ("  => boundaries: one crossing gives ")
                             + juce::String (oneBoundary, 9) + " against seven at "
                             + juce::String (warm1, 9)
-                            + (oneBoundary > 1.0e-9
-                                   ? " — present at a single crossing, so it is per-crossing rather "
-                                     "than cumulative"
-                                   : " — ABSENT at a single crossing, so it needs more than one"));
+                            + " — one newly-engaged stage's crossfade against seven, each behind more "
+                              "accumulated saturation gain than the last");
 
             double peak = 0.0;
             for (const auto& ch : at64)

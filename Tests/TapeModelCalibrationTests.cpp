@@ -56,7 +56,7 @@ public:
         for (size_t m = 0; m < kNumTapeModels; ++m)
         {
             TapeModelEQ eq;
-            eq.prepare(spec);
+            eq.prepare(spec, 0);
 
             double outSumSq = 0.0;
             for (int block = 0; block < 30; ++block)

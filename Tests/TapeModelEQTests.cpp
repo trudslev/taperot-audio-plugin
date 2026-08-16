@@ -17,7 +17,7 @@ public:
         beginTest("No large discontinuity when switching models mid-stream");
         {
             TapeModelEQ eq;
-            eq.prepare(spec);
+            eq.prepare(spec, 0);
 
             const int totalSamples = blockSize * numBlocks;
             auto fullSignal = generatePinkNoise(numChannels, totalSamples, 555);

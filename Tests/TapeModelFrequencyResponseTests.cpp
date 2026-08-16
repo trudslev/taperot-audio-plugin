@@ -13,7 +13,7 @@ namespace
         juce::dsp::ProcessSpec spec{sampleRate, (juce::uint32) blockSize, (juce::uint32) numChannels};
 
         TapeModelEQ eq;
-        eq.prepare(spec);
+        eq.prepare(spec, 0);
 
         juce::AudioBuffer<float> buffer(numChannels, blockSize);
         double inputSumSq = 0.0, outputSumSq = 0.0;

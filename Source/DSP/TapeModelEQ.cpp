@@ -69,7 +69,7 @@ float TapeModelEQ::processActiveChainSample(int channel, float x) noexcept
     return y * chain.makeupGain;
 }
 
-void TapeModelEQ::prepare(const juce::dsp::ProcessSpec& spec)
+void TapeModelEQ::prepare(const juce::dsp::ProcessSpec& spec, int initialModelIndex)
 {
     sampleRate = spec.sampleRate;
     const int numChannels = (int) spec.numChannels;
@@ -79,7 +79,12 @@ void TapeModelEQ::prepare(const juce::dsp::ProcessSpec& spec)
     chainA.filters.resize((size_t) numChannels);
     chainB.filters.resize((size_t) numChannels);
 
-    activeModelIndex = 0;
+    // **The model the caller is actually going to ask for, not a literal 0.** A stored copy of a
+    // selection guarding a TRANSITION must start at what the configuration selects; a stored copy
+    // guarding a coefficient RECOMPUTE wants the opposite, and starts at an impossible value so it
+    // fires immediately. Gatecrasher's `DampingStage::lastHF01 = -1.0f` is that second kind, in the
+    // identical construction, and is correct as it stands.
+    activeModelIndex = juce::jlimit(0, (int) kNumTapeModels - 1, initialModelIndex);
     pendingModelIndex = -1;
     aIsActive = true;
 

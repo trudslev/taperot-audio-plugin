@@ -408,8 +408,22 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
                                  (juce::uint32) getTotalNumOutputChannels()};
 
     saturator.prepare(spec);
+
+    /*  **Every stage is prepared knowing which model is selected**, rather than being prepared to
+        NONE and discovering the real one on its first block.
+
+        `TapeModelEQ` stored `activeModelIndex = 0` on every prepare while the default Program
+        selects 5, so the first block after any prepare crossfaded from a state nobody chose — 26.75 %
+        of peak in FADE, 97.55 % in CLUNK. A host re-fires `prepareToPlay` on every sample-rate and
+        buffer-size change, so this was not a once-per-instance cost.
+
+        Read off the live parameter for the same reason Elmer's output stage does: a session restore
+        writes the APVTS before the host prepares, so this is the value the first block should
+        already be at. */
+    const int initialModel = (int) modelParam->load();
+
     for (auto& stage : generationStages)
-        stage->prepare(spec);
+        stage->prepare(spec, initialModel);
     hum.prepare(spec);
     failureEngine.prepare(spec);
     stereoSpread.prepare(spec);

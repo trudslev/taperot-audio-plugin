@@ -61,14 +61,26 @@ public:
             // times. On every block after, the assignment is the same pointer, so the refcount goes
             // down and back up without reaching zero — which is why steady state is genuinely clean.
             //
-            // So the caching TapeRot uses to avoid per-block ALLOCATION still costs four per-block
-            // frees' worth of heap activity once, on the first block. Classification: live defect,
-            // measured, one-off. Nothing is fixed in this pass.
-            expectEquals (c.frees, 4,
-                          "the first-block coefficient release count moved. If it went to 0 the "
-                          "one-off is fixed; if it went up, something else releases on the audio "
-                          "thread.");
-            expectEquals (c.allocations, 0, "the cold block started allocating, not just freeing");
+            // **THE COLD ROW IS CLEAN AS OF STAGE 2, and the attribution above did not predict it.**
+            //
+            // The pin read `expectEquals (c.frees, 4)` with its own instruction attached — "if it
+            // went to 0 the one-off is fixed" — and it went to 0 when `TapeModelEQ::prepare` was
+            // given the model it is prepared for. That is one of the five sites named above, so the
+            // recorded cause list predicted **three** frees remaining and zero were observed.
+            //
+            // **Logged as a discrepancy rather than claimed as credit.** Either the four releases
+            // were all downstream of the first-block model reconfiguration — plausible, since
+            // reconfiguring a chain rebuilds coefficient objects and the Saturator assignments may
+            // simply have been releasing pointers that reconfiguration had already replaced — or the
+            // attribution to Saturator.cpp:38/40/92/94 was wrong when it was written. Nothing here
+            // distinguishes those, and a fix that removes more than its finding accounts for is
+            // exactly where a wrong change collects the credit.
+            //
+            // What IS established: cold and steady are both clean, and this now asserts it.
+            expect (c.clean(),
+                    "the first block touches the heap. It was 0 alloc / 4 free — four coefficient "
+                    "releases on the audio thread, which an allocation-only detector reported as "
+                    "clean: " + c.describe());
 
             expect (s.clean(), "steady-state processBlock touches the heap: " + s.describe());
         }

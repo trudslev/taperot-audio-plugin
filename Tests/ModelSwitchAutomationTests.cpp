@@ -8,7 +8,7 @@ namespace
     std::unique_ptr<DegradationCore> makeCascadeStage(int index, const juce::dsp::ProcessSpec& spec)
     {
         auto stage = std::make_unique<DegradationCore>(index);
-        stage->prepare(spec);
+        stage->prepare(spec, 0);   // NONE: these arms drive MODEL themselves from a known start
         return stage;
     }
 }

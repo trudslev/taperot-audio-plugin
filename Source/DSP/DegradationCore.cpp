@@ -16,10 +16,10 @@ DegradationCore::DegradationCore(int stageIndex)
 {
 }
 
-void DegradationCore::prepare(const juce::dsp::ProcessSpec& spec)
+void DegradationCore::prepare(const juce::dsp::ProcessSpec& spec, int initialModelIndex)
 {
     wowFlutter.prepare(spec);
-    tapeModelEQ.prepare(spec);
+    tapeModelEQ.prepare(spec, initialModelIndex);
     noiseSource.prepare(spec);
 }
 
