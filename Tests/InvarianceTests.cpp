@@ -1269,6 +1269,21 @@ public:
                                     + " -> " + line);
                 }
 
+                /*  **The decomposition checked at 96 kHz, because it rests on 511 and 2048
+                    agreeing — and against the 64 reference they do NOT at 96 kHz: 0.271299407
+                    against 0.304790836.** Either the short/long threshold moves with sample rate,
+                    or there is a third behaviour the 48 kHz table cannot see. Compared directly the
+                    way 48 kHz was, since the whole lesson of the last run is that a shared
+                    reference can sum two effects into one column. */
+                logMessage ("  --- 96 kHz, zero depth, centre "
+                                + juce::String (WowFlutter::nominalDelayMs, 1) + " ms ("
+                                + juce::String (juce::roundToInt (WowFlutter::nominalDelayMs * 96.0))
+                                + " samples) ---");
+
+                for (auto sizes : { std::vector<int> { 64, 128, 511, 2048 },
+                                    std::vector<int> { 511, 2048 },
+                                    std::vector<int> { 128, 2048 },
+                                    std::vector<int> { 128, 511 } })
                 {
                     TapeRotAudioProcessor p;
                     setP (p, ParamIDs::wow, 0.0f);
@@ -1281,13 +1296,12 @@ public:
                     nf::testing::render (p, s);
 
                     juce::String line;
-                    for (const auto& r : nf::testing::blockSizeInvariance (p, s, { 64, 128, 511, 2048 }))
-                        line << juce::String (r.maxAbsDifference, 9) << "  ";
+                    for (const auto& r : nf::testing::blockSizeInvariance (p, s, sizes))
+                        line << juce::String (r.actualBlockSize) << ":"
+                             << juce::String (r.maxAbsDifference, 9) << "  ";
 
-                    logMessage ("  96 kHz, zero depth, centre "
-                                    + juce::String (WowFlutter::nominalDelayMs, 1) + " ms ("
-                                    + juce::String (juce::roundToInt (WowFlutter::nominalDelayMs * 96.0))
-                                    + " samples) -> " + line);
+                    logMessage ("    ref " + juce::String (sizes.front()).paddedLeft (' ', 4)
+                                    + " -> " + line);
                 }
 
                 /*  ## MEASURED — two effects, not one, and the reference was hiding the split
