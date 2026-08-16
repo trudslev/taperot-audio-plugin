@@ -11,8 +11,23 @@ KnobFilmstrip::KnobFilmstrip(Layout::Cap cap)
 
     // Stated rather than inherited - see Layout::knobSweepDegrees for why a fully-overridden
     // paint() is exactly the situation in which an unstated sweep goes unnoticed.
-    setRotaryParameters(juce::degreesToRadians(180.0f - Layout::knobSweepDegrees * 0.5f),
-                        juce::degreesToRadians(180.0f + Layout::knobSweepDegrees * 0.5f),
+    /*  **Centred on TWELVE o'clock, and it used to be centred on six.**
+
+        JUCE measures rotary angles clockwise from 12 o'clock, so an arc symmetric about the pointer's
+        rest axis is `2*pi +/- sweep/2` — the `360` below. The old form was `180 +/- sweep/2`, which
+        is symmetric about 6 o'clock: the same SPAN, pointing the opposite way. That is why it
+        survived, and why a test asserting the span would have passed it.
+
+        **Nothing on the panel showed it**, which is the other half. `paint()` is fully overridden and
+        draws a baked filmstrip frame chosen by `valueToProportionOfLength`, so the Slider's own
+        rotary parameters reach no pixel here. They reach an accessibility client, a look-and-feel,
+        and any JUCE default paint path someone later reinstates — all of which would have been
+        handed an arc pointing at the floor.
+
+        `printedScaleDefects` cannot catch it either: it checks a ring's marks against the
+        parameter's range, and this is neither a mark nor a range. */
+    setRotaryParameters(juce::degreesToRadians(360.0f - Layout::knobSweepDegrees * 0.5f),
+                        juce::degreesToRadians(360.0f + Layout::knobSweepDegrees * 0.5f),
                         true);
 }
 

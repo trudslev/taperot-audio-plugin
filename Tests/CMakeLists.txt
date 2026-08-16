@@ -38,6 +38,7 @@ target_sources(TapeRotTests PRIVATE
     ../Source/PluginProcessor.cpp
     ../Source/PluginEditor.cpp
     ../Source/GUI/KnobFilmstrip.cpp
+    RotaryArcTests.cpp
     ../Source/GUI/SpriteButton.cpp
     ../Source/GUI/LampStrip.cpp
     ../Source/GUI/PitchScope.cpp
