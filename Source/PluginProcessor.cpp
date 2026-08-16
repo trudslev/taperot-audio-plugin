@@ -64,6 +64,8 @@ TapeRotAudioProcessor::TapeRotAudioProcessor(juce::File userDirectoryOverride)
     // the sound the plugin should make when a host loads it. Construction is single-threaded with
     // no host or automation attached, so applying this synchronously (rather than through the
     // pendingProgramIndex/AsyncUpdater path used by setCurrentProgram) is safe.
+    apvts.addParameterListener(ParamIDs::gen, this);
+
     store.refresh();
     applyFactoryProgram(kFactoryPrograms[defaultFactoryProgramIndex]);
     setCurrentId(factoryIdAt((int) defaultFactoryProgramIndex));
@@ -495,7 +497,7 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     inLevelSmoothed = 0.0f;
     outLevelSmoothed = 0.0f;
 
-    setLatencySamples(saturator.getLatencySamples());
+    updateLatency();
 }
 
 //==============================================================================
@@ -849,6 +851,34 @@ void TapeRotAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce:
 
     inputLevelDb.store(toDb(inLevelSmoothed), std::memory_order_relaxed);
     outputLevelDb.store(toDb(outLevelSmoothed), std::memory_order_relaxed);
+}
+
+/*  **The real figure, and it was 4 samples against a measured 1218.**
+
+    Every GEN stage is a delay line centred on `WowFlutter::nominalDelayMs`, so the cascade's latency
+    is that centre times the stage count, plus the Saturator's own oversampling latency. TapeRot
+    declared only the Saturator's — so every DAW placed its output late by the whole cascade with
+    nothing correcting it. That is session-wide misalignment rather than a local artefact.
+
+    Recomputed whenever GEN changes, which is what makes GEN non-automatable rather than merely
+    awkward: a host compensates a declared latency but has to rebuild its graph when one moves.
+*/
+void TapeRotAudioProcessor::parameterChanged(const juce::String& parameterID, float)
+{
+    if (parameterID == ParamIDs::gen)
+        updateLatency();
+}
+
+void TapeRotAudioProcessor::updateLatency()
+{
+    // Before the first prepare there is no rate to convert with, and prepareToPlay calls this.
+    if (getSampleRate() <= 0.0)
+        return;
+
+    const int stages = juce::jlimit(1, maxGenerations, (int) std::round(genParam->load()));
+    const int perStage = (int) std::round(WowFlutter::nominalDelayMs * 0.001 * getSampleRate());
+
+    setLatencySamples(saturator.getLatencySamples() + stages * perStage);
 }
 
 juce::AudioProcessorEditor* TapeRotAudioProcessor::createEditor()

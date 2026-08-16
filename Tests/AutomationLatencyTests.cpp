@@ -145,7 +145,7 @@ public:
 
                 logMessage ("  GEN " + juce::String (gen, 0) + " -> " + juce::String (measured)
                                 + " samples, " + juce::String (measured * 1000.0 / 48000.0, 1) + " ms"
-                                + "   (25 ms x GEN predicts " + juce::String ((int) (gen * 1200)) + ")");
+                                + " (per-stage centre x GEN predicts " + juce::String ((int) (gen * 1200)) + ")");
             }
 
             // --- the model set, predicted irrelevant ----------------------------------------
@@ -185,8 +185,14 @@ public:
 
             // **GEN must move it, or the mechanism is wrong.** This is the arm that can refute the
             // whole reading, and it is asserted first for that reason.
-            expectGreaterThan (byGen[2] - byGen[0], 6000,
-                               "GEN 8 did not carry ~8x GEN 1's latency, so the 25 ms-per-stage "
+            /*  **Derived from the centre constant, not the literal 6000 this used to carry.** That
+                figure was 7 x the old 25 ms stage with slack; the centre is 15 ms now and the same
+                relationship gives 7 x 720. Asserting the RELATIONSHIP is what survives the next time
+                the centre is sized against a measurement. */
+            const int perStageSamples = juce::roundToInt (WowFlutter::nominalDelayMs * 0.001 * 48000.0);
+
+            expectGreaterThan (byGen[2] - byGen[0], 6 * perStageSamples,
+                               "GEN 8 did not carry ~8x GEN 1's latency, so the per-stage centre "
                                "mechanism is not what produces this figure: GEN 1 "
                                    + juce::String (byGen[0]) + ", GEN 8 " + juce::String (byGen[2]));
 
@@ -225,7 +231,14 @@ public:
                 **Nothing regressed; a mislabelled quantity stopped being accidentally equal to the
                 one it was named after.** The spread is still reported from modLo/modHi, which is
                 what it is for. */
-            expectWithinAbsoluteError (atZeroDepth, 1200, 32,
+            /*  **Read from the constant, never transcribed.** This asserted 1200 — one stage of the
+                25 ms centre — and the centre is 15 ms now, sized against a measured excursion bound.
+                A literal here would have to be re-typed every time that figure moves, and the thing
+                being asserted is the RELATIONSHIP: zero-depth latency is exactly one stage's centre
+                delay plus the Saturator's own. */
+            const int perStage = juce::roundToInt (WowFlutter::nominalDelayMs * 0.001 * 48000.0);
+
+            expectWithinAbsoluteError (atZeroDepth, perStage, 32,
                                        "at zero modulation depth the latency should be exactly one "
                                        "stage's 25 ms centre delay — 1200 samples at 48 kHz. It is "
                                        + juce::String (modLo) + ", so the centre is not where "
@@ -259,6 +272,21 @@ public:
             const auto renderWith = [&] (bool withImpulse)
             {
                 TapeRotAudioProcessor p;
+
+                /*  **Wow and flutter at zero, because a declaration is a FIXED number.**
+
+                    The declared latency is necessarily the delay line's CENTRE; a modulated read
+                    pointer wanders either side of it and cannot match a single figure sample-exactly.
+                    Driven at the default depths the impulse emerged at 650 against a declared 724 —
+                    74 samples, which is the modulation and not a misdeclaration.
+
+                    At zero depth the two agree: the arm reads 722 against 724, which is what "the
+                    host places this correctly" means. The modulation's own spread is a separate
+                    measurement and is reported by the arm above. */
+                if (auto* w = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::wow)))
+                    w->setValueNotifyingHost (0.0f);
+                if (auto* f = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (ParamIDs::flutter)))
+                    f->setValueNotifyingHost (0.0f);
 
                 nf::testing::RenderSpec warmSpec;
                 warmSpec.blockSize = spec.blockSize;

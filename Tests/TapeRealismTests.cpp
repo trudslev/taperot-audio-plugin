@@ -44,7 +44,14 @@ public:
                 window produced an rms ratio of 0.345 against a true 0.984 — but it applies here for a
                 second reason as well: wow is 0.7 sine plus 0.3 of a slow random walk, so the
                 excursion is not purely periodic and its extreme is not reached every cycle. */
-            constexpr int probes = 256;
+            /*  **2048 probes = 87 s, about 44 wow cycles — sizing against a BOUND, not a draw.**
+
+                12.833 ms was one realisation. Wow is 0.7 sine plus 0.3 of a slow random walk, so
+                the extreme is not reached every cycle and 5.5 cycles is short. A read pointer that
+                crosses the write pointer is an intermittent click nobody would ever trace, so the
+                centre has to be sized above a measured maximum with a stated margin rather than
+                above a single sample of the distribution. */
+            constexpr int probes = 2048;
 
             const juce::dsp::ProcessSpec spec { fs, (juce::uint32) blockSize, 2 };
 

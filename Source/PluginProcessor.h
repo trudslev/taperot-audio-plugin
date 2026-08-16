@@ -22,7 +22,8 @@
 #include <memory>
 
 class TapeRotAudioProcessor final : public juce::AudioProcessor,
-                                     private juce::AsyncUpdater
+                                     private juce::AsyncUpdater,
+                                     private juce::AudioProcessorValueTreeState::Listener
 {
 public:
     /** @param userDirectoryOverride  where User Programs live. Defaults to the real per-OS
@@ -38,6 +39,17 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void reset() override;
+
+    /** Declares the cascade's real latency. Recomputed on a GEN change — see the definition. */
+    void updateLatency();
+
+private:
+    /** GEN only. A latency that MOVES forces a host graph rebuild, which is the whole reason GEN is
+        non-automatable — so the recompute has to happen wherever GEN can change, not only in
+        prepareToPlay. Delivered on the message thread by the APVTS. */
+    void parameterChanged (const juce::String& parameterID, float newValue) override;
+
+public:
     void releaseResources() override;
     bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
     void processBlock(juce::AudioBuffer<float>&, juce::MidiBuffer&) override;

@@ -324,8 +324,20 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         juce::StringArray{NoiseCharacterNames::tape, NoiseCharacterNames::vcr, NoiseCharacterNames::dust},
         0));
 
+    /*  **NON-AUTOMATABLE, and it still saves in Programs and in session state.**
+
+        Each generation is a real delay line, so GEN changes the plugin's latency — 720 samples per
+        stage at 48 kHz. A host compensates a DECLARED latency, but a latency that CHANGES forces a
+        graph rebuild, and a parameter in the automation lane can change it once per block.
+
+        It leaves the host's automation lane only. It is still a control on the panel, still stored
+        in a Program, still restored with a session. What it stops is a host writing it as a curve.
+
+        **Free now, breaking after release**: saved automation lanes referencing it would be orphaned
+        by this change, so it lands before there is any saved automation to break. */
     params.push_back(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{ParamIDs::gen, 1}, "GENERATION", 1, 8, 1));
+        juce::ParameterID{ParamIDs::gen, 1}, "GENERATION", 1, 8, 1,
+        juce::AudioParameterIntAttributes().withAutomatable(false)));
 
     // No withLabel here, unlike the others: the unit is value-dependent, so it has to live in the
     // text. LP spans 1-20 kHz and HP spans 20-2000 Hz, and the printed scales switch at 1k the same

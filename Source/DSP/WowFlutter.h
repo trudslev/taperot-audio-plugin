@@ -32,7 +32,36 @@ public:
     float getWowRateHz() const noexcept { return wowRateHz * wowFlutterRateMultiplier; }
     float getFlutterRateHz() const noexcept { return channels.empty() ? 0.0f : (float) channels[0].flutterRateHz; }
 
-    static constexpr float nominalDelayMs = 25.0f;
+    /*  **15 ms, sized against a MEASURED BOUND with a stated margin, and it was 25.**
+
+        The centre exists so the read pointer can wander below it without crossing the write
+        pointer — a crossing is an intermittent click nobody would ever trace back. It had 25 ms with
+        no recorded derivation.
+
+        Measured over 87 seconds, about **44 wow cycles**, at maximum depth on the SLOWEST stage
+        (rate x0.7932, since pitch shift is the rate of change of delay so a slower transport needs
+        more excursion for the same deviation):
+
+            wow alone        10.521 ms downward
+            wow AND flutter  12.875 ms downward   <- the binding case
+
+        Long enough to be a bound rather than a draw: at 5.5 cycles the same figure read 12.833, so
+        it has converged. Wow is 0.7 sine plus 0.3 of a slow random walk, which is why one cycle was
+        never going to be enough.
+
+        **Only the DOWNWARD excursion binds this.** Delay above the centre needs buffer length, which
+        `maxDelayMs` provides; conflating the two is what once reported 12.90 where the constraint
+        was 11.54.
+
+        15.0 = 12.875 measured + 0.083 for `interpolationMarginSamples` + 16 % margin. **An earlier
+        estimate of ~13 ms came from the wow-only figure and would have left six samples**, which is
+        not a margin — the binding case includes flutter.
+
+        The halving is free: absolute delay offset produces no sound, because pitch modulation is the
+        rate of change of delay. A line wandering 2.1-27.9 ms is identical to one wandering
+        12.1-37.9 ms. The 10 ms removed was pure latency with nothing attached, and at GEN 8 it is
+        200 ms becoming 120. */
+    static constexpr float nominalDelayMs = 15.0f;
 
 private:
     static constexpr float centerDelayMs = nominalDelayMs;
