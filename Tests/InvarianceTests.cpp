@@ -1344,6 +1344,35 @@ public:
                     further out: not two arms being incomparable, but every arm sharing one
                     unexamined baseline that happened to be on the wrong side of a split.
 
+                    ## OPEN FINDING — the delay line below ~15 ms, not closed by the revert
+
+                    `nominalDelayMs` is back at 25.0, which is choosing to sit above the threshold
+                    rather than fixing it. What is established:
+
+                      - Against the 64 reference it is TIME-DOMAIN and consistent at both sample
+                        rates: 25 ms clean at 48 k and 96 k, 15 ms dirty at both.
+                      - Zero depth diverges, so the modulator is not involved. A static delay line
+                        that is not block-invariant is the finding.
+                      - FOUR framings for the sub-structure are refuted: a boundary in samples
+                        (96 kHz at 1440 is dirtier than 48 kHz at 720), a boundary in time (the
+                        511-against-2048 pair behaves differently at the same 15 ms at two rates),
+                        centre-minus-excursion (zero depth has no excursion), and the
+                        two-effect decomposition below.
+                      - 511 against 2048 agrees at 0.001338730 ONLY at 48 kHz with the centre at 15
+                        or 25 ms. At 96 kHz it is 0.301 at 1440 samples and 0.594 at 720; at 48 kHz
+                        with a 7.5 ms centre it is 0.305.
+
+                    **The 0.001338730 residue is NOT filed against TapeRot's original unexplained
+                    block-size rows.** That reading depended on the decomposition above, and nothing
+                    has isolated the residue except a combination where every term happens to be
+                    small — which is the same mistake this hunt has already made in three other
+                    costumes.
+
+                    **What the revert closes**: the chain is back to its pre-stage-4 block-size
+                    behaviour, 0.000200 / 0.001022 / 0.001926 at 48 kHz. That was never clean; it is
+                    the state the sweep already characterised and filed. Step 6 unblocks because the
+                    chain is in a KNOWN state, not because it is invariant.
+
                     **No mechanism named.** */
                 logMessage ("  --- render length alone, WARM CASSETTE (the constructor's Program), harness input ---");
 

@@ -326,6 +326,30 @@ public:
             reference.prepareToPlay (spec.sampleRate, spec.blockSize);
             const int declared = reference.getLatencySamples();
 
+            /*  **Re-verified across GEN after the centre reverted to 25 ms.** The declaration is
+                derived from `nominalDelayMs`, so it moves with it, and a declaration verified at one
+                centre says nothing about another. Wow and flutter at zero throughout, because the
+                declared figure is necessarily the delay line's CENTRE and a modulated read pointer
+                cannot match a fixed number sample-exactly. */
+            for (int gen : { 1, 4, 8 })
+            {
+                TapeRotAudioProcessor g;
+
+                for (auto id : { ParamIDs::wow, ParamIDs::flutter })
+                    if (auto* q2 = dynamic_cast<juce::RangedAudioParameter*> (g.apvts.getParameter (id)))
+                        q2->setValueNotifyingHost (0.0f);
+
+                if (auto* gp = dynamic_cast<juce::RangedAudioParameter*> (g.apvts.getParameter (ParamIDs::gen)))
+                    gp->setValueNotifyingHost (gp->getNormalisableRange().convertTo0to1 ((float) gen));
+
+                g.setRateAndBufferSizeDetails (spec.sampleRate, spec.blockSize);
+                g.prepareToPlay (spec.sampleRate, spec.blockSize);
+
+                logMessage ("  GEN " + juce::String (gen) + " declares "
+                                + juce::String (g.getLatencySamples()) + " samples ("
+                                + juce::String (g.getLatencySamples() * 1000.0 / spec.sampleRate, 1) + " ms)");
+            }
+
             logMessage ("  impulse response peak " + juce::String (impulsePeak, 6)
                             + " — if that is 0 the two renders are identical and nothing was measured");
 

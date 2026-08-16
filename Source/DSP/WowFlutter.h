@@ -61,7 +61,28 @@ public:
         rate of change of delay. A line wandering 2.1-27.9 ms is identical to one wandering
         12.1-37.9 ms. The 10 ms removed was pure latency with nothing attached, and at GEN 8 it is
         200 ms becoming 120. */
-    static constexpr float nominalDelayMs = 15.0f;
+    /*  **REVERTED to 25.0 on 2026-08-16, and the reason is block dependence rather than the
+        excursion bound.**
+
+        Step 3 sized this to 15.0 against a converged excursion measurement — 12.875 ms downward at
+        maximum wow AND flutter over 43.7 cycles, plus the interpolator and 16 % margin — and that
+        arithmetic is still correct. 15 ms leaves the read pointer ample room.
+
+        What it also did was take the plugin below a threshold in the DELAY LINE. Against the
+        64-block reference, measured at zero depth:
+
+            centre 25 ms   48 kHz 0.000200/0.001022/0.001926   96 kHz 0.000078/0.000393/0.001153
+            centre 15 ms   48 kHz 0.029/0.125/0.125            96 kHz 0.068/0.271/0.305
+
+        Consistent at both sample rates, so it is time-domain on the figure that matters. Declared
+        latency is compensated by the host; block dependence is compensated by nothing, and the two
+        are not commensurable. 120 ms and 200 ms at GEN 8 are both mixing-only, so the halving
+        bought no use case.
+
+        **This is choosing to sit above the threshold, not fixing it.** The delay line's sub-15 ms
+        block dependence stays open as its own finding — see Tests/InvarianceTests.cpp, where four
+        framings for its sub-structure are refuted. */
+    static constexpr float nominalDelayMs = 25.0f;
 
 private:
     static constexpr float centerDelayMs = nominalDelayMs;
