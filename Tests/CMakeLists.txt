@@ -10,6 +10,7 @@ target_sources(TapeRotTests PRIVATE
     ChannelLayoutTests.cpp
     TapeRealismTests.cpp
     GeneratorInvarianceTests.cpp
+    PendingProgramLockTests.cpp
     TestMain.cpp
     ReadoutConformanceTests.cpp
     MenuMetricsTests.cpp
