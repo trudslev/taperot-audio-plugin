@@ -920,6 +920,71 @@ public:
             // with no generator is exactly invariant at any level — which is what the origin reading
             // requires, and what the withdrawn arm appeared to refute.
             logMessage ("  --- level, with no generator anywhere ---");
+            /*  **MIX swept rather than fixed, and the shape names the path.**
+
+                The gain-1 arm fails at 0.090253919 on a chain with every generator off, which is a
+                larger divergence than the fully-driven chain measures. The fixture is exonerated —
+                the transcription check above reads exactly 0.000000000 — so this is the processor,
+                and MIX 50 was incidental framing rather than a chosen condition.
+
+                  MIX 0    dry only, and with drive 0, wow 0, flutter 0, model NONE, noise 0 and
+                           GEN 1 this is the IDENTITY. Bit-identical to the input at every block
+                           size, or the finding is far larger than any alignment question and
+                           nothing downstream of it is readable. **The known case, and the cheapest
+                           arm in the set** — an identity path that is not identical cannot be
+                           explained away.
+                  MIX 100  wet only; the dry path contributes nothing.
+                  MIX 50   the arm as it stands.
+
+                Divergence at 100 and not 0 is the wet path. At 0 and not 100 is the dry path. At
+                both means MIX is not the variable. **Absent at both with 50 still failing is a
+                summing or alignment problem between two individually-clean paths** — and only that
+                combination establishes the dry-compensation candidate rather than merely fitting
+                it. */
+            for (float mix : { 0.0f, 100.0f, 50.0f })
+            {
+                TapeRotAudioProcessor p;
+                neutral (p, 0.0f);
+                setP (p, ParamIDs::mix, mix);
+                warm (p);
+
+                nf::testing::RenderSpec s;
+                s.blockSize = 512;
+                s.numBlocks = 48;
+                s.fillInput = scaledInput (1.0f);
+
+                double worst = 0.0;
+                for (const auto& r : nf::testing::blockSizeInvariance (p, s, { 64, 128, 511, 2048 }))
+                    worst = juce::jmax (worst, r.maxAbsDifference);
+
+                logMessage ("  MIX " + juce::String (mix, 0).paddedLeft (' ', 3)
+                                + ", no generator -> worst |delta| " + juce::String (worst, 9));
+            }
+
+            /*  ## MEASURED, and it refutes the dry-compensation candidate
+
+                    MIX   0  ->  0.000000000
+                    MIX 100  ->  0.180507839
+                    MIX  50  ->  0.090253919
+
+                **MIX 0 is exactly identical**, so the identity path is an identity and the known
+                case pays out — the finding is not larger than the mix.
+
+                **And 0.180507839 / 0.090253919 is 2.000000**, so MIX 50 is the wet path scaled by
+                one half and nothing else. The dry path contributes no divergence at any setting and
+                the blend is exactly linear. A summing or alignment problem between two paths cannot
+                produce a factor of exactly two; only one path carrying all of it can.
+
+                So it is the WET path, the dry-compensation delay is refuted, and the MIX 50 framing
+                was incidental exactly as suspected — but not for the reason suspected.
+
+                **What is left to explain is the size.** The generator-free wet path — drive 0,
+                wow 0, flutter 0, model NONE, noise 0, GEN 1 — diverges 0.18 across block sizes,
+                where the fully-driven chain measures 0.0002 to 0.0019. A chain with everything
+                turned off being two orders worse than the same chain driven is the next question,
+                and it is a question about the wet path alone now rather than about three
+                possibilities. */
+
             const auto g1  = worstAtGain ("gain 1,  no generator",   0.0f, 1.0f);
             const auto g15 = worstAtGain ("gain 1.5, no generator",  0.0f, 1.5f);
             const auto g2  = worstAtGain ("gain 2,  no generator",   0.0f, 2.0f);
