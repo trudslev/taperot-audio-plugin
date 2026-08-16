@@ -77,6 +77,22 @@ public:
             // exactly where a wrong change collects the credit.
             //
             // What IS established: cold and steady are both clean, and this now asserts it.
+            //
+            // **RE-OPENED AND RE-CLOSED 2026-08-16, by a wider instrument rather than a new bug.**
+            // The sentinel gained `malloc` interposition, and this row came back `1 alloc (4160
+            // bytes)` — all of it via malloc, so all of it previously uncountable. `AudioBuffer::
+            // setSize` allocates through `HeapBlock` -> `std::malloc`, and the detector had only
+            // ever overridden `operator new`.
+            //
+            // The cause was a **sibling divergence**, not a subtlety: five castings size `dryBuffer`
+            // in `prepareToPlay` and TapeRot did not, so its chunk lambda's `setSize` grew the
+            // buffer on the first block of every instance. 4160 bytes is 2 x 512 floats plus JUCE's
+            // channel-pointer block, which is the whole of it and leaves nothing unattributed.
+            //
+            // Note what this says about the paragraph above it. That one records four frees whose
+            // disappearance the attribution did not predict, and declines to claim the credit. This
+            // one is the opposite case and worth keeping beside it: the row read clean for a day
+            // because the instrument could not see the units the defect was denominated in.
             expect (c.clean(),
                     "the first block touches the heap. It was 0 alloc / 4 free — four coefficient "
                     "releases on the audio thread, which an allocation-only detector reported as "

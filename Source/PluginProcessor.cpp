@@ -477,6 +477,18 @@ void TapeRotAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock
     genSmoothed.setCurrentAndTargetValue(genParam->load());
     genFloorSnapshot.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, true);
 
+    // **dryBuffer is sized HERE, not on the first processBlock — and TapeRot was the one casting of
+    // six that did not do this.** Its `setSize` in the chunk lambda passes `avoidReallocating`, so
+    // with the buffer already this large that call is a no-op; without this line the first block of
+    // every instance grew it on the audio thread.
+    //
+    // It was invisible until the allocation sentinel learned to see `malloc`. `AudioBuffer::setSize`
+    // allocates through `HeapBlock` (`juce_AudioSampleBuffer.h:442` -> `juce_HeapBlock.h:263`),
+    // which calls `std::malloc` directly, while the detector overrode `operator new` and nothing
+    // else — so the growth counted zero and read exactly like a clean row. Measured at 4160 bytes
+    // on the first block at 48 k / 512 stereo, all of it via malloc.
+    dryBuffer.setSize(getTotalNumOutputChannels(), samplesPerBlock, false, false, true);
+
     const int maxDryDelaySamples =
         (int) std::ceil((double) maxGenerations * WowFlutter::nominalDelayMs * 0.001 * sampleRate);
     dryCompensationDelay.setMaximumDelayInSamples(juce::jmax(1, maxDryDelaySamples));
