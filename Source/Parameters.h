@@ -257,7 +257,18 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         // FLUTTER's own skew was deliberate and confirmed and is untouched - the earlier rule
         // "fix the maximum, not the taper" was about that control, where re-tapering would have
         // undone a decision made for its own reasons. WOW has no taper to undo.
-        juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.2f), 30.0f, percentAttrs));
+        //
+        // **0.3 rather than FLUTTER's 0.2, and matching exponents was the WRONG invariant.** The two
+        // maxima differ by about 5x in realised deviation, so an identical exponent puts the same
+        // physical condition at different knob positions: at 0.2 a good deck sat at 50 % on WOW
+        // against 30-35 % on FLUTTER, and a worn transport at ~65 % against 50 %. At 0.3 WOW's good
+        // deck moves to ~35 % and worn to ~56 %, landing on FLUTTER's.
+        //
+        // **Equivalent hardware at equivalent positions is the symmetry worth having**, not
+        // equivalent numbers in the range. It also spends the travel where the control is used —
+        // more between worn and warped, less on near-clean — and the maximum is untouched either
+        // way.
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.3f), 30.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID{ParamIDs::flutter, 1}, "FLUTTER",

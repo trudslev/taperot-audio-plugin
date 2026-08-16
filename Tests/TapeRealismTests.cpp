@@ -38,13 +38,30 @@ public:
             constexpr double fs = 48000.0;
             constexpr int blockSize = 512;
             constexpr int spacing = 2048;                 // impulses per probe
-            constexpr int probes = 64;                    // 64 * 2048 = 131072 samples = 2.7 s > one 0.5 Hz cycle
+            /*  **256 probes = 10.9 s, about 5.5 wow cycles, and it used to be 64 = 1.4 cycles.**
+
+                One cycle gives one draw. That lesson was learned on the wow cascade, where a 200-block
+                window produced an rms ratio of 0.345 against a true 0.984 — but it applies here for a
+                second reason as well: wow is 0.7 sine plus 0.3 of a slow random walk, so the
+                excursion is not purely periodic and its extreme is not reached every cycle. */
+            constexpr int probes = 256;
 
             const juce::dsp::ProcessSpec spec { fs, (juce::uint32) blockSize, 2 };
 
+            /*  **The SLOWEST stage, not the nominal rate.** Pitch shift is the rate of change of
+                delay, so a slower oscillation needs proportionally MORE excursion for the same
+                deviation — the slowest transport in the cascade is the worst case and it is what
+                sets the floor for any nominal delay. Per-stage rate multipliers are a draw now
+                (step 1), so the slowest is found rather than assumed. */
+            int slowestStage = 0;
+            for (int i = 1; i < 8; ++i)
+                if (DegradationCore::wowRateMultiplierFor (i) < DegradationCore::wowRateMultiplierFor (slowestStage))
+                    slowestStage = i;
+
             const auto excursionMs = [&] (float wowDepth, float flutterDepth)
             {
-                WowFlutter wf;
+                WowFlutter wf { (juce::uint64) slowestStage,
+                                DegradationCore::wowRateMultiplierFor (slowestStage) };
                 wf.prepare (spec);
 
                 double lo = 1.0e9, hi = -1.0e9;
@@ -101,6 +118,59 @@ public:
             const auto atZero = excursionMs (0.0f, 0.0f);
             const auto atMaxWow = excursionMs (1.0f, 0.0f);
             const auto atMaxBoth = excursionMs (1.0f, 1.0f);
+
+            /*  **Only the DOWNWARD excursion binds the centre.** Delay ABOVE the centre needs buffer
+                length, which `maxDelayMs` already provides; delay below it is what the centre has to
+                be large enough to allow. Conflating the two reported 12.90 ms on the previous run
+                where the real constraint was 11.54.
+
+                Stated separately here so the figure that sets `nominalDelayMs` cannot be read off
+                the wrong column. */
+            const double centreMs = atZero.first;   // measured, not the 25 ms constant transcribed
+
+            logMessage ("  slowest stage " + juce::String (slowestStage) + " at rate x"
+                            + juce::String (DegradationCore::wowRateMultiplierFor (slowestStage), 4)
+                            + ", window " + juce::String (probes * spacing / fs, 1) + " s ~"
+                            + juce::String (probes * spacing / fs * 0.5, 1) + " wow cycles");
+            logMessage ("  centre measured " + juce::String (centreMs, 3) + " ms");
+            logMessage ("  max wow  -> down " + juce::String (centreMs - atMaxWow.first, 3)
+                            + " ms, up " + juce::String (atMaxWow.second - centreMs, 3)
+                            + " ms, peak-to-peak " + juce::String (atMaxWow.second - atMaxWow.first, 3) + " ms");
+            logMessage ("  max both -> down " + juce::String (centreMs - atMaxBoth.first, 3)
+                            + " ms, up " + juce::String (atMaxBoth.second - centreMs, 3)
+                            + " ms, peak-to-peak " + juce::String (atMaxBoth.second - atMaxBoth.first, 3) + " ms");
+            logMessage ("  => the DOWNWARD figure is what binds a nominal delay; the upward one needs "
+                        "buffer length, which maxDelayMs already provides");
+
+            /*  ## THE STEP 3 PREDICTION IS REFUTED, and by a DECISION rather than by an error
+
+                Pre-stated: excursion 0.3-1.7 ms, a 2-3 ms centre, GEN 8 near 20 ms rather than 200.
+                Measured: 10.521 ms downward at maximum wow, 12.833 ms with flutter also at maximum.
+
+                **The prediction assumed step 2 would reduce the depth RANGES. It did not.** Step 2
+                re-tapered and kept both maxima, on the explicit ruling that 2.75 % wow is a
+                warped-record wobble and a legitimate extreme — capping the top to fix the middle
+                would have thrown away a sound the plugin can make. At 100 % knob the physical depth
+                is still 100 %, so the excursion at maximum is unchanged BY CONSTRUCTION.
+
+                The prediction and the ruling are inconsistent, and the ruling is the later one. This
+                is not a measurement that came out differently from expectation; it is a prediction
+                written before a decision that invalidated its premise.
+
+                **What the measurement does establish**, and it is not nothing: `centerDelayMs` is 25
+                and the binding constraint is 10.52 ms, so the centre carries about 14.5 ms of unused
+                headroom at the worst case. Sized to the measurement it could be roughly 12-13 ms —
+                halving GEN 8's latency from ~200 ms to ~100 ms, not the tenfold cut the prediction
+                assumed.
+
+                **So step 4's ranking does not invert.** At ~100 ms a fixed declared nominal still
+                taxes every GEN 1 user with 100 ms, which is the same objection at half the size. The
+                held decision stays held on the same reasoning.
+
+                The alternative is sizing the centre for TYPICAL use rather than the maximum — at
+                50 % knob the depth is 9.9 % and the excursion about 1 ms, so a 2-3 ms centre is
+                reachable if the extreme is clamped. That is a trade between a sound and a latency,
+                and it is a decision rather than a measurement. */
 
             logMessage ("  wow 0%,   flutter 0%   -> delay " + juce::String (atZero.first, 2)
                             + " .. " + juce::String (atZero.second, 2) + " ms");
