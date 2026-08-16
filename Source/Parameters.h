@@ -268,6 +268,18 @@ inline juce::AudioProcessorValueTreeState::ParameterLayout createTapeRotParamete
         // equivalent numbers in the range. It also spends the travel where the control is used —
         // more between worn and warped, less on near-clean — and the maximum is untouched either
         // way.
+        //
+        // **NOTHING NEEDED MIGRATING, and that is a fact rather than a decision.** A taper change
+        // would rewrite the meaning of every saved value IF Programs stored the normalised form.
+        // They do not, on either path: `FactoryProgram::wowPercent` is a plain percent assigned
+        // straight to the parameter, and User Programs and session state go through
+        // `apvts.copyState()`, whose ValueTree holds the DENORMALISED value — JUCE writes
+        // `unnormalisedValue` into it and reads it back with `setDenormalisedValue`
+        // (juce_AudioProcessorValueTreeState.cpp:81, 129, 413).
+        //
+        // So a stored 30.0 still means 30 % depth. What moved is only where on the knob 30 % sits.
+        // Recorded because "the taper changed and nothing needed migrating" is a different claim
+        // from "we chose not to migrate", and only the first costs nothing to keep true.
         juce::NormalisableRange<float>(0.0f, 100.0f, 0.0f, 0.3f), 30.0f, percentAttrs));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
