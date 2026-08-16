@@ -129,6 +129,136 @@ public:
                             "measurement is not tracing the modulation");
         }
 
+        beginTest ("DEPTH RANGES — cents at the knob positions, before any range is touched");
+        {
+            /*  **Step 2 opens with a measurement, because the ranges may already be right.**
+
+                The original complaint was that wow and flutter over five generations were
+                unlistenable, which is what made the factory Programs need rewriting. That was
+                ACCUMULATED deviation, and step 1 already cut it from 7.96x to 2.17x rms. The
+                single-generation range was never the thing that was wrong.
+
+                **And the taper is doing work a range edit would undo.** Read off the shipping
+                parameters rather than transcribed: WOW is 0-100 LINEAR, FLUTTER is 0-100 with skew
+                0.2. So half travel is 50 % of range on WOW and 100 * 0.5^5 = 3.1 % on FLUTTER —
+                the two controls are not comparable at the same knob position, and only FLUTTER has
+                the deliberate crazy-at-the-top shape.
+
+                Judged against real transports, where cents ~ 1731 x fractional deviation:
+
+                  good cassette deck   0.05-0.08 % WRMS   ~0.9-1.4 cents
+                  average portable     0.1-0.2 %          ~1.7-3.5
+                  worn or cheap        0.3-0.5 %          ~5-9
+                  dying transport      past 1 %           17+
+
+                The question is whether the MIDDLE of the travel lands on plausible hardware at
+                GEN 1 and stays musical at GEN 8. If both hold, step 2 is a no-op — which is a
+                result to report as one rather than a range edit nobody needed. */
+            const juce::dsp::ProcessSpec spec { 48000.0, 512, 2 };
+
+            TapeRotAudioProcessor ref;   // the shipping ranges, as the declaration they are
+
+            const auto physicalFor = [&ref] (const char* id, float knob)
+            {
+                if (auto* q = dynamic_cast<juce::RangedAudioParameter*> (ref.apvts.getParameter (id)))
+                    return q->getNormalisableRange().convertFrom0to1 (knob);
+                return 0.0f;
+            };
+
+            const auto deviation = [&spec] (int gen, float wow01, float flutter01)
+            {
+                std::vector<WowFlutter> stages;
+                stages.reserve ((size_t) gen);
+
+                for (int i = 0; i < gen; ++i)
+                    stages.emplace_back (i, DegradationCore::wowRateMultiplierFor (i));
+
+                for (auto& s : stages)
+                    s.prepare (spec);
+
+                juce::AudioBuffer<float> buffer (2, 512);
+                std::vector<float> accum (512, 0.0f);
+
+                double peak = 0.0, sumSq = 0.0;
+                juce::int64 n = 0;
+
+                for (int block = 0; block < 200; ++block)
+                {
+                    buffer.clear();
+                    std::fill (accum.begin(), accum.end(), 0.0f);
+
+                    for (auto& s : stages)
+                        s.process (buffer, wow01, flutter01, accum.data());
+
+                    if (block < 8)
+                        continue;                    // the delay lines fill
+
+                    for (float v : accum)
+                    {
+                        peak = juce::jmax (peak, (double) std::abs (v));
+                        sumSq += (double) v * v;
+                        ++n;
+                    }
+                }
+
+                return std::pair<double, double> { n > 0 ? std::sqrt (sumSq / (double) n) : 0.0, peak };
+            };
+
+            struct Control { const char* id; const char* label; bool isWow; };
+            const Control controls[] = { { ParamIDs::wow, "WOW    ", true },
+                                         { ParamIDs::flutter, "FLUTTER", false } };
+
+            logMessage ("  control  knob   physical    GEN 1 rms    GEN 1 pk    GEN 8 rms    GEN 8 pk");
+
+            for (const auto& c : controls)
+                for (float knob : { 0.25f, 0.50f, 0.75f, 1.00f })
+                {
+                    const float physical = physicalFor (c.id, knob);
+                    const float v = physical / 100.0f;
+
+                    const auto g1 = deviation (1, c.isWow ? v : 0.0f, c.isWow ? 0.0f : v);
+                    const auto g8 = deviation (8, c.isWow ? v : 0.0f, c.isWow ? 0.0f : v);
+
+                    logMessage ("  " + juce::String (c.label)
+                                    + juce::String ((int) (knob * 100.0f)).paddedLeft (' ', 6) + "%"
+                                    + juce::String (physical, 1).paddedLeft (' ', 9) + "%"
+                                    + juce::String (g1.first, 2).paddedLeft (' ', 13)
+                                    + juce::String (g1.second, 2).paddedLeft (' ', 12)
+                                    + juce::String (g8.first, 2).paddedLeft (' ', 13)
+                                    + juce::String (g8.second, 2).paddedLeft (' ', 12));
+                }
+
+            logMessage ("  (cents. ~1731 x fractional deviation, so 1.7 = 0.1 %, 8.7 = 0.5 %)");
+
+            /*  ## What this measured, recorded because the answer was NOT "no change required"
+
+                **WOW is LINEAR and FLUTTER is skewed, and only one premise survives that.** The
+                taper argument — half travel landing in the bottom 3 % of range — is FLUTTER's skew
+                of 0.2 and holds: 50 % knob is 3.1 % of range, 7.61 cents, 0.44 %, a worn deck. WOW
+                has no skew at all, so 50 % knob is 50 % of range: **22.44 cents rms = 1.30 %**,
+                past "dying transport". Its middle does not land on plausible hardware, and even
+                25 % knob is 0.65 %.
+
+                A good deck at 0.05-0.08 % needs roughly 2-3 % of WOW's travel — the bottom sliver
+                of a linear control, which is precisely the shape the FLUTTER skew exists to avoid.
+
+                **And a second finding that is NOT explained here: WOW does not accumulate across
+                generations and FLUTTER does.** WOW 100 % reads 44.87 rms at GEN 1 and 41.06 at
+                GEN 8 — a ratio of 0.91, no accumulation. FLUTTER 100 % reads 243.46 and 531.81 —
+                2.18x, which is the sqrt(8) the decorrelation work was aiming at. So step 1's 2.17x
+                figure, measured with both driven, was FLUTTER's; wow contributed nothing to it.
+
+                Flagged rather than accounted for. Two independent slow oscillators at different
+                rates should RMS-sum like anything else, and a ratio slightly below 1.0 is not what
+                partial correlation looks like either. It is the next thing to measure, and this
+                stage has already had three arms measure something other than what they were named
+                after — an explanation offered now would be a fourth. */
+
+            // Reported. A range is a design figure and pinning one here would pin a decision that
+            // has not been made — the measurement is what the decision is made from.
+            expect (true);
+        }
+
         beginTest ("THE WEIGHT VECTOR, measured per stage — what the accumulation gap actually is");
         {
             /*  **One run that produces the corrected weights rather than rejecting a hypothesis.**
