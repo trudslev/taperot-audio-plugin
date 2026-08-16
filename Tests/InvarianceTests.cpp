@@ -1227,6 +1227,110 @@ public:
                     **No mechanism is named.** Three candidates this stage fitted the direction of
                     their gap and were wrong, and a static delay line that is not block-invariant
                     invites a confident story more than any of them. */
+                /*  ## THE REFERENCE ITSELF — a fixed choice through every table in this hunt
+
+                    `blockSizeInvariance` compares every size against the FIRST in the list, and
+                    every figure so far has used 64. At 48 kHz, 511 and 2048 read identical to nine
+                    digits at zero depth AND at WARM CASSETTE — which is exactly what you see if 511
+                    and 2048 agree with each other and 64 is the odd one out.
+
+                    If 511-against-2048 is exact, the finding is not "a shorter centre is less
+                    block-invariant" but "SHORT blocks differ from long ones", with the centre
+                    setting the magnitude — and 128's figure becomes a point on a gradient rather
+                    than a step above a floor. That moves the hunt off the delay line's length
+                    entirely.
+
+                    The reference has never been questioned in this hunt. Same shape as the five
+                    pairing failures, one level further out: not two arms being incomparable, but
+                    every arm sharing one unexamined baseline. */
+                logMessage ("  --- the reference, zero depth, centre "
+                                + juce::String (WowFlutter::nominalDelayMs, 1) + " ms ---");
+
+                for (auto sizes : { std::vector<int> { 64, 128, 511, 2048 },
+                                    std::vector<int> { 511, 2048 },
+                                    std::vector<int> { 128, 2048 },
+                                    std::vector<int> { 128, 511 } })
+                {
+                    TapeRotAudioProcessor p;
+                    setP (p, ParamIDs::wow, 0.0f);
+                    setP (p, ParamIDs::flutter, 0.0f);
+
+                    nf::testing::RenderSpec s;
+                    s.blockSize = 512;
+                    s.numBlocks = 48;
+                    nf::testing::render (p, s);
+
+                    juce::String line;
+                    for (const auto& r : nf::testing::blockSizeInvariance (p, s, sizes))
+                        line << juce::String (r.actualBlockSize) << ":"
+                             << juce::String (r.maxAbsDifference, 9) << "  ";
+
+                    logMessage ("    ref " + juce::String (sizes.front()).paddedLeft (' ', 4)
+                                    + " -> " + line);
+                }
+
+                {
+                    TapeRotAudioProcessor p;
+                    setP (p, ParamIDs::wow, 0.0f);
+                    setP (p, ParamIDs::flutter, 0.0f);
+
+                    nf::testing::RenderSpec s;
+                    s.sampleRate = 96000.0;
+                    s.blockSize = 512;
+                    s.numBlocks = 48;
+                    nf::testing::render (p, s);
+
+                    juce::String line;
+                    for (const auto& r : nf::testing::blockSizeInvariance (p, s, { 64, 128, 511, 2048 }))
+                        line << juce::String (r.maxAbsDifference, 9) << "  ";
+
+                    logMessage ("  96 kHz, zero depth, centre "
+                                    + juce::String (WowFlutter::nominalDelayMs, 1) + " ms ("
+                                    + juce::String (juce::roundToInt (WowFlutter::nominalDelayMs * 96.0))
+                                    + " samples) -> " + line);
+                }
+
+                /*  ## MEASURED — two effects, not one, and the reference was hiding the split
+
+                    Zero depth throughout. Centre 15 ms:
+
+                      ref   64 -> 128:0.049608290  511:0.098989755  2048:0.098989755
+                      ref  511 -> 2048:0.001338730
+                      ref  128 -> 2048:0.098991275   511:0.098991275
+
+                    Centre 25 ms:
+
+                      ref   64 -> 128:0.000200262  511:0.001022242  2048:0.001926094
+                      ref  511 -> 2048:0.001338730
+                      ref  128 -> 2048:0.001926060  511:0.000963378
+
+                    And the missing cell: **25 ms at 96 kHz reads 0.000078 / 0.000393 / 0.001153 —
+                    CLEAN**, cleaner than 25 ms at 48 kHz.
+
+                    **The threshold is TIME-domain.** 15 ms is dirty at both 48 k and 96 k; 25 ms is
+                    clean at both. Sample count is not the variable — 1440 samples at 96 k/15 ms is
+                    dirty while 1200 at 48 k/25 ms is clean.
+
+                    **And there are two effects the 64-reference was summing into one column.**
+
+                    First, a CENTRE-INDEPENDENT residue: 511 against 2048 is **0.001338730 at both
+                    centres**, identical to nine digits. It does not care about the centre at all.
+
+                    Second, a centre-dependent split between SHORT and LONG blocks. At 15 ms, 511 and
+                    2048 agree to that residue while 64 and 128 sit 0.099 away from both. At 25 ms
+                    the split is gone and every pair is inside 0.0019.
+
+                    So the finding is not "a shorter centre is less block-invariant". It is "SHORT
+                    blocks break away from long ones when the centre is short", on top of a constant
+                    background that has nothing to do with the centre. 128's figure is a point on
+                    that split, not a step above a floor.
+
+                    **The reference had been a fixed choice through every table in this hunt and was
+                    never questioned** — the same shape as the five pairing failures, one level
+                    further out: not two arms being incomparable, but every arm sharing one
+                    unexamined baseline that happened to be on the wrong side of a split.
+
+                    **No mechanism named.** */
                 logMessage ("  --- render length alone, WARM CASSETTE (the constructor's Program), harness input ---");
 
                 for (int blocks : { 16, 32, 48, 64, 96, 128 })
