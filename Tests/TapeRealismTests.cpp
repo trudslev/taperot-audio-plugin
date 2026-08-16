@@ -129,6 +129,43 @@ public:
                             "measurement is not tracing the modulation");
         }
 
+        beginTest ("HF loss per MODEL across GEN 1..8 — the whole curve, not its endpoint");
+        {
+            /*  **An endpoint does not say whether a control is usable along its length.** GEN 8 at
+                -11 dB of 5 kHz is a defensible destination — eight generations of cassette dubbing
+                is murky, and that is the sound people reach for — but the setting that gets used is
+                GEN 3 or 4, and nothing about the endpoint predicts those. This is the same question
+                that made the factory Programs need rewriting the first time: a range that is right
+                at both ends and wrong between them reads as a broken control.
+
+                **Per model, because the loss is per model.** Generation loss is the dimension
+                machines differ on most audibly, so a single curve would say nothing about the
+                control that actually selects between them. */
+            const std::vector<double> hfProbes { 5000.0, 10000.0, 15000.0 };
+
+            for (int model = 1; model < (int) kNumTapeModels; ++model)
+            {
+                logMessage ("  " + juce::String (kTapeModels[(size_t) model].displayName)
+                                + "  (-3 dB per copy at "
+                                + juce::String (kTapeModels[(size_t) model].generationLossHz, 0)
+                                + " Hz)");
+                logMessage ("    GEN     5k       10k       15k");
+
+                for (float gen = 1.0f; gen <= 8.0f; gen += 1.0f)
+                {
+                    TapeRotAudioProcessor p;
+                    configureForResponse (p, gen, model);
+
+                    const auto rows = nf::testing::measureProcessorMagnitudeResponse (p, 48000.0, 512, hfProbes);
+
+                    logMessage ("     " + juce::String ((int) gen)
+                                    + juce::String (rows[0].gainDb, 2).paddedLeft (' ', 9)
+                                    + juce::String (rows[1].gainDb, 2).paddedLeft (' ', 10)
+                                    + juce::String (rows[2].gainDb, 2).paddedLeft (' ', 10));
+                }
+            }
+        }
+
         beginTest ("The generation accumulation law — noise, pitch and HF across GEN 1..8");
         {
             // Three curves, everything else fixed. What compounds and what should:
@@ -249,8 +286,10 @@ public:
                 }
 
                 // --- HF response --------------------------------------------------------------
+                // Generators OFF — see configureForResponse. With them up this column reads the
+                // accumulated hiss wherever the chain has pushed the tone beneath it.
                 TapeRotAudioProcessor p;
-                configure (p, gen);
+                configureForResponse (p, gen, 5);
                 const auto rows = nf::testing::measureProcessorMagnitudeResponse (p, 48000.0, 512, hfProbes);
 
                 const double centsRms = centsCount > 0 ? std::sqrt (centsSumSq / (double) centsCount) : 0.0;
@@ -269,6 +308,35 @@ public:
     }
 
 private:
+    /*  **The generators OFF, for any arm measuring a RESPONSE.**
+
+        `configure` drives NOISE, WOW and FLUTTER to 100, which is right for the noise and pitch
+        columns and wrong for a magnitude measurement. A swept-tone response reads the output at the
+        tone's frequency; once the chain has attenuated the tone below the accumulated hiss, the
+        reading is the HISS, and as hiss accumulates with GEN the curve RISES.
+
+        It did, and unmistakably: TOY read -33.47 dB at 15 kHz at GEN 1 and **-6.50 at GEN 8** —
+        eight generations of a 4.5 kHz transfer apparently gaining 27 dB of top. DICTAPHONE and
+        CAMCORDER did the same. Three arms in this stage have now measured something other than what
+        they were named after, each because the metric could not express the question.
+
+        Wow and flutter are off for the same reason from the other side: they modulate the delay
+        line, so a steady tone is smeared across bins and its own bin under-reads. */
+    static void configureForResponse (TapeRotAudioProcessor& p, float gen, int model)
+    {
+        const auto set = [&p] (const char* id, float physical)
+        {
+            if (auto* param = dynamic_cast<juce::RangedAudioParameter*> (p.apvts.getParameter (id)))
+                param->setValueNotifyingHost (param->getNormalisableRange().convertTo0to1 (physical));
+        };
+
+        set (ParamIDs::gen, gen);
+        set (ParamIDs::noise, 0.0f);
+        set (ParamIDs::wow, 0.0f);
+        set (ParamIDs::flutter, 0.0f);
+        set (ParamIDs::model, (float) model);
+    }
+
     static void configure (TapeRotAudioProcessor& p, float gen)
     {
         const auto set = [&p] (const char* id, float physical)

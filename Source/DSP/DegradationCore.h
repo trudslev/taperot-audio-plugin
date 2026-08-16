@@ -52,33 +52,30 @@ public:
 
     static float wowRateMultiplierFor (int stageIndex) noexcept;
 
-    /** The per-generation HF loss coefficient. Public so `GenerationCascadeTests` can rebuild the
-        chain from the same figure rather than transcribing one — that test asserts the cascade
-        equals its parts, so it has to rebuild the parts, and a transcribed constant would let the
-        two drift apart while the test kept passing. */
-    static float generationLossCoeffFor (double sampleRate) noexcept;
+    /** The per-generation HF loss coefficient for a MODEL. Public so `GenerationCascadeTests` can
+        rebuild the chain from the same figure rather than transcribing one — that test asserts the
+        cascade equals its parts, so it has to rebuild the parts, and a transcribed constant would
+        let the two drift apart while the test kept passing. Returns 0 for a model with no transfer
+        loss, which is a pass-through rather than a filter at DC. */
+    static float generationLossCoeffFor (double sampleRate, int modelIndex) noexcept;
 
 private:
     static constexpr float gentleSaturationDrive = 1.35f;
 
     /*  **The per-generation HF loss, which is the law that SHOULD compound and did not exist.**
 
-        A copy loses top end, and the loss multiplies: a deck 3 dB down at 14 kHz is 24 dB down after
-        eight passes. TapeRot measured 5 kHz moving **+0.8 dB** across eight generations — flat to
-        slightly rising — so the plugin spent its whole generation budget on the two things that must
-        not compound and none on the one that must. GEN sounded like more of everything rather than
-        like generations.
+        A copy loses top end, and the loss multiplies. TapeRot measured 5 kHz moving **+0.8 dB**
+        across eight generations — flat to slightly rising — so the plugin spent its whole generation
+        budget on the two things that must not compound and none on the one that must. GEN sounded
+        like more of everything rather than like generations.
 
-        A first-order low-pass is -3.01 dB at its own cutoff, so this constant IS the "3 dB down at
-        14 kHz per copy" figure rather than a fitted approximation of it. **The magnitude is a
-        starting point and a musical choice**, deliberately a named constant so it can move without
-        the law moving with it: the law is that the loss compounds, and that is true at any cutoff. */
-    static constexpr float generationLossHz = 14000.0f;
-
+        **The corner is PER MODEL** — `TapeModel::generationLossHz` — because generation loss is the
+        dimension machines differ on most audibly, and one shared figure would make MODEL stop
+        mattering at exactly the setting where it should matter most. */
     bool applySaturation;
     WowFlutter wowFlutter;
     std::vector<float> generationLossState;
-    float generationLossCoeff = 0.0f;
+    double generationLossSampleRate = 44100.0;
 
 public:
     // Metering passthrough for the scope's rate readouts. Fixed per instance, so a plain read.

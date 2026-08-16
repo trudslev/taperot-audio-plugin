@@ -19,9 +19,15 @@ float DegradationCore::wowRateMultiplierFor(int stageIndex) noexcept
     return 1.0f + wowRateSpread * (r.nextFloat() * 2.0f - 1.0f);
 }
 
-float DegradationCore::generationLossCoeffFor(double sampleRate) noexcept
+float DegradationCore::generationLossCoeffFor(double sampleRate, int modelIndex) noexcept
 {
-    return 1.0f - std::exp(-juce::MathConstants<float>::twoPi * generationLossHz / (float) sampleRate);
+    const auto& model = kTapeModels[(size_t) juce::jlimit(0, (int) kNumTapeModels - 1, modelIndex)];
+
+    if (model.generationLossHz <= 0.0f)
+        return 0.0f;   // no transfer loss: a pass-through, not a filter parked at DC
+
+    return 1.0f - std::exp(-juce::MathConstants<float>::twoPi * model.generationLossHz
+                            / (float) sampleRate);
 }
 
 DegradationCore::DegradationCore(int stageIndex)
@@ -39,7 +45,7 @@ void DegradationCore::prepare(const juce::dsp::ProcessSpec& spec, int initialMod
     tapeModelEQ.prepare(spec, initialModelIndex);
 
     generationLossState.assign((size_t) spec.numChannels, 0.0f);
-    generationLossCoeff = generationLossCoeffFor(spec.sampleRate);
+    generationLossSampleRate = spec.sampleRate;
     noiseSource.prepare(spec, initialNoiseAmount01);
 }
 
@@ -65,10 +71,16 @@ void DegradationCore::process(juce::AudioBuffer<float>& buffer, float wow01, flo
         const int numSamples = buffer.getNumSamples();
         const int numCh = juce::jmin(buffer.getNumChannels(), (int) generationLossState.size());
 
+        // Per block, from the model the block is actually running — see TapeModel::generationLossHz.
+        const float generationLossCoeff = generationLossCoeffFor(generationLossSampleRate, model);
+
         for (int ch = 0; ch < numCh; ++ch)
         {
             auto* data = buffer.getWritePointer(ch);
             auto& state = generationLossState[(size_t) ch];
+
+            if (generationLossCoeff <= 0.0f)
+                continue;
 
             for (int i = 0; i < numSamples; ++i)
             {

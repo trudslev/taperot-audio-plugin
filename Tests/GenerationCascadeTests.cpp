@@ -85,7 +85,7 @@ public:
                 being transcribed. This test rebuilds the parts by nature, so a copied number would
                 let the two drift apart while it kept passing — the check whose input derives from
                 somewhere other than the thing it checks. */
-            const float lossCoeff = DegradationCore::generationLossCoeffFor(spec.sampleRate);
+            const float lossCoeff = DegradationCore::generationLossCoeffFor(spec.sampleRate, 2);
             std::vector<float> lossState((size_t) numChannels, 0.0f);
 
             for (int block = 0; block < 5; ++block)
