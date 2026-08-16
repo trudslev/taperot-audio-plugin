@@ -985,6 +985,83 @@ public:
                 and it is a question about the wet path alone now rather than about three
                 possibilities. */
 
+            /*  ## THE 2x2 — are the two figures even comparable?
+
+                "Neutral 0.18 against driven 0.0002-0.0019" compares two FIXTURES, not two
+                configurations. The main block-size suite and this block differ in input
+                construction, render length and warm-up, and this sweep has repeatedly found two
+                numbers from different fixtures measuring different quantities — peak against rms,
+                cold against warmed. This is that shape one level up: not a wrong metric, but two
+                metrics read as one.
+
+                So both configurations through both input paths, with render length, warm-up and
+                block-size set held identical across all four. The only variables are the two axes.
+
+                Gap surviving both ways -> real, and the shape is the finding. Inverting or
+                collapsing -> the gap was the fixture, and the wet-path divergence is whatever the
+                main suite already measures. */
+            {
+                const auto cross = [this, &neutral, &scaledInput] (const char* label, bool driven, bool ownInput)
+                {
+                    TapeRotAudioProcessor p;
+
+                    if (! driven)
+                        neutral (p, 0.0f);       // otherwise the shipping defaults, as the main suite uses
+
+                    warm (p);
+
+                    nf::testing::RenderSpec s;
+                    s.blockSize = 512;
+                    s.numBlocks = 48;
+
+                    if (ownInput)
+                        s.fillInput = scaledInput (1.0f);
+
+                    double worst = 0.0;
+                    for (const auto& r : nf::testing::blockSizeInvariance (p, s, { 64, 128, 511, 2048 }))
+                        worst = juce::jmax (worst, r.maxAbsDifference);
+
+                    logMessage ("  " + juce::String (label).paddedRight (' ', 34)
+                                    + juce::String (worst, 9));
+                    return worst;
+                };
+
+                logMessage ("  --- the same two configurations through both input paths ---");
+                const auto nd = cross ("neutral, harness default input", false, false);
+                const auto nf_ = cross ("neutral, this block's fillInput", false, true);
+                const auto dd = cross ("driven,  harness default input", true,  false);
+                const auto df = cross ("driven,  this block's fillInput", true,  true);
+
+                logMessage ("  => neutral/driven ratio: default path "
+                                + juce::String (nd / juce::jmax (1.0e-12, dd), 3)
+                                + ", fillInput path " + juce::String (nf_ / juce::jmax (1.0e-12, df), 3));
+                logMessage ("  => default/fillInput ratio: neutral "
+                                + juce::String (nd / juce::jmax (1.0e-12, nf_), 3)
+                                + ", driven " + juce::String (dd / juce::jmax (1.0e-12, df), 3));
+
+                /*  ## MEASURED, and the premise it was testing is refuted twice over
+
+                    neutral 0.090253919 through BOTH input paths; driven 0.125078112 through BOTH.
+                    Ratios exactly 1.000 either way.
+
+                    **The input path is irrelevant.** A second, independent confirmation that this
+                    block's fixture is not the difference — the transcription check said the signals
+                    are bit-identical, and this says the divergence they produce is too.
+
+                    **And the neutral chain diverges LESS than the driven one, not two orders more.**
+                    0.090 against 0.125. The claim that a chain with everything turned off is two
+                    orders worse than the same chain driven was an artefact of comparing this
+                    block's figure against the MAIN SUITE's 0.0002-0.0019 — two fixtures, read as
+                    one, which is the shape this run existed to test for.
+
+                    **What is now open is a different discrepancy**: this arm and the main suite
+                    both run the shipping defaults through the harness's own input, and they read
+                    0.125078112 and 0.001926094. The only difference introduced here is 48 blocks
+                    against 64, which cannot produce 65x. Two runs of the same configuration
+                    disagreeing is a smaller and better-posed question than the one it replaced, and
+                    it is where the next cut goes. */
+            }
+
             const auto g1  = worstAtGain ("gain 1,  no generator",   0.0f, 1.0f);
             const auto g15 = worstAtGain ("gain 1.5, no generator",  0.0f, 1.5f);
             const auto g2  = worstAtGain ("gain 2,  no generator",   0.0f, 2.0f);
