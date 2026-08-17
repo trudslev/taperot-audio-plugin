@@ -355,8 +355,14 @@ the changelog is a gap by construction, not an omission.
 
 ### The wordmark's licensing exception
 
-**Impact Label Reversed is donationware and not distributable**, so the wordmark **ships as
-artwork and the font binary is deliberately absent from `fonts/`.** An absent font that is
+**Impact Label Reversed is donationware and cannot be embedded in a shipping binary**, so the
+wordmark **ships as artwork and the font does not** — `fonts/` carries no file for it, and that is
+**absent by licensing, not missing**. The wordmark is delivered cut at a **stated path** —
+`assets/taperot-wordmark.png` — because a named path is confirmed in one look while an unnamed one
+takes exhausting the whole image set to establish: **a stated path matters as much as the file.**
+The cut is **694 × 150**, rotated −1.5° as
+drawn, with the face checked loaded at cut time so the letterforms are the real ones and not a
+Barlow Condensed fallback. An absent font that is
 not declared looks like a delivery defect and gets "fixed" by substituting a face, which
 moves every measurement taken from the nameplate. The strip is drawn at 40 / 40 / .10 em,
 rotated **−1.5°**, on a Dymo-style plate `linear-gradient(#100e0c, #1c1815)` with 2 × 18
@@ -389,7 +395,8 @@ padding and a 2 px radius.
 
 - Wire both meter wells, the scope and the pitch-deviation readout to real signal; the render
   shows `−6.2` / `−1.4`, `±34 cents` and `WOW 0.50 Hz · FLUT 11.2 Hz` as samples.
-- **Wordmark re-cut at 3×** per call 6, as artwork, with the font binary absent and declared.
+- ~~Wordmark re-cut at 3×~~ — **cut, 694 × 150**, rotated −1.5° as drawn, with Impact Label
+  Reversed checked loaded at cut time and the font binary absent by licensing (§9).
 - Confirm DRIVE / FLUTTER's skew 0.2 and the three log rings against the build's
   `NormalisableRange` before the marks are final.
 - **`shared/HEADER-PART.md` revision 3 is pending three build answers** — the meter's display

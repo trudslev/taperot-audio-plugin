@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>TapeRot product icon — direction D2</title>
+  <defs>
+    <clipPath id="squircle"><rect x="0" y="0" width="1024" height="1024" rx="229" ry="229"></rect></clipPath>
+  </defs>
+  <g clip-path="url(#squircle)">
+    <rect x="0" y="0" width="1024" height="1024" fill="#F0A94B"></rect>
+    <circle cx="512" cy="512" r="368.64" fill="#201D18"></circle>
+    <polygon points="530.65,253.88 571.56,130.44 692.09,170.38 651.18,293.83" fill="#F0A94B"></polygon>
+    <polygon points="744.86,399.10 872.22,372.80 897.90,497.15 770.54,523.45" fill="#F0A94B"></polygon>
+    <polygon points="726.21,657.21 812.66,754.36 717.80,838.77 631.35,741.62" fill="#F0A94B"></polygon>
+    <polygon points="493.35,770.12 452.44,893.56 331.91,853.62 372.82,730.17" fill="#F0A94B"></polygon>
+    <polygon points="279.14,624.90 151.78,651.20 126.10,526.85 253.46,500.55" fill="#F0A94B"></polygon>
+    <polygon points="297.79,366.79 211.34,269.64 306.20,185.23 392.65,282.38" fill="#F0A94B"></polygon>
+  </g>
+  <rect x="6.1" y="6.1" width="1011.8" height="1011.8" rx="223" ry="223" fill="none" stroke="#C07E23" stroke-width="12.3"></rect>
+</svg>
