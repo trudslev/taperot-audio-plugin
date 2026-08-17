@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<style>
+  @font-face { font-family: 'Impact Label'; src: url('fonts/ImpactLabelReversed.ttf') format('truetype'); font-display: swap; }
+  body { margin: 0; background: #6b665c; }
+  a { color: #6d4a22; }
+  a:hover { color: #3f2a11; }
+</style>
+</helmet>
+<div style="padding:40px;background:#6b665c;">
+<div style="position:relative;margin:0 auto;width:1340px;height:790px;background:linear-gradient(180deg,#efe6d0,#e2d8bf);box-shadow:inset 0 0 0 8px #e4dac2, inset 0 0 0 9px rgba(0,0,0,.10), 0 10px 40px rgba(0,0,0,.35);overflow:hidden;">
+
+  <div style="position:absolute;left:2.5px;top:20.5px;width:11px;height:11px;border-radius:9999px;background:radial-gradient(circle at 38% 30%,#f2ebd8,#b9ae92 58%,#7d7255);box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 2px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.25);"></div>
+  <div style="position:absolute;left:4px;top:25.2px;width:8px;height:1.6px;border-radius:1px;background:rgba(60,52,38,.55);"></div>
+  <div style="position:absolute;left:1326.5px;top:20.5px;width:11px;height:11px;border-radius:9999px;background:radial-gradient(circle at 38% 30%,#f2ebd8,#b9ae92 58%,#7d7255);box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 2px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.25);"></div>
+  <div style="position:absolute;left:1328px;top:25.2px;width:8px;height:1.6px;border-radius:1px;background:rgba(60,52,38,.55);"></div>
+  <div style="position:absolute;left:2.5px;top:758.5px;width:11px;height:11px;border-radius:9999px;background:radial-gradient(circle at 38% 30%,#f2ebd8,#b9ae92 58%,#7d7255);box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 2px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.25);"></div>
+  <div style="position:absolute;left:4px;top:763.2px;width:8px;height:1.6px;border-radius:1px;background:rgba(60,52,38,.55);"></div>
+  <div style="position:absolute;left:1326.5px;top:758.5px;width:11px;height:11px;border-radius:9999px;background:radial-gradient(circle at 38% 30%,#f2ebd8,#b9ae92 58%,#7d7255);box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -1px 2px rgba(0,0,0,.35), 0 1px 1px rgba(0,0,0,.25);"></div>
+  <div style="position:absolute;left:1328px;top:763.2px;width:8px;height:1.6px;border-radius:1px;background:rgba(60,52,38,.55);"></div>
+
+  <div style="position:absolute;left:16px;top:16px;width:1308px;height:104px;box-sizing:border-box;border-radius:5px;background:linear-gradient(180deg,#2c2923,#201d18);box-shadow:inset 0 0 0 1px #0e0c09, inset 0 1px 0 rgba(255,255,255,.08), inset 0 -3px 8px rgba(0,0,0,.45), 0 2px 4px rgba(60,45,20,.28);">
+    <div style="position:absolute;left:22px;top:14px;width:303px;height:84px;">
+      <div style="display:inline-block;transform:rotate(-1.5deg);background:linear-gradient(180deg,#100e0c,#1c1815);padding:2px 18px;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);">
+        <span style="font-family:'Impact Label','Barlow Condensed',sans-serif;font-size:40px;line-height:40px;letter-spacing:.10em;color:#f4efe3;text-shadow:0 1px 0 rgba(0,0,0,.85);">TAPEROT</span>
+      </div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;line-height:17px;letter-spacing:.26em;color:#efe7d3;margin-top:4px;">TAPE DEGRADATION PROCESSOR</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;line-height:14px;letter-spacing:.20em;color:#ccc1a6;">MODEL MT-77 · STEREO</div>
+    </div>
+    <div style="position:absolute;left:341px;top:25px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.24em;color:#ccc1a6;">{{ caption }}</div>
+    <div style="position:absolute;left:341px;top:45px;width:641px;height:34px;box-sizing:border-box;display:flex;align-items:stretch;background:linear-gradient(180deg,#16130f,#100e0b);box-shadow:inset 0 0 0 1px #4e4740, inset 0 2px 6px rgba(0,0,0,.85);border-radius:3px;overflow:hidden;">
+      <div style="width:72px;display:flex;align-items:center;justify-content:center;border-right:1px solid #4e4740;font-family:'Share Tech Mono',monospace;font-size:17px;line-height:22px;letter-spacing:.10em;color:#f2b25c;">{{ bankTag }}</div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:17px;line-height:22px;letter-spacing:.10em;color:#f2b25c;text-shadow:0 0 9px rgba(240,169,75,.35);">{{ programName }}</div>
+      <div style="width:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:flex-end;padding-right:16px;"><svg viewBox="0 0 14 8" style="width:14px;height:8px;flex:0 0 14px;"><path d="M1 1.6 L7 6.4 L13 1.6" fill="none" stroke="#f2b25c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+    </div>
+    <div style="position:absolute;left:990px;top:45px;width:62px;height:34px;box-sizing:border-box;border-radius:4px;background:linear-gradient(180deg,#23282c,#14181b);box-shadow:inset 0 0 0 1px #0b0d0f, inset 0 1px 0 rgba(255,255,255,.10), inset 0 -2px 5px rgba(0,0,0,.55), 0 1px 2px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;line-height:13px;letter-spacing:.12em;color:{{ saveInk }};text-shadow:{{ saveGlow }};">SAVE</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;line-height:13px;letter-spacing:.12em;color:{{ storeInk }};text-shadow:{{ storeGlow }};">STORE</span>
+    </div>
+    <div style="position:absolute;left:1060px;top:45px;width:70px;height:34px;box-sizing:border-box;border-radius:4px;background:linear-gradient(180deg,#23282c,#14181b);box-shadow:inset 0 0 0 1px #0b0d0f, inset 0 1px 0 rgba(255,255,255,.10), inset 0 -2px 5px rgba(0,0,0,.55), 0 1px 2px rgba(0,0,0,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;">
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;line-height:13px;letter-spacing:.12em;color:{{ deleteInk }};text-shadow:{{ deleteGlow }};">DELETE</span>
+      <span style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:11px;line-height:13px;letter-spacing:.12em;color:{{ cancelInk }};text-shadow:{{ cancelGlow }};">CANCEL</span>
+    </div>
+    <div style="position:absolute;left:1148px;top:25px;width:64px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.28em;color:#ccc1a6;">IN</div>
+    <div style="position:absolute;left:1148px;top:45px;width:64px;height:34px;box-sizing:border-box;background:linear-gradient(180deg,#16130f,#100e0b);box-shadow:inset 0 0 0 1px #4e4740, inset 0 2px 6px rgba(0,0,0,.85);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:17px;line-height:22px;color:#efe7d3;">−6.2</div>
+    <div style="position:absolute;left:1222px;top:25px;width:64px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.28em;color:#ccc1a6;">OUT</div>
+    <div style="position:absolute;left:1222px;top:45px;width:64px;height:34px;box-sizing:border-box;background:linear-gradient(180deg,#16130f,#100e0b);box-shadow:inset 0 0 0 1px #4e4740, inset 0 2px 6px rgba(0,0,0,.85);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:17px;line-height:22px;color:#efe7d3;">−1.4</div>
+  </div>
+
+  <div style="position:absolute;left:16px;top:136px;width:1308px;height:164px;box-sizing:border-box;border-radius:2px;background:linear-gradient(180deg,#16130f,#100e0a);box-shadow:inset 0 0 0 1px #4e4740, inset 0 3px 9px rgba(0,0,0,.9);overflow:hidden;">
+    <div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(240,169,75,.13) 0 1px,rgba(0,0,0,0) 1px 163.5px),repeating-linear-gradient(180deg,rgba(240,169,75,.13) 0 1px,rgba(0,0,0,0) 1px 41px);"></div>
+    <div style="position:absolute;left:0;top:82px;width:1308px;height:1px;background:repeating-linear-gradient(90deg,rgba(240,169,75,.30) 0 3px,rgba(0,0,0,0) 3px 7px);"></div>
+    <svg viewBox="0 0 1308 164" width="1308" height="164" style="position:absolute;left:0;top:0;">
+      <polyline points="{{ wavePoints }}" fill="none" stroke="#f0a94b" stroke-width="1.7" stroke-linejoin="round" style="filter:drop-shadow(0 0 5px rgba(217,131,36,.55));"></polyline>
+    </svg>
+    <div style="position:absolute;left:14px;top:8px;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:15px;letter-spacing:1.3px;color:#e3a65a;">PITCH DEV · {{ pitchDev }}</div>
+    <div style="position:absolute;right:14px;top:8px;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:15px;letter-spacing:1.3px;color:#e3a65a;">500 ms / DIV</div>
+    <div style="position:absolute;left:14px;bottom:8px;font-family:'Share Tech Mono',monospace;font-size:12px;line-height:15px;letter-spacing:1.3px;color:#e3a65a;">{{ rateReadout }}</div>
+    <div style="position:absolute;right:14px;bottom:8px;display:flex;align-items:center;gap:9px;">
+      <span style="font-family:'Share Tech Mono',monospace;font-size:12px;line-height:15px;letter-spacing:1.3px;color:#e3a65a;">GEN {{ generationLabel }}</span>
+      <span style="width:9px;height:9px;flex:0 0 9px;border-radius:9999px;background:{{ failLampFill }};box-shadow:{{ failLampGlow }};"></span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:12px;line-height:15px;letter-spacing:1.3px;color:#e3a65a;">FAIL</span>
+    </div>
+  </div>
+
+  <sc-for list="{{ dividers }}" as="dv" hint-placeholder-count="5">
+    <div style="position:absolute;left:{{ dv.x }}px;top:316px;width:2px;height:420px;background:linear-gradient(90deg,#b2a68a 0 1px,rgba(255,255,255,.7) 1px 2px);"></div>
+  </sc-for>
+
+  <sc-for list="{{ sections }}" as="s" hint-placeholder-count="6">
+    <div style="position:absolute;left:{{ s.left }}px;top:326px;width:{{ s.width }}px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;line-height:15px;letter-spacing:.28em;color:#3a3328;">{{ s.name }}</div>
+  </sc-for>
+
+  <sc-for list="{{ knobs }}" as="k" hint-placeholder-count="12">
+    <div style="position:absolute;left:{{ k.left }}px;top:{{ k.top }}px;width:{{ k.d }}px;height:{{ k.d }}px;">
+      <div style="position:absolute;left:50%;top:50%;width:{{ k.arcBox }}px;height:{{ k.arcBox }}px;transform:translate(-50%,-50%);border-radius:50%;background:conic-gradient(from 225deg,rgba(58,51,40,.28) 0turn 0.75turn,rgba(0,0,0,0) 0.75turn);mask:radial-gradient(closest-side,rgba(0,0,0,0) calc(100% - 1.4px),#000 calc(100% - 1.4px));"></div>
+      <sc-for list="{{ k.ticks }}" as="t" hint-placeholder-count="6">
+        <div style="position:absolute;left:50%;bottom:50%;width:{{ t.w }}px;height:{{ t.h }}px;margin-left:-1px;transform-origin:bottom center;transform:rotate({{ t.a }}deg);background:linear-gradient(180deg,#3a3328 0 {{ t.ink }}px,rgba(0,0,0,0) {{ t.ink }}px);"></div>
+      </sc-for>
+      <sc-for list="{{ k.nums }}" as="n" hint-placeholder-count="5">
+        <div style="position:absolute;left:50%;top:50%;font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:11px;line-height:13px;letter-spacing:.04em;color:#3a3328;white-space:nowrap;transform:{{ n.tf }};">{{ n.t }}</div>
+      </sc-for>
+      <div style="position:absolute;inset:0;border-radius:50%;background:{{ k.cap }};box-shadow:{{ k.capShadow }};"></div>
+      <div style="position:absolute;inset:7px;border-radius:50%;background:radial-gradient(20% 15% at 32% 18%,rgba(255,255,255,.85),rgba(255,255,255,.3) 55%,rgba(255,255,255,0) 100%);"></div>
+      <div style="position:absolute;left:50%;bottom:50%;width:3px;height:{{ k.pointerH }}px;margin-left:-1.5px;border-radius:1.5px;transform-origin:bottom center;transform:rotate({{ k.ang }}deg);background:{{ k.pointer }};"></div>
+      <div style="position:absolute;left:50%;top:{{ k.unitTop }}px;transform:translateX(-50%);font-family:'Share Tech Mono',monospace;font-size:10px;line-height:13px;letter-spacing:.10em;color:#3a3328;white-space:nowrap;">{{ k.unit }}</div>
+      <div style="position:absolute;left:50%;top:{{ k.labelTop }}px;transform:translateX(-50%);font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:12px;line-height:15px;letter-spacing:.18em;color:#3a3328;white-space:nowrap;">{{ k.name }}</div>
+    </div>
+  </sc-for>
+
+  <div style="position:absolute;left:189px;top:566px;width:134px;height:27px;box-sizing:border-box;border-radius:2px;background:linear-gradient(180deg,#16130f,#100e0b);box-shadow:inset 0 0 0 1px #4e4740, inset 0 2px 6px rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:12.5px;line-height:16px;letter-spacing:1.2px;color:#f2b25c;text-shadow:0 0 8px rgba(240,169,75,.4);">{{ machineLabel }}</div>
+
+  <sc-for list="{{ shoeGroups }}" as="g" hint-placeholder-count="4">
+    <div style="position:absolute;left:{{ g.left }}px;top:{{ g.top }}px;width:{{ g.width }}px;">
+      <div style="text-align:{{ g.textAlign }};font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.22em;color:#3a3328;">{{ g.caption }}</div>
+      <div style="display:flex;height:{{ g.height }}px;margin-top:7px;border-radius:3px;overflow:hidden;box-shadow:inset 0 0 0 1px #a79b80, 0 1px 2px rgba(0,0,0,.25);">
+        <sc-for list="{{ g.items }}" as="p" hint-placeholder-count="3">
+          <div style="flex:1;background:{{ p.face }};box-shadow:{{ p.shadow }};"></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;margin-top:6px;">
+        <sc-for list="{{ g.items }}" as="q" hint-placeholder-count="3">
+          <div style="flex:1;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.14em;color:#3a3328;">{{ q.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-for>
+
+  <sc-for list="{{ roundGroups }}" as="rg" hint-placeholder-count="2">
+    <div style="position:absolute;left:{{ rg.left }}px;top:{{ rg.top }}px;width:{{ rg.width }}px;">
+      <sc-if value="{{ rg.captionAbove }}" hint-placeholder-val="{{ true }}">
+        <div style="text-align:center;margin-bottom:{{ rg.captionGap }}px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.22em;color:#3a3328;">{{ rg.caption }}</div>
+      </sc-if>
+      <div style="display:flex;justify-content:center;gap:{{ rg.gap }}px;">
+        <sc-for list="{{ rg.items }}" as="rb" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:26px;height:26px;flex:0 0 26px;border-radius:9999px;background:radial-gradient(circle at 36% 28%,#4a423a,#2a251e 52%,#15120e);box-shadow:inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 5px rgba(0,0,0,.6), 0 2px 3px rgba(0,0,0,.32);display:flex;align-items:center;justify-content:center;">
+              <div style="width:11px;height:11px;border-radius:9999px;background:{{ rb.lampFill }};box-shadow:{{ rb.lampGlow }};"></div>
+            </div>
+            <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.14em;color:#3a3328;">{{ rb.label }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ rg.captionBelow }}" hint-placeholder-val="{{ true }}">
+        <div style="text-align:center;margin-top:7px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.22em;color:#3a3328;">{{ rg.caption }}</div>
+      </sc-if>
+    </div>
+  </sc-for>
+
+  <div style="position:absolute;left:359px;top:568px;width:282px;display:flex;justify-content:center;gap:8px;">
+    <sc-for list="{{ genStages }}" as="g" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
+        <div style="width:20px;height:20px;flex:0 0 20px;border-radius:3px;background:{{ g.face }};box-shadow:{{ g.shadow }};"></div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:11px;line-height:14px;color:#3a3328;">{{ g.n }}</div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="position:absolute;left:359px;top:548px;width:282px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.22em;color:#3a3328;">GENERATION</div>
+
+  <div style="position:absolute;left:26px;top:752px;width:400px;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:13px;letter-spacing:.18em;color:#5f5749;">MT-77 · SN 0143</div>
+  <div style="position:absolute;left:914px;top:752px;width:400px;text-align:right;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:13px;letter-spacing:.18em;color:#5f5749;">TAPEROT · v1.0</div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1420,&quot;height&quot;:980},&quot;programState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;factory&quot;,&quot;factory-edited&quot;,&quot;user&quot;,&quot;user-edited&quot;,&quot;naming&quot;],&quot;default&quot;:&quot;factory&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Panel state&quot;},&quot;generation&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1,&quot;min&quot;:1,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Panel state&quot;},&quot;noiseCharacter&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;TAPE&quot;,&quot;VCR&quot;,&quot;DUST&quot;],&quot;default&quot;:&quot;TAPE&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Machine&quot;},&quot;switchMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;FADE&quot;,&quot;CLUNK&quot;],&quot;default&quot;:&quot;FADE&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Machine&quot;},&quot;hum&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Machine&quot;},&quot;spread&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;LINKED&quot;,&quot;STEREO&quot;],&quot;default&quot;:&quot;LINKED&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Decay&quot;},&quot;failureActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Decay&quot;},&quot;faultDropouts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;},&quot;faultSnags&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;},&quot;faultCrinkles&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;},&quot;faultImbalance&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;}}">
+class Component extends DCLogic {
+  // 270° sweep, −135 … +135. The build's figure (TapeRotTheme.h:236); its own spec's −120…+120 is stale.
+  a(f) { return -135 + f * 270; }
+
+  knobSpec() {
+    const A = (f) => this.a(f);
+    const even5 = [0, 0.25, 0.5, 0.75, 1];
+    const N = (fs, labels) => fs.map((f, i) => [f, labels[i], 1]);
+    // DRIVE and FLUTTER share one legend — 0–100 % at skew 0.2, fractions settled in catalogue §10.
+    const driveMarks = [
+      [0, '0', 1], [0.251261, '0.1', 0], [0.346572, '0.5', 0], [0.398107, '1', 1],
+      [0.457305, '2', 0], [0.549280, '5', 1], [0.630957, '10', 0], [0.757858, '25', 1],
+      [0.870551, '50', 0], [0.944088, '75', 0], [1, '100', 1]
+    ];
+    const pct = N(even5, ['0', '25', '50', '75', '100']);
+    // Signal path, left to right: INPUT · MACHINE · TRANSPORT · TAPE · DECAY · OUTPUT.
+    return [
+      ['DRIVE', '%', 92, 444, 76, 0.870551, driveMarks, 'ivory'],
+      // Nine detents, every one a major tick (2 × 9) and none numeralled — the machine names
+      // print in the readout, not on the fascia, so the marks carry no text but full length.
+      ['MODEL', '', 256, 444, 104, 0.625, [
+        [0, '', 1], [0.125, '', 1], [0.25, '', 1], [0.375, '', 1], [0.5, '', 1],
+        [0.625, '', 1], [0.75, '', 1], [0.875, '', 1], [1, '', 1]], 'signature'],
+      ['LP', 'kHz', 1069, 640, 56, 1, [
+        [0, '1', 1], [0.255084, '', 0], [0.335788, '', 0], [0.413403, '', 0], [0.508959, '3', 1],
+        [0.574791, '', 0], [0.626602, '', 0], [0.707651, '', 0], [0.799184, '', 0],
+        [0.912457, '', 0], [1, '20', 1]], 'ivory'],
+      ['HP', 'Hz', 1257, 640, 56, 0, [
+        [0, '20', 1], [0.204645, '', 0], [0.251947, '', 0], [0.284536, '', 0],
+        [0.331659, '', 0], [0.381880, '', 0], [0.441757, '', 0], [0.487060, '200', 1],
+        [0.556094, '', 0], [0.653691, '', 0], [0.725693, '', 0], [0.809782, '', 0],
+        [0.916481, '', 0], [1, '2k', 1]], 'ivory'],
+      ['WOW', '%', 438, 444, 76, 0.30, pct, 'ivory'],
+      ['FLUTTER', '%', 562, 444, 76, 0.757858, driveMarks, 'ivory'],
+      ['NOISE', '%', 741, 444, 76, 0, pct, 'ivory'],
+      ['FAILURE', '%', 914, 444, 76, 0, pct, 'ivory'],
+      ['RAMP', 's', 1163, 580, 56, 0.331544, [
+        [0, '0.05', 1], [0.120718, '', 0], [0.174160, '', 0], [0.229806, '', 0],
+        [0.270270, '', 0], [0.331541, '', 0], [0.419417, '0.5', 1], [0.485877, '', 0],
+        [0.565523, '', 0], [0.669743, '', 0], [0.754006, '', 0], [0.889795, '', 0],
+        [1, '4', 1]], 'ivory'],
+      ['MIX', '%', 1089, 444, 76, 1, pct, 'ivory'],
+      ['OUTPUT', 'dB', 1237, 444, 76, 0.5, N(even5, ['−24', '−12', '0', '+12', '+24']), 'ivory']
+    ].map(([name, unit, cx, cy, d, pf, marks, look]) => ({
+      name, unit, cx, cy, d, look, ang: A(pf),
+      // MODEL's cap centre sits on the row's centreline like every other dial, but its Ø104 body
+      // would push its label 14 px below the shared label line — so the label is pinned to y 516.
+      labelY: name === 'MODEL' ? 516 : 0,
+      marks: marks.map(([f, t, numbered]) => [A(f), t, numbered])
+    }));
+  }
+
+  renderVals() {
+    const state = this.props.programState ?? 'factory';
+    const gen = this.props.generation ?? 1;
+    const failing = this.props.failureActive ?? false;
+    const spreadStereo = (this.props.spread ?? 'LINKED') === 'STEREO';
+    const character = this.props.noiseCharacter ?? 'TAPE';
+    const switchMode = this.props.switchMode ?? 'FADE';
+    const hum = this.props.hum ?? false;
+
+    // The Program buttons are the shared part, not TapeRot's own plate: shared/HEADER-PART.md §6.
+    const lit = { ink: '#f4f8fa', glow: '0 0 7px rgba(244,248,250,.6)' };
+    const idle = { ink: '#9aa1a6', glow: 'none' };
+    const naming = state === 'naming';
+    const edited = state === 'factory-edited' || state === 'user-edited';
+    const user = state === 'user' || state === 'user-edited';
+    const names = {
+      'factory': ['FACT', '01 WARM CASSETTE'],
+      'factory-edited': ['FACT', '01 WARM CASSETTE *'],
+      'user': ['USER', 'VHS SLUMP'],
+      'user-edited': ['USER', 'VHS SLUMP *'],
+      'naming': ['NAME', 'VHS SLUMP▮']
+    };
+    const [bankTag, programName] = names[state] || names['factory'];
+
+    // Cap art from its own spec §7: radial #F8F2E3 → #EFE7D2 45% → #DED3B8, rim #443E36, pointer #2B251C.
+    const ivoryCap = 'radial-gradient(circle at 34% 24%,#f8f2e3,#efe7d2 45%,#ded3b8 100%)';
+    const ivoryShadow = 'inset 0 0 0 1.5px #443e36, inset 0 1px 0 rgba(255,255,255,.75), inset 0 -3px 8px rgba(0,0,0,.20), 0 3px 6px rgba(0,0,0,.24)';
+    // The signature control is marked by material as well as size: MODEL is the only dark cap.
+    const signatureCap = 'radial-gradient(circle at 34% 24%,#4a4237,#2b2620 46%,#14110d 100%)';
+    const signatureShadow = 'inset 0 0 0 1.5px #0e0c09, inset 0 1px 0 rgba(255,255,255,.14), inset 0 -3px 9px rgba(0,0,0,.6), 0 4px 8px rgba(0,0,0,.38)';
+
+    const knobs = this.knobSpec().map((k) => {
+      const r = k.d / 2;
+      const numR = r + 8 + 9 + 6 + 6.5;
+      const sig = k.look === 'signature';
+      return {
+        name: k.name, unit: k.unit, d: k.d, ang: k.ang,
+        left: k.cx - r, top: k.cy - r,
+        arcBox: k.d + 12,
+        pointerH: r - 8,
+        unitTop: k.d + 20,
+        labelTop: k.labelY ? k.labelY - (k.cy - r) : k.d + 34,
+        cap: sig ? signatureCap : ivoryCap,
+        capShadow: sig ? signatureShadow : ivoryShadow,
+        pointer: sig ? '#f2e9d6' : '#2b251c',
+        ticks: k.marks.map(([a, , numbered]) => numbered
+          ? { a, h: r + 8 + 9, ink: 9, w: 2 }
+          : { a, h: r + 8 + 5, ink: 5, w: 1.5 }),
+        nums: k.marks.filter(([, t, numbered]) => numbered && t !== '').map(([a, t]) => ({
+          t,
+          tf: 'translate(-50%,-50%) rotate(' + a + 'deg) translate(0,-' + numR + 'px) rotate(' + (-a) + 'deg)'
+        }))
+      };
+    });
+
+    // Lamps: accent #F0A94B lit. Two button forms, both from its own plate —
+    // a pale cap with an integral lamp beside the legend for the selectors, and a
+    // round dark cap with a lamp in its face for the momentaries and the fault group.
+    const lampOn = {
+      fill: 'radial-gradient(circle at 38% 30%,#ffd48a,#f0a94b 42%,#b4741d 78%,#6b4310)',
+      glow: 'inset 0 1px 1px rgba(255,255,255,.35), inset 0 0 6px 1px rgba(240,169,75,.5), 0 0 7px 1px rgba(240,169,75,.3)'
+    };
+    const lampOffPale = {
+      fill: 'radial-gradient(circle at 38% 30%,#c6bda2,#b3a88c 60%,#8d8368)',
+      glow: 'inset 0 1px 1px rgba(255,255,255,.5), inset 0 -1px 3px rgba(0,0,0,.28)'
+    };
+    const lampOffDark = {
+      fill: 'radial-gradient(circle at 38% 30%,#6a6152,#4b443a 60%,#2a251c)',
+      glow: 'inset 0 1px 1px rgba(255,255,255,.12), inset 0 -1px 3px rgba(0,0,0,.6)'
+    };
+    const shoe = (on, label) => ({
+      label,
+      face: on ? 'linear-gradient(180deg,#f2ebd8,#d8cdb0)' : 'linear-gradient(180deg,#241f18,#15120d)',
+      shadow: on
+        ? 'inset 0 1px 0 rgba(255,255,255,.9), inset -1px 0 0 rgba(0,0,0,.18)'
+        : 'inset 1px 0 0 rgba(255,255,255,.06)'
+    });
+    const pale = (on, label) => ({ label, lampFill: (on ? lampOn : lampOffPale).fill, lampGlow: (on ? lampOn : lampOffPale).glow });
+    const round = (on, label) => ({ label, lampFill: (on ? lampOn : lampOffDark).fill, lampGlow: (on ? lampOn : lampOffDark).glow });
+
+    const btnRest = {
+      face: 'linear-gradient(180deg,#eae0c8,#dbd0b4)',
+      shadow: 'inset 0 0 0 1px #a79b80, inset 0 1px 0 rgba(255,255,255,.75), 0 1px 2px rgba(0,0,0,.22)',
+      ink: '#2e2820', glow: 'none'
+    };
+    const btnHeld = {
+      face: 'linear-gradient(180deg,#2a2620,#191610)',
+      shadow: 'inset 0 0 0 1px #6b6254, inset 0 1px 0 rgba(255,255,255,.10), inset 0 -2px 5px rgba(0,0,0,.55)',
+      ink: '#f6f1e4', glow: '0 0 7px rgba(246,241,228,.5)'
+    };
+
+    return {
+      caption: naming ? 'NAME PROGRAM' : 'PROGRAM',
+      bankTag, programName, knobs,
+      saveInk: (!naming && edited ? lit : idle).ink, saveGlow: (!naming && edited ? lit : idle).glow,
+      storeInk: (naming ? lit : idle).ink, storeGlow: (naming ? lit : idle).glow,
+      deleteInk: (!naming && user ? lit : idle).ink, deleteGlow: (!naming && user ? lit : idle).glow,
+      cancelInk: (naming ? lit : idle).ink, cancelGlow: (naming ? lit : idle).glow,
+      machineLabel: 'CASSETTE I',
+      pitchDev: '±34 cents',
+      rateReadout: 'WOW 0.50 Hz · FLUT 11.2 Hz',
+      generationLabel: String(gen),
+      dividers: [{ x: 168 }, { x: 344 }, { x: 656 }, { x: 826 }, { x: 1002 }],
+      sections: [
+        { name: 'INPUT', left: 20, width: 144 },
+        { name: 'MACHINE', left: 172, width: 168 },
+        { name: 'TRANSPORT', left: 348, width: 304 },
+        { name: 'NOISE', left: 660, width: 162 },
+        { name: 'DECAY', left: 830, width: 168 },
+        { name: 'OUTPUT', left: 1006, width: 314 }
+      ],
+      // §4B shoe switches — the shoe carries the state, every position printed alike and never
+      // re-inked. Chosen for TapeRot over its lamp-button stack: it is a shared suite part, and it
+      // halves the height these three groups take in a section that also carries MODEL and NOISE.
+      shoeGroups: [
+        { caption: 'SWITCHING', left: 436, top: 622, width: 128, height: 32, textAlign: 'center',
+          items: ['FADE', 'CLUNK'].map((l) => shoe(l === switchMode, l)) },
+        { caption: 'HUM', left: 677, top: 622, width: 128, height: 32, textAlign: 'center',
+          items: [shoe(!hum, 'OFF'), shoe(hum, 'ON')] },
+        { caption: 'SPREAD', left: 850, top: 548, width: 128, height: 32, textAlign: 'center',
+          items: [shoe(!spreadStereo, 'LINKED'), shoe(spreadStereo, 'STEREO')] }
+      ],
+      // Round dark lamp-buttons: the three momentaries and the fault group.
+      roundGroups: [
+        { caption: 'FAIL', captionAbove: true, captionBelow: false, captionGap: 4, left: 20, top: 548, width: 144, gap: 16, items: [round(failing, 'STP'), round(false, 'FLT'), round(false, 'FAI')] },
+        { caption: 'NOISE BED', captionAbove: true, captionBelow: false, captionGap: 7, left: 677, top: 548, width: 128, gap: 16, items: [
+          round(character === 'TAPE', 'TAPE'), round(character === 'VCR', 'VCR'), round(character === 'DUST', 'DUST')
+        ] },
+        { caption: 'FAULT ACTIVITY', captionAbove: true, captionBelow: false, captionGap: 7, left: 826, top: 622, width: 176, gap: 12, items: [
+          round(this.props.faultDropouts ?? true, 'DRP'),
+          round(this.props.faultSnags ?? true, 'SNG'),
+          round(this.props.faultCrinkles ?? true, 'CRK'),
+          round(this.props.faultImbalance ?? true, 'WBL')
+        ] }
+      ],
+      genStages: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+        n: String(n),
+        face: n === gen
+          ? 'radial-gradient(circle at 38% 30%,#ffd48a,#f0a94b 45%,#b4741d 82%,#6b4310)'
+          : 'radial-gradient(circle at 38% 30%,#4a423a,#2a251e 55%,#15120e)',
+        shadow: n === gen
+          ? 'inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 3px rgba(0,0,0,.35), 0 0 7px 1px rgba(240,169,75,.35)'
+          : 'inset 0 1px 0 rgba(255,255,255,.12), inset 0 -1px 3px rgba(0,0,0,.6), 0 1px 2px rgba(0,0,0,.28)'
+      })),
+      failLampFill: (failing ? lampOn : lampOffDark).fill,
+      failLampGlow: (failing ? lampOn : lampOffDark).glow,
+      wavePoints: Array.from({ length: 164 }, (_, i) => {
+        const x = i * 8;
+        const wow = Math.sin(i * 0.42) * 0.62;
+        const flut = Math.sin(i * 1.34) * 0.38;
+        const drift = Math.sin(i * 0.07) * 0.22;
+        return x + ',' + (82 + (wow + flut + drift) * 34).toFixed(1);
+      }).join(' ')
+    };
+  }
+}
+</script>
+</body>
+</html>
