@@ -2,6 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## RESUME POINT — the header has a measured baseline, and it is what a panel move fails against
+
+**Verified `23da122` on 2026-08-17: this casting's header draws exactly where its own constants say.**
+Not read — captured from the Release standalone and measured off the pixels.
+
+Why it is written here rather than left in a session report: the value of a baseline is entirely in
+being read by whoever moves the panel next, and a figure that lives somewhere the mover does not
+open is worth nothing.
+
+**What was measured**, band at y 63, height 34, canvas 1336 x 679:
+
+| Element | Constants | Measured |
+|---|---|---|
+| LCD | `lcdDivider` 491 splits it | 417.0 .. 884.0, split at 489.5/491.0 |
+| SAVE | `saveHitArea` 896.2 .. 972.2 | 897.5 .. 995.0 (glyph-broken) |
+| DELETE | `deleteHitArea` 982.2 .. 1058.2 | 1044.5 .. 1055.5 (glyph-broken) |
+| meter wells | — | 1132.0 .. 1210.5, 1225.0 .. 1303.5 |
+
+**What this is NOT.** This casting references `nf::HeaderGeometry` **nowhere**, so it is on its own
+canvas and its own layout, and none of the figures above is expected to match the shared part. The
+baseline says *internally consistent*, not *conformant*.
+
+**The defect it exists to catch** was found in Chorus-60 on 2026-08-17: that casting's header pass
+aliased its LCD to the shared part and left SAVE, DELETE and both meter wells as literals from the
+previous canvas — **29 px right and 29 px down** — and nothing could see it, because the plate baked
+those faces and the only symptom was text centred inside a box nobody drew. It surfaced the moment
+the material had to be painted from those rects.
+
+**So when this casting moves: alias every band figure in one edit, then re-measure against the table
+above.** A rect that moves and a rect that does not are indistinguishable in a diff and obvious in a
+measurement. And note that **a literal which happens to agree with core is indistinguishable from an
+alias by reading** — Reflect-84 held four such literals, one of them 2 px off §4's shared descriptor
+anchor, in the casting whose editor had been declared conformant.
+
+---
+
 ## Commands
 
 TapeRot builds on macOS (AU + VST3 + Standalone), Windows (VST3 + Standalone), and Linux
