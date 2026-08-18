@@ -38,6 +38,59 @@ anchor, in the casting whose editor had been declared conformant.
 
 ---
 
+## THE SUITE'S FOUR RED ARMS HERE — filed against the sweep's existing rows, 2026-08-18
+
+**These are open findings expressed as failing assertions, not regressions.** The suite reports
+`TESTS FAILED (exit 1)` and has been meant to: each arm asserts a property the sweep established is
+not held, so a green run here would mean an arm had been relaxed.
+
+**They do not come from the core repin.** Core moved `3feeead → fcd8268` on 2026-08-17 and this
+casting's `_deps` followed it a day later, which raised the question. Core's delta touches exactly
+one public header — `nf/HeaderPart.h` — and **0 of this casting's 779 compiler dependency files
+mention it.** That is the compiler's own record rather than an argument from the diff, and it is the
+measurement that was available: rebuilding against the old pin is blocked by core's own staleness
+check, which is fatal by design and whose only opt-out covers an unreachable remote.
+
+| Arm | Figure | Files against |
+|---|---|---|
+| `NoiseSource` diverges with block size at character 1 | 3.72529e-09 | **the block-coupling class, RATE form** — a new member |
+| Block size 128 vs 64, defaults | 0.000200262, sample 0 | the NOISE-path transient, **localised-not-explained** |
+| Block size 511 vs 64, defaults | 0.001022242, sample 0 | same |
+| Block size 2048 vs 64, defaults | 0.001926094, sample 0 | same |
+
+### The three block-size rows are NOT the sweep's recorded numbers, and that is the finding
+
+The sweep recorded **0.009630475** at 2048 and slices of 0.009630 / 0.007679 / 0.002036 across the
+first three 8 ms windows, then exactly zero from 24 ms. This arm reports **0.001926094** at 2048 —
+a factor of five apart.
+
+**They are not comparable, because the configurations differ.** The recorded row states its own:
+*NOISE at 100, warmed*. This arm runs at **default parameters**, warmed. A smaller NOISE gives a
+smaller divergence, and five-fold is unremarkable for that.
+
+So the correct filing is neither "the same numbers" nor "a different defect". It is the
+reproducibility rule arriving in a comparison rather than in a measurement: **a figure is a property
+of a processor IN A CONFIGURATION, and two figures measured in different ones cannot be equal or
+unequal — only unrelated.** What is comparable is the signature, and it matches on every axis
+available: first at sample 0, monotonic in block size, and the 64-against-64 self-comparison exact.
+
+**What would make them comparable is one run**, driving this arm at NOISE 100. That is worth doing
+when the row is next opened; it is not worth doing to answer the repin question, which the
+dependency records already settled.
+
+### The `NoiseSource` arm is a new member of a recorded class
+
+Its own comment connects it to the catalogued *stored copy of a selection, compared per block* table
+— gatecrasher `currentAlgorithm`, reflect-84 `currentAlgorithm`, taperot `TapeModelEQ::activeModelIndex`
+— and it is a fourth member. But **the symptom is the RATE form, not the spurious-first-block form**:
+the character crossfade is *started* per prepare and *stepped* per block, so its duration in seconds
+moves with the buffer size. That is `LfoBank`'s pre-stage-1a defect in a crossfade rather than in a
+generator, which is a form the block-coupling table did not have.
+
+At character 0 it cannot fire — requested equals the constructed value, so no crossfade starts — and
+the arm says so in place. A probe at the one value that cannot distinguish the hypothesis is the
+mistake this sweep already made once with a pre-delay at 0.
+
 ## Commands
 
 TapeRot builds on macOS (AU + VST3 + Standalone), Windows (VST3 + Standalone), and Linux
