@@ -27,3 +27,22 @@ stated here and in `GUI-SPEC.md` §9 so the gap cannot be read as an oversight a
 substituting a face — which would move every measurement taken from the nameplate.
 
 Nothing else on this panel is baked.
+
+
+---
+
+## The prototype places this artwork now (export 9)
+
+`designs/TapeRot MT-77 Panel.dc.html` drew its nameplate in Impact Label Reversed with a CSS plate
+behind it. That face is absent by decision and no bundle may carry it, so the declaration never
+resolved and the nameplate rendered on the Barlow Condensed fallback — the one artefact in the
+delivery that looked right and could not be measured.
+
+**It now places `assets/taperot-wordmark.png`** at drawn **231.2 × 50** in the nameplate zone at
+(22, 14), from `designs/assets/taperot/`. The artwork carries the plate, the emboss and the −1.5°
+tilt, so the CSS plate, its 2 × 18 padding and its `rotate(-1.5deg)` were removed with the `<span>`;
+the plate's `drop-shadow(0 1px 2px rgba(0,0,0,.6))` is kept in CSS. The `@font-face` rule is gone.
+
+**This makes the artwork the source of record for the wordmark in both directions** — the build
+embeds it and the prototype renders it, so a side-by-side compares like with like. A re-cut of this
+file changes what both show.
