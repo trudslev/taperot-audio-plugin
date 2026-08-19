@@ -91,6 +91,27 @@ At character 0 it cannot fire — requested equals the constructed value, so no 
 the arm says so in place. A probe at the one value that cannot distinguish the hypothesis is the
 mistake this sweep already made once with a pre-delay at 0.
 
+## THE PANEL PROTOTYPE RENDERS THE WORDMARK IN A FALLBACK, AND ALWAYS WILL
+
+`design/TapeRot MT-77 Panel.dc.html` declares `@font-face … url('fonts/ImpactLabelReversed.ttf')`.
+That file is not there and **must never be**: `design/fonts/ABSENT.md` records the face as
+donationware and not embeddable, so the letterforms ship as artwork — `assets/taperot-wordmark.png`,
+694 × 150 — and the font does not. Same file ends with *"substituting a face here moves every
+measurement taken from the nameplate."* **The prototype substitutes one on every render.**
+
+So this is not a missing file to chase. It is a declaration that guarantees a fallback, and the
+declaration is what makes it read as an oversight rather than the decision it is. **No width, glyph
+or letter position may be taken off that prototype's nameplate** — the wordmark PNG is the artefact
+with the real letterforms, and it is the one to measure.
+
+Chorus-60 has the same symptom for the opposite reason: its face is licensed, embeddable and simply
+in the wrong directory. Both are `design-asks/prototype-font-paths-do-not-resolve.md`; only that one
+closes by moving a file.
+
+    python3 ../tools/enumerate_prototype.py "design/TapeRot MT-77 Panel.dc.html" --canvas 1340x790
+
+---
+
 ## Commands
 
 TapeRot builds on macOS (AU + VST3 + Standalone), Windows (VST3 + Standalone), and Linux
