@@ -13,6 +13,7 @@ target_sources(TapeRotTests PRIVATE
     PendingProgramLockTests.cpp
     TestMain.cpp
     ReadoutConformanceTests.cpp
+    EditorWiringTests.cpp
     MenuMetricsTests.cpp
     SaturatorTests.cpp
     WowFlutterTests.cpp
