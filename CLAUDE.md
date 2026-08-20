@@ -38,7 +38,45 @@ anchor, in the casting whose editor had been declared conformant.
 
 ---
 
-## THE SUITE'S FOUR RED ARMS HERE — filed against the sweep's existing rows, 2026-08-18
+## THE SUITE'S **FIVE** RED ARMS HERE — filed against the sweep's existing rows, 2026-08-18
+
+**Re-run against a freshly built binary on 2026-08-20, and all four documented figures reproduce to
+NINE SIGNIFICANT FIGURES.** They were re-verified because this casting's test binary turned out to be
+four days old — a cache variable pointing at a deleted scratch directory made every configure fail
+while every build reported success. The re-run is what turns them from a result into a result that
+carries:
+
+| Arm | Filed 2026-08-18 | Fresh binary, core `fcd8268` |
+|---|---|---|
+| `NoiseSource` at character 1 | 3.72529e-09 | **3.72529e-09** |
+| 128 vs 64 | 0.000200262 @ 0 | **0.000200262 @ 0** |
+| 511 vs 64 | 0.001022242 @ 0 | **0.001022242 @ 0** |
+| 2048 vs 64 | 0.001926094 @ 0 | **0.001926094 @ 0** |
+
+**And the heading said four when the suite reports five.** The fifth is
+*Invariance / the block-size rows — ToneFilters' LP ramp, armed on EVERY prepare*, which refutes
+that candidate: 20 kHz 0.001926094 against 1 kHz 0.002924729, so the divergence does not grow with
+the smoother's travel. `git show 47efda3:Tests/InvarianceTests.cpp` has it, so it was failing on the
+day the four were filed and was simply not counted — the shape this suite records as *a list reads
+as complete*, arriving in a list of failures.
+
+**What the stale binary did and did not invalidate**, because the first answer given was too strong.
+`git diff dc92bd2 c4eeae8 -- Source/ Tests/ CMakeLists.txt` is **empty**: nothing but `CLAUDE.md` and
+twelve files under `design/` changed in the whole window. The binary was stale in its DATE and
+current in its CONTENT, so the window's results were run against the right source and stand.
+
+The one thing that genuinely did not carry is the repin claim, and it is now stronger rather than
+withdrawn. Core moved `3feeead → fcd8268` on 2026-08-17 and the argument offered was static — 0 of
+779 compiler dependency files mention `nf/HeaderPart.h`, which core's delta is confined to. That
+argument was sound and did not depend on the binary. But the sentence saying this casting's `_deps`
+*"followed it a day later"* was not true: the configure that would have re-fetched had been failing
+since 2026-08-16, so the binary was still linking the old core. **The fresh binary links `fcd8268`
+and produces identical figures**, so the claim is confirmed by measurement now instead of by
+inference.
+
+---
+
+### The original entry, unchanged
 
 **These are open findings expressed as failing assertions, not regressions.** The suite reports
 `TESTS FAILED (exit 1)` and has been meant to: each arm asserts a property the sweep established is
