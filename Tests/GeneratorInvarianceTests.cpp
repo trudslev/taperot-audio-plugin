@@ -156,7 +156,10 @@ public:
                                         runAt (64), runAt (512));
 
                 expectEquals (w, 0.0,
-                              "NoiseSource diverges with block size at character "
+                              "OPEN FINDING, DELIBERATELY RED — the block-coupling class, RATE "
+                              "form; a new member, filed 2026-08-18 in this casting's CLAUDE.md. "
+                              "Not a regression, and a green run here would mean the arm was "
+                              "relaxed. NoiseSource diverges with block size at character "
                                   + juce::String (character) + " — its character crossfade is "
                                   "started per prepare and stepped per block");
             }

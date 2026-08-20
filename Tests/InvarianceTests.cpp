@@ -248,6 +248,11 @@ public:
 
             for (const auto& r : results)
                 expect (r.sampleExact,
+                        "OPEN FINDING, DELIBERATELY RED — the NOISE-path transient, filed as "
+                        "LOCALISED-NOT-EXPLAINED in this casting's CLAUDE.md. Characterised down "
+                        "to ~20 ms and six remaining candidates; the bisection was stopped on "
+                        "cost/benefit, not abandoned. Not a regression, and a green run here would "
+                        "mean the arm was relaxed. "
                         "block-size invariance failed — the same sample stream cut differently "
                         "produced different output: " + r.describe());
         }
@@ -439,7 +444,12 @@ public:
                             : "REFUTED: LP's distance does not drive it — a third candidate out"));
 
             expect (atLow > atTop * 2.0,
-                    "the block-size divergence did not grow with the LP smoother's travel, so "
+                    "OPEN FINDING, DELIBERATELY RED — an EXCLUSION arm of the same "
+                    "localised-not-explained bisection, refuting ToneFilters' LP ramp as the "
+                    "cause. It is the fifth of this casting's five red arms and its heading said "
+                    "four for two days, because the four had figures and this one had a "
+                    "refutation. Not a regression. "
+                    "The block-size divergence did not grow with the LP smoother's travel, so "
                     "ToneFilters' ramp is not what produces these rows either: 20 kHz "
                         + juce::String (atTop, 9) + ", 1 kHz " + juce::String (atLow, 9));
 
