@@ -2,6 +2,7 @@ juce_add_console_app(TapeRotTests PRODUCT_NAME "TapeRotTests")
 
 target_sources(TapeRotTests PRIVATE
     RealtimeSafetyTests.cpp
+    CpuBaselineTests.cpp
     NumericalRobustnessTests.cpp
     InstrumentValidationTests.cpp
     InvarianceTests.cpp
@@ -70,7 +71,22 @@ target_sources(TapeRotTests PRIVATE
 #
 # The JucePlugin_* pair stays because juce_add_console_app does not define them and PluginProcessor
 # still uses JucePlugin_Name for getName().
+# **The core commit this casting was pinned at, resolved at CONFIGURE time and baked into the CPU
+# test's provenance.** The tag moves while core is pre-release, so `v1.0.0` in a baseline file would
+# record nothing — the whole value of the provenance block is that a figure can be attributed to one
+# state of six castings and one state of core, which is what makes "one sitting, all six, one machine
+# state" checkable after the fact rather than a promise.
+execute_process(
+    COMMAND git -C "${neonfoundrycore_SOURCE_DIR}" rev-parse --short HEAD
+    OUTPUT_VARIABLE NF_CORE_PIN_COMMIT_VALUE
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+if(NOT NF_CORE_PIN_COMMIT_VALUE)
+    set(NF_CORE_PIN_COMMIT_VALUE "unknown")
+endif()
+
 target_compile_definitions(TapeRotTests PRIVATE
+    NF_CORE_PIN_COMMIT="${NF_CORE_PIN_COMMIT_VALUE}"
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JucePlugin_Name="${TAPEROT_PRODUCT_NAME}"
