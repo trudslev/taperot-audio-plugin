@@ -58,32 +58,30 @@ FetchContent_MakeAvailable(NeonFoundryCore)
 # Retina display resolves it to a flat wash.
 juce_add_binary_data(TapeRotBinaryData
     SOURCES
-        design/assets/2x/panel_background_2x.png
-        design/assets/2x/knob_large_2x.png      # DRIVE/WOW/FLUTTER/NOISE/FAILURE/MIX/OUTPUT
-        design/assets/2x/knob_small_2x.png      # LP/RAMP/HP
-        design/assets/2x/knob_model_2x.png      # 9 frames, one per tape model
-        design/assets/2x/btn_fade_on_2x.png     design/assets/2x/btn_fade_off_2x.png
-        design/assets/2x/btn_clunk_on_2x.png    design/assets/2x/btn_clunk_off_2x.png
-        design/assets/2x/btn_tape_on_2x.png     design/assets/2x/btn_tape_off_2x.png
-        design/assets/2x/btn_vcr_on_2x.png      design/assets/2x/btn_vcr_off_2x.png
-        design/assets/2x/btn_dust_on_2x.png     design/assets/2x/btn_dust_off_2x.png
-        design/assets/2x/btn_off_on_2x.png      design/assets/2x/btn_off_off_2x.png
-        design/assets/2x/btn_on_on_2x.png       design/assets/2x/btn_on_off_2x.png
-        design/assets/2x/btn_linked_on_2x.png   design/assets/2x/btn_linked_off_2x.png
-        design/assets/2x/btn_stereo_on_2x.png   design/assets/2x/btn_stereo_off_2x.png
-        # Program header. The plate leaves both frames empty (delta v1.0.7); these carry every
-        # state, including CANCEL, which replaces DELETE while a Program name is being typed.
-        # One three-frame strip per Program button: both-dark / top-lit / bottom-lit. The five
-        # single-face sprites these replace (btn_save_on|off, btn_delete_on|off, btn_cancel) are
-        # still shipped in design/assets but are no longer build inputs - btn_cancel in particular
-        # was a RELABEL, the face that said CANCEL where its neighbour said DELETE, which the
-        # two-legend rule forbids.
-        design/assets/2x/btn_save_strip_2x.png  design/assets/2x/btn_delete_strip_2x.png
-        design/assets/2x/gen_seg_on_2x.png      design/assets/2x/gen_seg_off_2x.png
-        design/assets/2x/lamp_on_2x.png         # shared: 4 fault dots + 3 FAIL buttons
-        design/assets/2x/lamp_off_2x.png
-        design/assets/2x/lamp_press_2x.png
-        design/assets/2x/led_fail_on_2x.png     design/assets/2x/led_fail_off_2x.png
+        # **The whole runtime asset list, and it is one bitmap.**
+        #
+        # Call 5 retired the filmstrips and the plate together: every knob, cap, pointer, tick,
+        # numeral, label, shoe, lamp, divider and heading is a draw call now. Revision 1 embedded a
+        # panel plate and 29 sprites; all 30 are gone, and the code that blitted them is DELETED
+        # rather than adapted, because a sprite path left in place is a second way to draw a control
+        # that nothing exercises.
+        #
+        # The wordmark is the exception and §9 states why: **Impact Label Reversed is donationware
+        # and cannot be embedded**, so the letterforms ship as artwork and the font does not. That
+        # is absent BY LICENSING, not missing - `design/fonts/ABSENT.md` says so, because an absent
+        # font that is not declared looks like a delivery defect and gets "fixed" by substituting a
+        # face, which moves every measurement taken from the nameplate.
+        #
+        # The cut is 694 x 150 at 3x, which is a 230.2 x 44 plate rotated -1.5 deg. It arrives
+        # pre-rotated; `ProgramHeader::paintNameplate` blits it upright.
+        design/assets/taperot-wordmark.png
+        # §8's two faces. Barlow Condensed 600 is panel lettering; Share Tech Mono carries numerals,
+        # units, the model line and both readouts, per call 7's split.
+        #
+        # **§8 asks for Barlow Condensed 500 for scale numerals and no 500 weight has been
+        # delivered to any casting in this suite.** SemiBold stands in, which Gatecrasher's rewrite
+        # also did without recording it; `design-asks/barlow-condensed-500.md` asks for the cut.
+        design/fonts/BarlowCondensed-SemiBold.ttf
         design/fonts/share-tech-mono/ShareTechMono-Regular.ttf)
 
 # AU is Apple-only; Windows only ever builds VST3 + Standalone. VST3_COPY_DIR/AU_COPY_DIR are only
@@ -153,14 +151,23 @@ target_sources(TapeRot PRIVATE
     Source/DSP/TapeStop.cpp
     Source/DSP/FilterSweep.cpp
     Source/DSP/OutputStage.cpp
-    Source/GUI/KnobFilmstrip.cpp
-    Source/GUI/SpriteButton.cpp
-    Source/GUI/LampStrip.cpp
+    Source/GUI/KnobComponent.cpp
+    Source/GUI/ShoeSwitch.cpp
+    Source/GUI/LampButtonGroup.cpp
     Source/GUI/PitchScope.cpp
+    Source/GUI/TapeRotPanelBackground.cpp
+    Source/GUI/GenerationLadder.cpp
+    Source/GUI/MachineReadout.cpp
     Source/GUI/ProgramHeader.cpp
     Source/GUI/TapeRotEditorContent.cpp)
 
 target_compile_definitions(TapeRot PUBLIC
+    # **TapeRot derives its version now, where it used to bake it.** Root CLAUDE.md lists this
+    # casting with gatecrasher and fifth-member as the three whose footers read "v1.0" as ARTWORK,
+    # needing a re-cut whenever the number moves. The plate is gone, so the footer is drawn from
+    # PROJECT_VERSION like chorus-60's, reflect-84's and elmer's - one fewer thing to remember at
+    # release, and one fewer place for the suite to disagree with itself about its own version.
+    NF_VERSION_SHORT="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0

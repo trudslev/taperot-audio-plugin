@@ -45,28 +45,54 @@ public:
     void runTest() override
     {
 
-        beginTest ("This panel is on its OWN canvas — structurally absent from the shared part");
+        beginTest ("This panel is ON the shared part, and every band figure comes from it");
         {
-            /*  **Absent by construction, not clean.** TapeRot does not reference
-                `nf::HeaderGeometry` anywhere: it is 1336 x 679 and its band is its own. So there is
-                no alias here for a partial migration to be partial OF, and the defect the three
-                aliased castings guard against cannot exist yet.
+            /*  **This arm has inverted, and the note it replaces is kept in the commit rather than
+                here because it described a panel that no longer exists.** It read: *"Absent by
+                construction, not clean. TapeRot does not reference `nf::HeaderGeometry` anywhere:
+                it is 1336 x 679 and its band is its own... It becomes possible the moment this
+                panel is moved onto the shared part."*
 
-                It becomes possible the moment this panel is moved onto the shared part, and the
-                header-geometry sweep's finding is what that costs: **Chorus-60's pass aliased its
-                LCD and left four other band figures as literals from the previous canvas**, which
-                nothing could see because the plate baked their faces.
+                That moment is this commit. §10 item 1 took the canvas 1336 -> 1340 (call 1, and
+                **4 px, the smallest move in the suite**, because the band was already close to the
+                part's) and item 5 replaced the header outright.
 
-                What this arm buys meanwhile is a measured baseline. The canvas is asserted against
-                its own constants so that a panel move which shifts one rect and not another has
-                something to fail against — the same thing this casting's CLAUDE.md resume point
-                records from a Release capture. */
+                So the defect the old note called unreachable is now reachable, and this is the arm
+                that reaches it. **Chorus-60's pass aliased its LCD and left SAVE, DELETE and both
+                meter wells as literals from the previous canvas - 29 px right and 29 px down -
+                invisible for as long as the plate baked their faces.** A literal that happens to
+                agree with core is indistinguishable from an alias by reading, so every cell below
+                is compared against `nf::HeaderGeometry` rather than against a figure.
+
+                What it CANNOT do is prove provenance: a derivation and a literal are
+                indistinguishable at runtime while they agree, so this catches **divergence**, not a
+                re-typed constant. That is the whole window in which the two are different at all -
+                if the shared figure moves and this casting does not follow, it fires. */
             namespace L = TapeRotTheme::Layout;
+            namespace H = TapeRotTheme::Header;
 
-            expectEquals ((int) L::canvasWidth, 1336);
-            expectEquals ((int) L::canvasHeight, 679);
+            expectEquals ((int) L::canvasWidth, 1340);
+            expectEquals ((int) L::canvasWidth, nf::HeaderGeometry::canvasWidth);
+            expectEquals ((int) L::canvasHeight, 790);
 
-            expectNotEquals ((int) L::canvasWidth, 0);
+            expect (H::lcd()          == nf::HeaderGeometry::lcd().toFloat(),          "LCD cell");
+            expect (H::saveButton()   == nf::HeaderGeometry::saveButton().toFloat(),   "SAVE cell");
+            expect (H::deleteButton() == nf::HeaderGeometry::deleteButton().toFloat(), "DELETE cell");
+            expect (H::inWell()       == nf::HeaderGeometry::inWell().toFloat(),       "IN well");
+            expect (H::outWell()      == nf::HeaderGeometry::outWell().toFloat(),      "OUT well");
+            expect (H::nameplate()    == nf::HeaderGeometry::nameplate().toFloat(),    "nameplate zone");
+
+            /*  §9's Dymo cut is 694 x 150 at 3x, which is a 230.2 x 44 plate rotated -1.5 deg. That
+                arithmetic is what settles the nameplate stack: core records this casting's
+                published §4 row as `30 + 38 + 4 = 72`, six short of the anchor, and the delivered
+                prototype draws the descriptor at 84, six past it. **The cut says 44, and 30 + 44 + 4
+                is 78 exactly.** `Header`'s static_assert pins it; this logs it so a reader who
+                meets the three disagreeing figures can see which one was built. */
+            logMessage ("  nameplate stack " + juce::String (nf::HeaderGeometry::nameplateY)
+                            + " + " + juce::String (H::dymoPlateH, 1)
+                            + " + " + juce::String (H::dymoLeading, 1)
+                            + " = " + juce::String (nf::HeaderGeometry::descriptorY)
+                            + ", the shared descriptor anchor");
         }
 
         beginTest ("The real editor constructs, lays out and tears down");

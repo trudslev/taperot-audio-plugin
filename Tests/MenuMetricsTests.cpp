@@ -33,7 +33,7 @@ public:
 
         beginTest ("The caption is its padding plus its own type's line box");
         {
-            const auto captionFont = TapeRotTheme::Font::of (11.0f);
+            const auto captionFont = TapeRotTheme::Font::monoAt (11.0f);
 
             expectEquals (m.sectionHeaderHeight, nf::captionHeight (captionFont, 3, 4));
 

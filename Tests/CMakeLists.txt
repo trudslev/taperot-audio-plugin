@@ -27,7 +27,7 @@ target_sources(TapeRotTests PRIVATE
     ParametersStateTests.cpp
     ParameterTextTests.cpp
     GenerationCascadeTests.cpp
-    FilmstripConformanceTests.cpp
+    PrintedScaleTests.cpp
     MeteringTests.cpp
     TapeModelCalibrationTests.cpp
     TapeModelFrequencyResponseTests.cpp
@@ -40,11 +40,14 @@ target_sources(TapeRotTests PRIVATE
     # ordering would be asserting against a copy of the code rather than the code.
     ../Source/PluginProcessor.cpp
     ../Source/PluginEditor.cpp
-    ../Source/GUI/KnobFilmstrip.cpp
+    ../Source/GUI/KnobComponent.cpp
     RotaryArcTests.cpp
-    ../Source/GUI/SpriteButton.cpp
-    ../Source/GUI/LampStrip.cpp
+    ../Source/GUI/ShoeSwitch.cpp
+    ../Source/GUI/LampButtonGroup.cpp
     ../Source/GUI/PitchScope.cpp
+    ../Source/GUI/TapeRotPanelBackground.cpp
+    ../Source/GUI/GenerationLadder.cpp
+    ../Source/GUI/MachineReadout.cpp
     ../Source/GUI/ProgramHeader.cpp
     ../Source/GUI/TapeRotEditorContent.cpp
     ../Source/DSP/Hum.cpp
@@ -86,6 +89,8 @@ if(NOT NF_CORE_PIN_COMMIT_VALUE)
 endif()
 
 target_compile_definitions(TapeRotTests PRIVATE
+    # The test target compiles the GUI sources, and the panel footer reads this.
+    NF_VERSION_SHORT="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
     NF_CORE_PIN_COMMIT="${NF_CORE_PIN_COMMIT_VALUE}"
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

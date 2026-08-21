@@ -76,7 +76,7 @@ public:
 
                     p->setValueNotifyingHost (position);
 
-                    const auto defects = nf::readoutDefects (*p, TapeRotTheme::Layout::readoutFormat());
+                    const auto defects = nf::readoutDefects (*p, TapeRotTheme::Runtime::readoutFormat());
 
                     for (const auto& defect : defects)
                         expect (false, p->paramID + " at " + juce::String (position, 2)
@@ -105,7 +105,7 @@ public:
                     {
                         p->setValueNotifyingHost (position);
 
-                        const auto text = nf::describeParameter (*p, TapeRotTheme::Layout::readoutFormat());
+                        const auto text = nf::describeParameter (*p, TapeRotTheme::Runtime::readoutFormat());
                         expect (text.length() <= budget,
                                 p->paramID + " prints " + juce::String (text.length())
                                     + " characters: \"" + text + "\"");
@@ -175,7 +175,7 @@ public:
             // sanctioned change can silently revert and every suite in the suite stays green.
             //
             // Read through the SHIPPING readout format rather than a copy, for the reason stated on
-            // TapeRotTheme::Layout::readoutFormat: a test that declares its own format asserts
+            // TapeRotTheme::Runtime::readoutFormat: a test that declares its own format asserts
             // against itself.
             LayoutHost host;
 
@@ -189,7 +189,7 @@ public:
 
             if (switchMode != nullptr)
             {
-                const auto format = TapeRotTheme::Layout::readoutFormat();
+                const auto format = TapeRotTheme::Runtime::readoutFormat();
 
                 switchMode->setValueNotifyingHost (0.0f);
                 expectEquals (nf::describeParameter (*switchMode, format), juce::String ("SWITCH: FADE"));

@@ -41,7 +41,7 @@ protected:
 public:
     juce::Font getPopupMenuFont() override
     {
-        return TapeRotTheme::Font::of (itemTextSize);
+        return TapeRotTheme::Font::monoAt (itemTextSize);
     }
 
     void drawPopupMenuBackground (juce::Graphics& g, int width, int height) override
@@ -112,7 +112,7 @@ public:
         // the moment a caption comes from data, the site that re-cases it is the site that
         // gets it wrong. Re-arguing the exception each time costs more than the rule.
         TapeRotTheme::Text::drawTracked (g, sectionName,
-                                         TapeRotTheme::Font::of (headerTextSize), headerTracking,
+                                         TapeRotTheme::Font::monoAt (headerTextSize), headerTracking,
                                          r.withTrimmedLeft ((float) tickColumn),
                                          juce::Justification::left,
                                          // **Opaque.** BRAND.md permits opacity for STATE and
@@ -162,7 +162,7 @@ private:
         // 3px above and 4px below is the suite's ADOPTED default, not a derived figure: only
         // Elmer and Reflect-84 have designer-authored caption padding and they disagree (3/4
         // against 9/4), so there is no suite constant to derive. See BRAND.md.
-        m.sectionHeaderHeight = nf::captionHeight (TapeRotTheme::Font::of (headerTextSize), 3, 4);
+        m.sectionHeaderHeight = nf::captionHeight (TapeRotTheme::Font::monoAt (headerTextSize), 3, 4);
         m.separatorHeight = 9;
         m.leadingColumn = tickColumn;
         m.horizontalPadding = 26;

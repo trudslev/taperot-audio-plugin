@@ -5,10 +5,14 @@ using namespace TapeRotTheme;
 
 namespace
 {
-    // Hit areas are the plate rects from spec section 4, NOT the sprite rects - the 3px shadow
-    // bleed around each sprite must not be clickable.
-    const auto& saveBounds   = TapeRotTheme::Layout::saveHitArea;
-    const auto& deleteBounds = TapeRotTheme::Layout::deleteHitArea;
+    /*  The hit rects ARE the drawn cells now, and that is the change worth naming.
+
+        Revision 1 kept a separate pair of "plate rects" because each sprite carried a 3 px shadow
+        bleed that must not be clickable - so there were two rectangles per button, one drawn and
+        one clicked, and nothing checked they agreed. With the faces drawn there is no bleed and no
+        second rectangle: `nf::HeaderGeometry::saveButton()` is both.  */
+    inline juce::Rectangle<float> saveBounds()   { return TapeRotTheme::Header::saveButton(); }
+    inline juce::Rectangle<float> deleteBounds() { return TapeRotTheme::Header::deleteButton(); }
 }
 
 ProgramHeader::ProgramHeader(TapeRotAudioProcessor& p) : processorRef(p)
@@ -79,7 +83,7 @@ bool ProgramHeader::keyPressed(const juce::KeyPress& key)
 bool ProgramHeader::hitTest(int x, int y)
 {
     const juce::Point<float> p((float) x, (float) y);
-    return Layout::programLcd.contains(p) || saveBounds.contains(p) || deleteBounds.contains(p);
+    return Header::lcd().contains(p) || saveBounds().contains(p) || deleteBounds().contains(p);
 }
 
 void ProgramHeader::mouseDown(const juce::MouseEvent& e)
@@ -92,13 +96,13 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
     // that never had it - and the field stays open, so the next keystroke edits a name for the
     // wrong Program entirely. The other five castings all guard this; Fifth Member's
     // ProgramHeader.cpp names it as TapeRot's bug and deliberately does not copy it.
-    if (Layout::programLcd.contains(e.position) && ! namingMode)
+    if (Header::lcd().contains(e.position) && ! namingMode)
     {
         showProgramMenu();
         return;
     }
 
-    if (saveBounds.contains(e.position))
+    if (saveBounds().contains(e.position))
     {
         // SAVE always creates a new Program and never overwrites, so there is no "New" action.
         // First press opens the name field; the second commits what was typed, so the button works
@@ -110,7 +114,7 @@ void ProgramHeader::mouseDown(const juce::MouseEvent& e)
         return;
     }
 
-    if (deleteBounds.contains(e.position))
+    if (deleteBounds().contains(e.position))
     {
         // While naming, this button IS cancel - it wears the CANCEL sprite, and Escape does the
         // same thing from the keyboard.
@@ -143,9 +147,9 @@ void ProgramHeader::mouseMove(const juce::MouseEvent& e)
     const bool saveLive   = namingMode || processorRef.isProgramModified();
     const bool deleteLive = namingMode || deleteEnabled();
 
-    const bool clickable = Layout::programLcd.contains(e.position)
-                        || (saveBounds.contains(e.position) && saveLive)
-                        || (deleteBounds.contains(e.position) && deleteLive);
+    const bool clickable = Header::lcd().contains(e.position)
+                        || (saveBounds().contains(e.position) && saveLive)
+                        || (deleteBounds().contains(e.position) && deleteLive);
 
     setMouseCursor(clickable ? juce::MouseCursor::PointingHandCursor
                              : juce::MouseCursor::NormalCursor);
@@ -208,8 +212,8 @@ void ProgramHeader::showProgramMenu()
     // The menu hangs off the LCD and reads as an extension of it, so it takes the glass's width
     // rather than sizing itself to the longest Program name. localAreaToGlobal already carries the
     // editor's scale transform, so this stays right at every window size.
-    const auto glassOnScreen = localAreaToGlobal(Layout::programLcd.getSmallestIntegerContainer());
-    const auto glass = Layout::programLcd.getSmallestIntegerContainer();
+    const auto glassOnScreen = localAreaToGlobal(Header::lcd().getSmallestIntegerContainer());
+    const auto glass = Header::lcd().getSmallestIntegerContainer();
 
     auto options = juce::PopupMenu::Options()
                        .withTargetComponent(this)
@@ -269,8 +273,8 @@ void ProgramHeader::showParameter(const juce::String& paramId)
     // Straight through nf::describeParameter, which is straight through the parameter's own getText
     // and getLabel - so the LCD and the host cannot disagree about what a control reads. That
     // guarantee is the whole reason the string moved to core; the case rule this panel wants is
-    // stated in TapeRotTheme::Layout::readoutFormat() rather than hand-written here.
-    readout.show(nf::describeParameter(*param, TapeRotTheme::Layout::readoutFormat()));
+    // stated in TapeRotTheme::Runtime::readoutFormat() rather than hand-written here.
+    readout.show(nf::describeParameter(*param, TapeRotTheme::Runtime::readoutFormat()));
     repaint();
 }
 
@@ -314,115 +318,332 @@ juce::String ProgramHeader::lcdText() const
     return processorRef.displayLabelFor(id)
          + (processorRef.isProgramModified() ? " *" : "");
 }
+//==============================================================================
+/*  What varies, and nothing else.
 
-void ProgramHeader::paint(juce::Graphics& g)
+    Program identity and its dirty marker, the naming state and whatever has been typed, and
+    whether the list is open. **Not the meter values** - they change on every tick and are 10 % of
+    the cost, so a key carrying them would rebuild the layer 60 times a second and cache nothing.
+
+    The live parameter readout IS in the key, and that is correct rather than an oversight: while a
+    control is dragged the glass genuinely differs every frame, so the layer rebuilding per frame is
+    the layer doing its job.  */
+juce::String ProgramHeader::staticCacheKey() const
 {
-    const auto currentId = processorRef.getCurrentProgramId();
-    const auto lcdFont = Font::of(Layout::lcdTextSize);
+    const auto id = processorRef.getCurrentProgramId();
 
-    // --- PROGRAM: one glass, with the bank chip as a single field that switches its text --------
-    const auto glass = Layout::programLcd;
-    // Both fields are measured off the plate's own divider rather than guessed insets.
-    const auto bankArea = glass.withRight(Layout::lcdDivider);
-    // Stops short of the baked dropdown chevron - a long User Program name would otherwise run
-    // straight under it.
-    const auto nameArea = glass.withLeft(Layout::lcdDivider + Layout::lcdNameInset)
-                               .withRight(Layout::lcdChevron.getX() - 8.0f);
+    return juce::String ((int) id.bank) + id.id
+         + "|" + id.displayName
+         + "|" + juce::String ((int) processorRef.isProgramModified())
+         + "|" + juce::String ((int) namingMode) + typedName
+         + "|" + juce::String ((int) menuOpen)
+         + "|" + juce::String ((int) deleteEnabled())
+         + "|" + readout.textAt (juce::Time::getMillisecondCounter());
+}
 
-    // Naming always produces a User Program, so the chip says so from the first keystroke.
-    // **An em-dash where the Program is in neither bank** - INIT, or an unresolved identifier.
-    // Printing FACT or USER there would name a bank the Program is not in.
-    const bool onInit   = ! namingMode && (currentId.bank == ProgramBank::init
-                                            || currentId.bank == ProgramBank::unresolved);
-    const bool userBank = namingMode || currentId.bank == ProgramBank::user;
+/*  §9's Dymo strip and the wordmark that sits on it.
 
-    // **NAME while typing, not USER.** The Program is not in the user bank until the name is
-    // committed, and if the user cancels it never will be - so USER there names a thing that does
-    // not exist yet. Elmer had this right first; it is the suite standard now.
-    Text::drawTracked(g, namingMode ? juce::String("NAME")
-                                    : (onInit ? Text::emDash() : juce::String(userBank ? "USER" : "FACT")), lcdFont,
-                      Layout::lcdTracking, bankArea, juce::Justification::centred,
-                      onInit ? Colour::lcdText.withAlpha(0.42f) : Colour::lcdText);
+    **The wordmark is the one bitmap this panel ships**, and §9 states why: Impact Label Reversed is
+    donationware, so the letterforms ship as artwork and the font does not. `design/fonts/ABSENT.md`
+    records that as *absent by licensing, not missing* - the distinction matters because an absent
+    font that is not declared looks like a delivery defect and gets "fixed" by substituting a face,
+    which moves every measurement taken from the nameplate.
 
-    if (namingMode)
+    The cut is 694 x 150 at 3x and it is a **44 px plate rotated -1.5 deg**: 230.2 x 44 at that
+    angle bounds to 693.8 x 150.0. So the bitmap arrives pre-rotated and is blitted upright - the
+    rotation is IN the artwork, and rotating it again here would double it.  */
+void ProgramHeader::paintNameplate (juce::Graphics& g) const
+{
+    const auto zone = Header::nameplate();
+
+    /*  The plate's own unrotated box, from which the cut's bounding box is centred. Deriving the
+        blit from the plate rather than from the cut is what keeps the descriptor on the shared
+        anchor: 30 + 44 + 4 = 78, which `Header`'s static_assert pins.  */
+    const juce::Rectangle<float> plate (zone.getX(), zone.getY(),
+                                        Header::dymoPlateW, Header::dymoPlateH);
+
+    const float cutW = Header::dymoCutW / 3.0f;
+    const float cutH = Header::dymoCutH / 3.0f;
+    const auto blit = juce::Rectangle<float> (cutW, cutH).withCentre (plate.getCentre());
+
+    const auto wordmark = juce::ImageCache::getFromMemory (BinaryData::taperotwordmark_png,
+                                                           BinaryData::taperotwordmark_pngSize);
+
+    if (wordmark.isValid())
     {
-        // Block caret, 1 s period at 50% duty. The editor repaints this component at 60 Hz for the
-        // meters, so the blink needs no timer of its own.
-        const bool caretOn = (juce::Time::getMillisecondCounter() % 1000) < 500;
-        const auto caret = juce::String::charToString((juce::juce_wchar) 0x2588);   // U+2588
-
-        Text::drawTracked(g, typedName + (caretOn ? caret : juce::String()), lcdFont,
-                          Layout::lcdTracking, nameArea, juce::Justification::left, Colour::lcdText);
+        g.drawImage (wordmark, blit, juce::RectanglePlacement::stretchToFit);
     }
     else
     {
-        Text::drawTracked(g, lcdText(), lcdFont, Layout::lcdTracking, nameArea,
-                          juce::Justification::left, Colour::lcdText);
+        /*  **A visible failure rather than a silent one.** A missing wordmark that falls back to
+            bare fascia reads as a design decision; this reads as a fault. Root `CLAUDE.md` records
+            a prototype whose font silently failed to resolve being written up as a missing glyph on
+            a shipped plate - a fallback that looks like a finding costs more than a fault does.  */
+        g.setGradientFill ({ Colour::dymoTop, plate.getX(), plate.getY(),
+                             Colour::dymoBottom, plate.getX(), plate.getBottom(), false });
+        g.fillRoundedRectangle (plate, Header::dymoRadius);
+        g.setColour (Colour::wordmarkInk);
+        g.drawText ("TAPEROT", plate, juce::Justification::centred, false);
     }
 
-    // --- SAVE / DELETE / CANCEL -----------------------------------------------------------------
-    // The plate leaves both frames empty as of delta v1.0.7, so every state is a sprite. SAVE stays
-    // dark until a parameter differs from the Program on display, so it never invites a save that
-    // would do nothing; DELETE is live only on a User Program, and becomes CANCEL while a name is
-    // being typed.
-    const auto blitButton = [&g](const juce::Image& strip, juce::Point<float> topLeft,
-                                 Asset::ProgramButtonFrame frame)
-    {
-        // The strip is three frames stacked at 2x; the destination is 1x, so the source rect is
-        // taken in the strip's own pixels rather than by scaling the destination.
-        const int frameH = strip.getHeight() / 3;
-        const int srcY = (int) frame * frameH;
+    //== The function descriptor, on the SHARED anchor =======================
+    Text::drawTracked (g, "TAPE DEGRADATION PROCESSOR",
+                       Font::label (Type::functionDescriptor.cssPx),
+                       Font::trackingPx (Type::functionDescriptor.trackingEm, Type::functionDescriptor.cssPx),
+                       { zone.getX(), (float) nf::HeaderGeometry::descriptorY,
+                         zone.getWidth(), (float) nf::HeaderGeometry::descriptorH },
+                       juce::Justification::centredLeft, Colour::descriptorInk);
 
-        g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-        g.drawImage(strip,
-                    topLeft.x, topLeft.y, Layout::headerButtonW, Layout::headerButtonH,
-                    0, srcY, strip.getWidth(), frameH);
+    //== The model line ======================================================
+    Text::drawTracked (g, "MODEL MT-77 " + Text::middleDot() + " STEREO",
+                       Font::monoAt (Type::modelLine.cssPx),
+                       Font::trackingPx (Type::modelLine.trackingEm, Type::modelLine.cssPx),
+                       { zone.getX(), (float) nf::HeaderGeometry::modelLineY,
+                         zone.getWidth(), (float) nf::HeaderGeometry::modelLineH },
+                       juce::Justification::centredLeft, Colour::modelLineInk);
+}
+
+/*  §7.1's two-legend Program button.
+
+    Each button carries BOTH legends at all times and lights the one that applies - so SAVE/STORE
+    and DELETE/CANCEL are positions, not states of one word. BRAND.md forbids the older form where
+    the button relabelled itself, and the reason is legibility under the hand: a control whose
+    legend changes is one the player has to read before pressing.  */
+void ProgramHeader::paintProgramButton (juce::Graphics& g, juce::Rectangle<float> cell,
+                                        const char* upper, const char* lower,
+                                        bool upperLit, bool lowerLit) const
+{
+    g.setGradientFill ({ Colour::wellTop, cell.getX(), cell.getY(),
+                         Colour::wellBottom, cell.getX(), cell.getBottom(), false });
+    g.fillRoundedRectangle (cell, 3.0f);
+    g.setColour (Colour::wellFrame);
+    g.drawRoundedRectangle (cell.reduced (0.5f), 3.0f, 1.0f);
+
+    const auto font = Font::label (Type::programLegend.cssPx);
+    const float tracking = Font::trackingPx (Type::programLegend.trackingEm, Type::programLegend.cssPx);
+
+    const auto row = [&] (const char* text, float y, bool isLit)
+    {
+        Text::drawTracked (g, text, font, tracking,
+                           { cell.getX(), y, cell.getWidth(), Type::programLegend.lineBox },
+                           juce::Justification::centred,
+                           isLit ? Colour::lcdText : Colour::modelLineInk.withAlpha (0.55f));
     };
 
-    /*  GUI-SPEC's state matrix. Read the ROW, not the buttons - they are not independent, and two
-        of the five rows are only correct when read together:
+    row (upper, Header::legendUpperY, upperLit);
+    row (lower, Header::legendLowerY, lowerLit);
+}
 
-        | Panel state                 | SAVE frame | DELETE frame |
-        | Factory Program, unmodified | 0          | 0            |
-        | Factory Program, edited     | 1          | 0            |
-        | User Program, unmodified    | 0          | 1            |
-        | User Program, edited        | 1          | 1            |
-        | Naming a Program            | 2          | 2            |
+/*  **The cached region is the header BLOCK, not the component's bounds, and the difference is two
+    orders of magnitude.**
 
-        **Naming overrides both resting legends**: while a name is being typed, SAVE and DELETE are
-        dark even on an edited User Program, because nothing can be saved or deleted until the name
-        is committed or abandoned. That is why namingMode is tested first rather than folded in. */
-    using Frame = Asset::ProgramButtonFrame;
+    This component spans the canvas - it has to, so the Program list can be anchored and so its
+    `hitTest` can claim three cells scattered across the band - but it INKS a 1308 x 104 strip.
+    Caching its bounds would allocate 1340 x 790 at device scale: 16.9 MB at 2x, blitted 60 times a
+    second to deliver two meter numerals.
 
-    blitButton(Asset::saveButtonStrip(), Layout::saveSpriteTopLeft,
-               namingMode                        ? Frame::bottomLit
-               : processorRef.isProgramModified() ? Frame::topLit
-                                                  : Frame::bothDark);
+    Root `CLAUDE.md` records that exact trade from Chorus-60's ModScope, in as many words:
+    *"caching 1340 x 812 would have been a 17 MB image to save 3 ms, which is the wrong trade and
+    exactly the kind a cache makes silently."* It was made here anyway on the first pass, and what
+    caught it was the CPU bar - four editor cells at 1.33-1.39x baseline. A cache that is too big
+    does not fail, it just costs, which is why the bar is the only thing that sees it.  */
+juce::Rectangle<int> ProgramHeader::cachedRegion()
+{
+    return { (int) TapeRotTheme::Header::blockX, (int) TapeRotTheme::Header::blockY,
+             (int) TapeRotTheme::Header::blockW, (int) TapeRotTheme::Header::blockH };
+}
 
-    blitButton(Asset::deleteButtonStrip(), Layout::deleteSpriteTopLeft,
-               namingMode        ? Frame::bottomLit
-               : deleteEnabled() ? Frame::topLit
-                                 : Frame::bothDark);
+void ProgramHeader::renderStaticLayer (float deviceScale, const juce::String& key)
+{
+    const auto region = cachedRegion().toFloat();
+    staticLayer = juce::Image (juce::Image::ARGB,
+                               juce::roundToInt (region.getWidth()  * deviceScale),
+                               juce::roundToInt (region.getHeight() * deviceScale), true);
+    ++staticBuilds;
+    builtKey = key;
 
-    // --- MODEL readout --------------------------------------------------------------------------
-    // **Printed as the parameter spells it, never re-cased.** This carried a .toUpperCase() until
-    // 2026-08-13, which was invisible only because kTapeModels already authors every displayName in
-    // caps - so it re-cased nothing and looked harmless while being the second display site in this
-    // file deciding case for itself. The moment a model were added in mixed case, this readout and
-    // the host's automation lane would have printed different strings for one parameter.
-    if (auto* modelParam = processorRef.apvts.getParameter("model"))
-        Text::drawTracked(g, modelParam->getText(modelParam->getValue(), 0),
-                          Font::of(Layout::modelTextSize), Layout::modelTracking,
-                          Layout::modelReadout, juce::Justification::centred, Colour::lcdText);
+    juce::Graphics g (staticLayer);
+    g.addTransform (juce::AffineTransform::scale (deviceScale));
+    // Everything below is written in CANVAS coordinates, so the layer is translated rather than
+    // every rect being rebased - which would mean two coordinate systems in one function.
+    g.addTransform (juce::AffineTransform::translation (-region.getX(), -region.getY()));
 
-    // --- IN / OUT -------------------------------------------------------------------------------
-    const auto meterFont = Font::of(Layout::meterTextSize);
-    const auto level = [&g, &meterFont](juce::Rectangle<float> r, float db)
+    //== The header block, drawn for the first time ==========================
+    /*  The block, the band, the LCD cell, the Program buttons and both meter wells are the shared
+        part - every rectangle below comes from `nf::HeaderGeometry`, none is transcribed. Chorus-60
+        aliased its LCD and left SAVE, DELETE and both wells as literals from a previous canvas,
+        **29 px right and 29 px down**, and it was invisible for as long as the plate baked those
+        faces. A literal that happens to agree with core reads exactly like an alias.  */
     {
-        Text::drawTracked(g, juce::String(db, 1), meterFont, 0.0f, r,
-                          juce::Justification::centred, Colour::meterNumerals);
+        const juce::Rectangle<float> block (Header::blockX, Header::blockY, Header::blockW, Header::blockH);
+
+        g.setGradientFill ({ Colour::headerTop, block.getX(), block.getY(),
+                             Colour::headerBottom, block.getX(), block.getBottom(), false });
+        g.fillRoundedRectangle (block, Header::blockRadius);
+    }
+
+    paintNameplate (g);
+
+    //== The three captions on the band's caption row ========================
+    {
+        const auto font = Font::label (Type::switchCaption.cssPx);
+        const float tracking = Font::trackingPx (0.24f, Type::switchCaption.cssPx);
+        const auto caption = [&] (const char* text, juce::Rectangle<float> over, float trackEm)
+        {
+            Text::drawTracked (g, text, font, Font::trackingPx (trackEm, Type::switchCaption.cssPx),
+                               { over.getX(), Header::captionY, over.getWidth(), Header::captionH },
+                               juce::Justification::centredLeft, Colour::modelLineInk);
+        };
+
+        caption (namingMode ? "NAME PROGRAM" : "PROGRAM", Header::lcd(), 0.24f);
+        caption ("IN",  Header::inWell(),  0.28f);
+        caption ("OUT", Header::outWell(), 0.28f);
+        juce::ignoreUnused (tracking);
+    }
+
+    //== The LCD well and both meter wells ===================================
+    const auto well = [&] (juce::Rectangle<float> cell)
+    {
+        g.setGradientFill ({ Colour::wellTop, cell.getX(), cell.getY(),
+                             Colour::wellBottom, cell.getX(), cell.getBottom(), false });
+        g.fillRoundedRectangle (cell, 3.0f);
     };
 
-    level(Layout::inMeter, processorRef.getInputLevelDb());
-    level(Layout::outMeter, processorRef.getOutputLevelDb());
+    well (Header::lcd());
+
+    //== §7.1's matrix, applied ==============================================
+    {
+        const bool edited = processorRef.isProgramModified();
+        const bool canDelete = deleteEnabled();
+
+        paintProgramButton (g, Header::saveButton(), "SAVE", "STORE",
+                            ! namingMode && edited, namingMode);
+        paintProgramButton (g, Header::deleteButton(), "DELETE", "CANCEL",
+                            ! namingMode && canDelete, namingMode);
+    }
+
+    //== The LCD's own text: bank tag, name, or the parameter takeover =======
+    {
+        const auto lcdFont = Font::monoAt (Type::lcdValue.cssPx);
+        const float tracking = Font::trackingPx (Type::lcdValue.trackingEm, Type::lcdValue.cssPx);
+        const auto liveReadout = readout.textAt (juce::Time::getMillisecondCounter());
+
+        if (liveReadout.isNotEmpty())
+        {
+            Text::drawTracked (g, liveReadout, lcdFont, tracking, Header::lcd().reduced (16.0f, 0.0f),
+                               juce::Justification::centred, Colour::lcdText);
+        }
+        else
+        {
+            const auto id = processorRef.getCurrentProgramId();
+
+            /*  **`nf::programBankTag` is core's and it already carries the INIT rule**, so this
+                does not re-derive it: an em-dash for INIT and for an unresolved identifier, because
+                both are in neither bank and either word would be a lie. Writing the branch here
+                would be a second copy of a rule five siblings read from one place - which is the
+                divergence this suite has measured seven times.  */
+            const bool inNeitherBank = id.bank == ProgramBank::init
+                                    || id.bank == ProgramBank::unresolved;
+
+            Text::drawTracked (g, nf::programBankTag (id, namingMode), lcdFont, tracking,
+                               Header::bankCell(), juce::Justification::centred,
+                               inNeitherBank && ! namingMode ? Colour::lcdText.withAlpha (0.42f)
+                                                             : Colour::lcdText);
+
+            Text::drawTracked (g, lcdText(), lcdFont, tracking, Header::nameCell(),
+                               juce::Justification::left, Colour::lcdText);
+        }
+    }
+
+    //== §10 item 6's chevron: the shared 14 x 8 stroked path ================
+    if (! namingMode && readout.textAt (juce::Time::getMillisecondCounter()).isEmpty())
+    {
+        const auto box = Header::chevron();
+        juce::Path chevron;
+
+        /*  Mirrored about its own centre line while the list is open rather than rotated, so the
+            apex stays on one vertical axis and it reads as flipping in place instead of sliding
+            sideways. Cleared in `showMenuAsync`'s callback, which JUCE also runs on a dismissal -
+            without that, clicking away leaves the mark stuck.  */
+        if (menuOpen)
+        {
+            chevron.startNewSubPath (box.getX(), box.getBottom());
+            chevron.lineTo (box.getCentreX(), box.getY());
+            chevron.lineTo (box.getRight(), box.getBottom());
+        }
+        else
+        {
+            chevron.startNewSubPath (box.getX(), box.getY());
+            chevron.lineTo (box.getCentreX(), box.getBottom());
+            chevron.lineTo (box.getRight(), box.getY());
+        }
+
+        g.setColour (Colour::lcdText);
+        g.strokePath (chevron, juce::PathStrokeType (1.6f, juce::PathStrokeType::curved,
+                                                     juce::PathStrokeType::rounded));
+    }
+
+    well (Header::inWell());
+    well (Header::outWell());
+}
+
+/*  The two meter wells always, and the block only when something in the key moved.
+
+    The key is what the static layer is built from, so comparing against it here asks exactly the
+    right question: *would a repaint draw anything different?* If not, the only pixels that can have
+    changed are the two numerals, and those are 64 px cells.  */
+void ProgramHeader::refresh()
+{
+    if (staticCacheKey() != builtKey)
+    {
+        repaint (cachedRegion());
+        return;
+    }
+
+    repaint (TapeRotTheme::Header::inWell().getSmallestIntegerContainer());
+    repaint (TapeRotTheme::Header::outWell().getSmallestIntegerContainer());
+}
+
+void ProgramHeader::paint (juce::Graphics& g)
+{
+    const float deviceScale = (float) g.getInternalContext().getPhysicalPixelScaleFactor();
+    const auto key = staticCacheKey();
+
+    if (! staticLayer.isValid() || builtKey != key
+        || ! juce::approximatelyEqual (builtAtScale, deviceScale))
+    {
+        renderStaticLayer (deviceScale, key);
+        builtAtScale = deviceScale;
+    }
+
+    const auto region = cachedRegion().toFloat();
+    g.drawImageTransformed (staticLayer,
+                            juce::AffineTransform::scale (1.0f / deviceScale)
+                                .translated (region.getX(), region.getY()));
+
+    //== The only live pixels: two meter numerals ============================
+    /*  §6 measures this ink at **15.03** on the well. The format is the suite-wide ruling: floor
+        sentinel, +99.9 ceiling, one decimal always, and an explicit sign decision - the widest
+        string is 5 and 64 px of well holds it on all six.
+
+        **This casting was LIVE DEFECT 2 of that ruling.** `PluginProcessor.cpp`'s
+        `linear > 1.0e-5f ? 20*log10(linear) : -99.9f` has no GUI clamp at all, and 20·log10(1e-5)
+        is exactly -100.0 - so a linear value just above the threshold rounds to `"-100.0"`, six
+        characters, from the one casting whose GUI never clamped. The band is 0.58 % wide and a
+        smoothed level crosses it **whenever audio stops**. The clamp is applied here, at the
+        display, which is where the other five castings' floors already are.  */
+    {
+        const auto font = Font::monoAt (Type::lcdValue.cssPx);
+        const float tracking = Font::trackingPx (Type::lcdValue.trackingEm, Type::lcdValue.cssPx);
+
+        const auto level = [&] (juce::Rectangle<float> cell, float db)
+        {
+            const float clamped = juce::jlimit (-99.9f, 99.9f, db);
+            Text::drawTracked (g, juce::String (clamped, 1), font, tracking, cell,
+                               juce::Justification::centred, Colour::meterNumerals);
+        };
+
+        level (Header::inWell(),  processorRef.getInputLevelDb());
+        level (Header::outWell(), processorRef.getOutputLevelDb());
+    }
 }

@@ -53,7 +53,7 @@ public:
         object rather than a bar with a list floating under it. */
     static int menuAnchorY() noexcept
     {
-        return (int) std::floor(TapeRotTheme::Layout::programLcd.getBottom());
+        return (int) std::floor(TapeRotTheme::Header::lcd().getBottom());
     }
 
     /** Where menuHost has to start, and it is NOT the anchor: JUCE clamps a menu to
@@ -64,7 +64,23 @@ public:
         list can grow past the panel, because JUCE sizes it to `parentArea.getHeight() - 24` while
         the room actually below the anchor is the LCD's own height less than that. */
     static int menuHostTop() noexcept { return menuAnchorY() - 8; }
-    void refresh() { repaint(); }
+    /** Repaints only what the 20-per-second poll can actually have changed.
+
+        **`repaint()` on this component invalidates the WHOLE CANVAS**, because it spans the canvas
+        so the Program list has somewhere to anchor and so its `hitTest` can claim three cells
+        scattered across the band. A full invalidation forces JUCE to re-composite every child under
+        it - the fascia, eleven knobs, the scope, three shoes, three lamp groups - to deliver two
+        meter numerals.
+
+        That is the same defect Chorus-60 measured as an unconditional 20 Hz repaint costing 9.6x
+        more static than live, arriving one level up: there the waste was inside the paint, here it
+        is in what the paint was asked to cover. Narrowing the cached image alone moved the CPU cell
+        from 11.95 % to 11.67 % - a refutation, and the reason this is the second fix rather than
+        the first. */
+    void refresh();
+
+    /** Asserted by the tests. **A cache with no rebuild counter is a cache nobody has checked.** */
+    int staticLayerBuildCount() const noexcept { return staticBuilds; }
 
 private:
     void timerCallback() override;
@@ -97,14 +113,44 @@ private:
 
     TapeRotAudioProcessor& processorRef;
 
-    // No menuOpen flag here, unlike CHORUS-60 / REFLECT-84 / FIFTH MEMBER: this panel's dropdown
-    // chevron is PRINTED IN THE PLATE (delta v1.0.3), so there is nothing at runtime to invert
-    // while the list is open. Drawing one over the top would double-print it; un-baking is a plate
-    // change, raised with the designers rather than worked around in code.
+    /*  **This panel now HAS a menuOpen flag, and the note that said it could not is deleted
+        rather than amended**, because what it recorded was true of a panel that no longer exists.
+        It read: *"this panel's dropdown chevron is PRINTED IN THE PLATE (delta v1.0.3), so there
+        is nothing at runtime to invert while the list is open... un-baking is a plate change,
+        raised with the designers rather than worked around in code."*
+
+        The plate is gone and the chevron is §10 item 6's shared 14 x 8 stroked path, so the state
+        that would have been dead is live. Root `CLAUDE.md` names TapeRot and Gatecrasher together
+        as the two castings in this position; both are un-baked in the same round.  */
+    bool menuOpen = false;
     juce::Component* menuParent = nullptr;
+
+    /*  The static half of this header, cached.
+
+        Chorus-60 measured its own equivalent at **994.6 µs of static per 103.8 µs of live - 9.6x**
+        - and caching it took the component from 1.546 ms to 0.114 ms per paint and about five
+        points off that panel's editor cell. The split is the same here: a 1308 x 104 block, a
+        nameplate, three wells and two button faces that cannot have changed, redrawn behind two
+        meter numerals that can.
+
+        **The meter values are deliberately absent from the key.** A key including them rebuilds
+        every tick and caches nothing, which is the failure the measurement was run to avoid.  */
+    juce::Image staticLayer;
+    juce::String builtKey;
+    float builtAtScale = 0.0f;
+    int staticBuilds = 0;
+
+    /** The strip this component actually inks: the header block, not its canvas-wide bounds. */
+    static juce::Rectangle<int> cachedRegion();
+
+    void renderStaticLayer (float deviceScale, const juce::String& key);
+    juce::String staticCacheKey() const;
+    void paintNameplate (juce::Graphics&) const;
+    void paintProgramButton (juce::Graphics&, juce::Rectangle<float>, const char* upper,
+                             const char* lower, bool upperLit, bool lowerLit) const;
     /** The parameter takeover: what to show, and until when. The deadline is core's; the one-shot
         Timer that notices it, the font, the cell and every pixel of the painting stay here. */
-    nf::ReadoutTimer readout { TapeRotTheme::Layout::readoutFormat() };
+    nf::ReadoutTimer readout { TapeRotTheme::Runtime::readoutFormat() };
     /** Outlives showMenuAsync's callback, so it must be a member rather than a local. */
     ProgramMenuLookAndFeel menuLookAndFeel;
 

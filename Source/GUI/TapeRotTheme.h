@@ -4,62 +4,160 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 
 #include <BinaryData.h>
+#include <nf/HeaderPart.h>
+#include <nf/ParameterReadout.h>
+#include <nf/PrintedScale.h>
 
 #include <array>
 
 /**
-    TapeRot's design tokens, transcribed from `design/GUI-SPEC.md`.
+    TapeRot's design tokens, from `design/GUI-SPEC.md` (model MT-77, harmonisation round).
 
-    Every coordinate is in 1x logical pixels measured from the top-left of `panel_background.png`,
-    exactly as the spec states them. The bitmaps are embedded at 2x and drawn at these 1x
-    coordinates, so the panel stays crisp on a Retina display; a 1:1 blit resolves the fascia
-    texture to a flat wash.
+    **The panel is code-drawn.** Call 5 retired the filmstrips and the plate together: every knob,
+    cap, pointer, tick, numeral, unit, label, shoe, lamp, divider and heading on this panel is a
+    draw call. **Exactly one bitmap ships** — the wordmark, and only because Impact Label Reversed
+    is donationware that cannot be embedded (§9). That is the whole asset list.
 
-    **Nothing printed is drawn in code.** Every label, scale legend, tick and unit mark - and the
-    Dymo nameplate - lives in the plate, positioned by eye against its ticks. Recomputing any of it
-    at runtime would move it. The runtime layer is exactly four things: the scope trace, the LCD
-    text, the MODEL readout, and the IN/OUT numerals.
+    This file used to open with *"Nothing printed is drawn in code"* and describe a 1336 x 679
+    canvas with 31 sprites. Both were true of revision 1 and neither is true now. The inversion is
+    worth stating rather than deleting, because the failure mode inverted with it: while the panel
+    was baked, the hazard was **double-printing** a runtime draw over baked ink, which is visible.
+    Now the same element fails by being **absent**, and the panel merely looks emptier than the
+    render. Root `CLAUDE.md` records that shape from Chorus-60, whose hand-authored enumeration of
+    the same transition came out thirteen rows short.
 
-    Sprite placements below are the SPRITE's top-left with its transparent bleed included, so each
-    blits at its stated position with no further offset. All assets carry straight (non-
-    premultiplied) alpha.
+    So this panel's element list was **derived, not authored** — `tools/enumerate_prototype.py` over
+    the delivered `design/TapeRot MT-77 Panel.dc.html`, which reports 326 objects (199 material,
+    129 ink) in 17 type roles. Every figure below is measured off that enumeration or stated by the
+    spec, and the two were compared rather than one trusted.
+
+    Coordinates are 1x logical pixels from the top-left of the 1340 x 790 canvas.
 */
-#include <nf/ParameterReadout.h>
-
 namespace TapeRotTheme
 {
 
 //==============================================================================
+/** §6, every hex measured against its own ground by name. Functional 7:1, flavour 4.5:1, state 3:1;
+    §6 records that every functional role on this panel clears its floor and no ink moved this round. */
 namespace Colour
 {
-    /** The one accent. Icon and panel must stay in step - the icon's edge stroke is #C07E23 and its
-        lit-segment gradient runs #F5B85F to #D98324 against this same value. */
-    inline const juce::Colour accent        { 0xFFF0A94B };
+    /** §6's one accent. Every lamp, the scope trace and the lit GENERATION stage.
+        The LCD's `lcdText` is NOT this — it is the display phosphor, and appears only on glass. */
+    inline const juce::Colour accent          { 0xFFF0A94B };
 
-    inline const juce::Colour lcdText       { 0xFFF2B25C };
-    inline const juce::Colour lcdGlow       { juce::Colour::fromRGBA (240, 169, 75, 89) };   // .35
-    inline const juce::Colour meterNumerals { 0xFFEFE7D3 };
-    inline const juce::Colour scopeLegend   { 0xFFE3A65A };
-    inline const juce::Colour scopeTrace    { 0xFFF0A94B };
-    inline const juce::Colour scopeHalo     { juce::Colour::fromRGBA (217, 131, 36, 71) };   // .28
-    inline const juce::Colour scopeGrid     { juce::Colour::fromRGBA (240, 169, 75, 33) };   // .13
-    inline const juce::Colour scopeCentre   { juce::Colour::fromRGBA (240, 169, 75, 77) };   // .30
-    inline const juce::Colour scopeWell     { 0xFF100E0A };
+    //== Fascia and its furniture =============================================
+    inline const juce::Colour fasciaTop       { 0xFFEFE6D0 };
+    inline const juce::Colour fasciaBottom    { 0xFFE2D8BF };
+    inline const juce::Colour bezel           { 0xFFE4DAC2 };
+    inline const juce::Colour bezelLine       { juce::Colour::fromRGBA (0, 0, 0, 26) };    // .10
+    // contrast: 8.79-10.03:1 vs fasciaBottom,fasciaTop [functional]
+    inline const juce::Colour panelInk        { 0xFF3A3328 };
+    inline const juce::Colour divider         { 0xFFB2A68A };
+    inline const juce::Colour screwFace       { 0xFFF2EBD8 };
+    inline const juce::Colour screwSlot       { juce::Colour::fromRGBA (60, 52, 38, 140) }; // .55
 
-    // Kept for reference against the plate; nothing below is drawn in code any more.
-    inline const juce::Colour fasciaTop     { 0xFFEFE6D0 };
-    inline const juce::Colour fasciaBottom  { 0xFFE2D8BF };
-    inline const juce::Colour headerTop     { 0xFF2C2923 };
-    inline const juce::Colour headerBottom  { 0xFF201D18 };
-    inline const juce::Colour wellInterior  { 0xFF16130F };
+    //== Header block, and the ink that sits on it ============================
+    inline const juce::Colour headerTop       { 0xFF2C2923 };
+    inline const juce::Colour headerBottom    { 0xFF201D18 };
+    // contrast: 11.76:1 vs headerTop [functional]
+    inline const juce::Colour descriptorInk   { 0xFFEFE7D3 };
+    /** §10 item 7. The six-material header strip carried `#b0a695`, which measures **6.03** against
+        this block — worse than the body hex it was meant to have fixed — and had drawn the block as
+        `#1a1613 -> #100d0b`, a material that does not ship, so its 7.48 was against the wrong ground.
+        The body's hex won and the strip was corrected to it. */
+    // contrast: 8.11:1 vs headerTop [functional]
+    inline const juce::Colour modelLineInk    { 0xFFCCC1A6 };
+
+    //== The Dymo strip =======================================================
+    inline const juce::Colour dymoTop         { 0xFF100E0C };
+    inline const juce::Colour dymoBottom      { 0xFF1C1815 };
+
+    //== Glass: the LCD, the scope well, the MACHINE readout ==================
+    inline const juce::Colour wellTop         { 0xFF16130F };
+    inline const juce::Colour wellBottom      { 0xFF100E0B };
+    inline const juce::Colour wellFrame       { 0xFF4E4740 };
+    // contrast: 9.96:1 vs wellTop [functional]
+    inline const juce::Colour lcdText         { 0xFFF2B25C };
+    // contrast: 15.03:1 vs wellTop [functional]
+    inline const juce::Colour meterNumerals   { 0xFFEFE7D3 };
+    // contrast: 8.70:1 vs wellTop [functional]
+    inline const juce::Colour scopeLegend     { 0xFFE3A65A };
+    // A graphic rather than lettering, so it takes the flavour floor - but it is measured against
+    // the same well every readout is, because a trace crossing a numeral is what the clamp in
+    // PitchScope exists to prevent.
+    // contrast: 9.24:1 vs wellTop [flavour]
+    inline const juce::Colour scopeTrace      { 0xFFF0A94B };
+    inline const juce::Colour scopeHalo       { juce::Colour::fromRGBA (217, 131, 36, 140) };  // .55
+    inline const juce::Colour scopeGrid       { juce::Colour::fromRGBA (240, 169, 75, 33) };   // .13
+    inline const juce::Colour scopeZero       { juce::Colour::fromRGBA (240, 169, 75, 77) };   // .30
+    // The strip runs #100e0c -> #1c1815, so the LIGHTER end is the worst case for pale ink.
+    // contrast: 15.37:1 vs dymoBottom [functional]
+    inline const juce::Colour wordmarkInk     { 0xFFF4EFE3 };
+
+    //== Caps, §3 =============================================================
+    inline const juce::Colour ivoryCapHi      { 0xFFF8F2E3 };
+    inline const juce::Colour ivoryCapMid     { 0xFFEFE7D2 };
+    inline const juce::Colour ivoryCapLo      { 0xFFDED3B8 };
+    inline const juce::Colour ivoryCapRim     { 0xFF443E36 };
+    // contrast: 12.30:1 vs ivoryCapMid [state]
+    inline const juce::Colour ivoryPointer    { 0xFF2B251C };
+
+    inline const juce::Colour darkCapHi       { 0xFF4A4237 };
+    inline const juce::Colour darkCapMid      { 0xFF2B2620 };
+    inline const juce::Colour darkCapLo       { 0xFF14110D };
+    inline const juce::Colour darkCapRim      { 0xFF0E0C09 };
+    // §6: both pointers clear the suite's thinnest pointer separation (4.24) by a wide margin,
+    // which is what a two-tone cap scheme buys and the reason §3 marks the signature control by
+    // MATERIAL as well as by diameter.
+    // contrast: 12.42:1 vs darkCapMid [state]
+    inline const juce::Colour darkPointer     { 0xFFF2E9D6 };
+
+    inline const juce::Colour sweepArc        { juce::Colour::fromRGBA (58, 51, 40, 71) };  // .28
+
+    //== Shoes, §5.1 ==========================================================
+    inline const juce::Colour shoeOnTop       { 0xFFF2EBD8 };
+    inline const juce::Colour shoeOnBottom    { 0xFFD8CDB0 };
+    inline const juce::Colour shoeOffTop      { 0xFF241F18 };
+    inline const juce::Colour shoeOffBottom   { 0xFF15120D };
+    inline const juce::Colour shoeRing        { 0xFFA79B80 };
+    inline const juce::Colour shoeOnSheen     { juce::Colour::fromRGBA (255, 255, 255, 230) }; // .90
+
+    //== Round lamp-buttons and lamps, §5.3 ===================================
+    inline const juce::Colour lampCapHi       { 0xFF4A423A };
+    inline const juce::Colour lampCapMid      { 0xFF2A251E };
+    inline const juce::Colour lampCapLo       { 0xFF15120E };
+
+    inline const juce::Colour lampLitHi       { 0xFFFFD48A };
+    inline const juce::Colour lampLitMid      { 0xFFF0A94B };
+    inline const juce::Colour lampLitLo       { 0xFFB4741D };
+    inline const juce::Colour lampLitEdge     { 0xFF6B4310 };
+    inline const juce::Colour lampLitInner    { juce::Colour::fromRGBA (240, 169, 75, 128) }; // .5
+    inline const juce::Colour lampGlow        { juce::Colour::fromRGBA (240, 169, 75, 90) };
+
+    inline const juce::Colour lampDarkHi      { 0xFF6A6152 };
+    inline const juce::Colour lampDarkMid     { 0xFF4B443A };
+    inline const juce::Colour lampDarkLo      { 0xFF2A251C };
+
+    //== §7.5 bypass ==========================================================
+    /** Full-bleed 0.50 `#808080` multiply over the whole panel. Pointers do not move, the scope
+        freezes, every lamp goes out, no caption, no desaturation. The legibility floors do not
+        apply in this state, which §6 says in as many words. */
+    inline const juce::Colour bypassVeil      { 0xFF808080 };
+    inline constexpr float    bypassAlpha     = 0.50f;
 }
 
 //==============================================================================
 namespace Font
 {
-    /** Share Tech Mono is the only typeface needed at runtime. Every printed word on this panel -
-        Helvetica for the labels, ImpactLabel for the nameplate - is baked into the plate, so
-        neither is embedded any more. */
+    /** §8: panel lettering is Barlow Condensed, numerals/units/model line/readouts are Share Tech
+        Mono — this casting's own mono, per call 7's split. */
+    inline juce::Typeface::Ptr barlowSemiBold()
+    {
+        static const juce::Typeface::Ptr t = juce::Typeface::createSystemTypefaceFor (
+            BinaryData::BarlowCondensedSemiBold_ttf, (size_t) BinaryData::BarlowCondensedSemiBold_ttfSize);
+        return t;
+    }
+
     inline juce::Typeface::Ptr mono()
     {
         static const juce::Typeface::Ptr t = juce::Typeface::createSystemTypefaceFor (
@@ -67,51 +165,92 @@ namespace Font
         return t;
     }
 
-    /** CSS `font-size` is an em size, which is NOT juce::Font::withHeight() - that sets
-        ascent+descent, a typeface-specific multiple of the em, so a spec px passed straight to
-        withHeight() renders visibly small. JUCE 8's withPointHeight() expresses it directly. */
-    inline juce::Font of (float cssPx)
+    /** CSS `font-size` is an **em** size; `juce::Font::withHeight` sets **ascent + descent**, a
+        typeface-specific multiple of the em. A spec px passed to `withHeight` renders visibly
+        small — root `CLAUDE.md` records two castings whose menu type is 11-23 % under its nominal
+        for exactly this reason, one of them below the functional floor. `withPointHeight` means
+        what a spec means. */
+    inline juce::Font label (float cssPx)
+    {
+        return juce::Font (juce::FontOptions (barlowSemiBold()).withPointHeight (cssPx));
+    }
+
+    inline juce::Font monoAt (float cssPx)
     {
         return juce::Font (juce::FontOptions (mono()).withPointHeight (cssPx));
+    }
+
+    /** §8 quotes tracking in **em**; `Text::drawTracked` takes **px**. One function so the two
+        cannot be confused at a call site, which is how a `.10 em` becomes a 0.10 px. */
+    inline constexpr float trackingPx (float em, float cssPx) noexcept { return em * cssPx; }
+}
+
+//==============================================================================
+namespace Paint
+{
+    /** A CSS `radial-gradient(circle at X% Y%, ...)` over a circular face.
+
+        **The radius has to reach the FAR edge of the face, not an arbitrary corner.** Written as a
+        gradient from the light point to `centre + (r, r)`, the ramp's radius comes out **2.01r**
+        where the face only spans 1.61r from that point - so the cap shows the inner 80 % of the
+        ramp and reads as flat ivory with no sculpting at all. That is what the first capture of
+        this panel showed, on all eleven knobs and all ten lamp buttons at once.
+
+        `juce::ColourGradient`'s radial form takes point1 as the centre and point2 as *a* point on
+        the ramp's outer circle, so any point at the right distance will do - which is exactly why
+        it is easy to get wrong by picking a convenient one.
+
+        @param lightX  the CSS `at X%`, as a fraction
+        @param lightY  the CSS `at Y%`, as a fraction */
+    inline juce::ColourGradient sculptedFace (juce::Point<float> centre, float radius,
+                                              float lightX, float lightY,
+                                              juce::Colour inner, juce::Colour outer)
+    {
+        const juce::Point<float> lightAt (centre.x + radius * (lightX - 0.5f) * 2.0f,
+                                          centre.y + radius * (lightY - 0.5f) * 2.0f);
+        const float reach = lightAt.getDistanceFrom (centre) + radius;
+
+        return { inner, lightAt, outer, lightAt.translated (reach, 0.0f), true };
     }
 }
 
 //==============================================================================
 namespace Text
 {
-    /** U+2014, from its codepoint: juce::String's const char* constructor decodes Latin-1, so a
-        UTF-8 literal would render as stray glyphs. */
-    inline juce::String emDash()
-    {
-        return juce::String::charToString ((juce::juce_wchar) 0x2014);
-    }
+    /** Every non-ASCII glyph is built from its **codepoint**. `juce::String`'s `const char*`
+        constructor decodes **Latin-1, not UTF-8**, so a UTF-8 literal renders as stray glyphs — a
+        `U+2212` written narrow drew `<A-circumflex>^'60` on Gatecrasher during its rewrite.
 
-    inline juce::String middleDot()
+        The prototype enumeration reports exactly three above-ASCII codepoints on this panel
+        (U+00B1 x1, U+00B7 x5, U+2212 x4) and **no whitespace other than U+0020**, which is checked
+        separately because a U+3000 transcribes to `' '` and looks right. */
+    inline juce::String middleDot()  { return juce::String::charToString ((juce::juce_wchar) 0x00B7); }
+    inline juce::String plusMinus()  { return juce::String::charToString ((juce::juce_wchar) 0x00B1); }
+    inline juce::String minusSign()  { return juce::String::charToString ((juce::juce_wchar) 0x2212); }
+    inline juce::String emDash()     { return juce::String::charToString ((juce::juce_wchar) 0x2014); }
+
+    /** A signed decibel string with §3.2's leading plus kept, and a real U+2212 for the minus. */
+    inline juce::String signedDb (float db, int places = 0)
     {
-        // juce::String's const char* constructor decodes Latin-1, not UTF-8, so a "\xc2\xb7"
-        // literal renders as a stray A-circumflex.
-        return juce::String::charToString ((juce::juce_wchar) 0x00B7);
+        const auto mag = juce::String (std::abs (db), places);
+        return db < 0.0f ? minusSign() + mag : "+" + mag;
     }
 
     inline float trackedWidth (const juce::String& text, const juce::Font& font, float tracking)
     {
         float w = 0.0f;
-
         for (int i = 0; i < text.length(); ++i)
         {
             w += juce::GlyphArrangement::getStringWidth (font, juce::String::charToString (text[i]));
-
             if (i < text.length() - 1)
                 w += tracking;
         }
-
         return w;
     }
 
-    /** Delta v1.0.2 quotes the scope legends by *baseline*, not by box, and juce::Graphics has no
-        baseline-anchored drawText. A box running exactly one ascent above the baseline to one
-        descent below it puts the baseline where it was specified once drawTracked centres the
-        glyphs in it - derived from the font rather than eyeballed against the plate. */
+    /** A box running one ascent above the baseline to one descent below it, so that `drawTracked`
+        centring the glyphs in it puts the baseline where the spec quoted it — derived from the
+        font rather than eyeballed. */
     inline juce::Rectangle<float> rowAtBaseline (const juce::Font& font, float left, float right,
                                                  float baselineY)
     {
@@ -119,8 +258,9 @@ namespace Text
         return { left, baselineY - ascent, right - left, ascent + descent };
     }
 
-    /** juce::Font carries no absolute-pixel letter-spacing, so tracked text is drawn glyph by
-        glyph. Every tracking figure in this spec is quoted in px. */
+    /** `juce::Font` carries no absolute-pixel letter-spacing, so tracked text is drawn glyph by
+        glyph. **A `drawText` on panel lettering silently drops the tracking**, which is one of the
+        four shapes Chorus-60's type sweep found on strings that were otherwise struck as drawn. */
     inline void drawTracked (juce::Graphics& g, const juce::String& text, const juce::Font& font,
                              float tracking, juce::Rectangle<float> area,
                              juce::Justification justification, juce::Colour colour)
@@ -148,397 +288,389 @@ namespace Text
 }
 
 //==============================================================================
+/** §8. Every size is a CSS px em size with a **pinned line box** (call 4), so the pair travels
+    together and a size cannot be moved without someone meeting the box it has to sit in. */
+namespace Type
+{
+    struct Role { float cssPx; float lineBox; float trackingEm; };
+
+    inline constexpr Role wordmark          { 40.0f,  40.0f, 0.10f };   // Impact Label Reversed - artwork, §9
+    inline constexpr Role functionDescriptor{ 14.0f,  17.0f, 0.26f };
+    inline constexpr Role modelLine         { 11.0f,  14.0f, 0.20f };
+    inline constexpr Role sectionHeading    { 12.0f,  15.0f, 0.28f };
+    inline constexpr Role controlLabel      { 12.0f,  15.0f, 0.18f };
+    inline constexpr Role unit              { 10.0f,  13.0f, 0.10f };
+    inline constexpr Role scaleNumeral      { 11.0f,  13.0f, 0.04f };
+    inline constexpr Role switchCaption     { 10.0f,  13.0f, 0.22f };
+    inline constexpr Role legend            { 10.0f,  13.0f, 0.14f };   // shoe and lamp legends
+    inline constexpr Role programLegend     { 11.0f,  13.0f, 0.12f };
+    inline constexpr Role lcdValue          { 17.0f,  22.0f, 0.10f };
+
+    /** Two roles §8 quotes in **absolute px** rather than em, and they are left that way rather
+        than converted: 1.3 px at 12 is .1083 em and 1.2 at 12.5 is .096 em, neither of which is a
+        figure anybody chose. Converting them would invent precision. */
+    inline constexpr float scopeReadoutCssPx    = 12.0f,  scopeReadoutLineBox    = 15.0f,  scopeReadoutTrackingPx   = 1.3f;
+    inline constexpr float machineReadoutCssPx  = 12.5f,  machineReadoutLineBox  = 16.0f,  machineReadoutTrackingPx = 1.2f;
+
+    /** §8's scale numeral is **Barlow Condensed 500** and no bundle has delivered a 500 weight to
+        any casting in this suite — `design/fonts/` carries SemiBold (600) only, and Gatecrasher's
+        rewrite made the identical substitution without recording it. Drawn at 600 here, said out
+        loud rather than left to be discovered: `design-asks/barlow-condensed-500.md`. */
+    inline constexpr bool scaleNumeralIsSubstituted = true;
+}
+
+//==============================================================================
 namespace Layout
 {
-    inline constexpr float canvasWidth  = 1336.0f;
-    inline constexpr float canvasHeight = 679.0f;
+    /** §1. **Call 1 cost TapeRot 4 px** — 1336 to 1340, the smallest move in the suite, because its
+        band was already close to the part's. The width is the shared part's; only the height is
+        this casting's. */
+    inline constexpr float canvasWidth  = (float) nf::HeaderGeometry::canvasWidth;   // 1340
+    inline constexpr float canvasHeight = 790.0f;
 
-    /** Assets are embedded at 2x and drawn at 1x coordinates. */
-    inline constexpr int assetScale = 2;
+    inline constexpr float bezelInset   = 8.0f;
 
-    // --- frames the plate leaves empty, filled at runtime (spec section 1) ------------------
-    /** **The header band: y 63, height 34, shared by all five parts.** The LCD, both Program
-        buttons and both meter wells stand the same height on the same Y, which is BRAND.md's
-        suite-wide header figure rather than this panel's - the castings are differently-sized
-        units, not scales of one design.
+    /** §1's four thumbscrews, at the stated centres. */
+    inline constexpr float screwDiameter = 11.0f;
+    inline constexpr float screwSlotW = 8.0f, screwSlotH = 1.6f;
+    inline constexpr std::array<juce::Point<float>, 4> screwCentres { {
+        { 8.0f, 26.0f }, { 1332.0f, 26.0f }, { 8.0f, 764.0f }, { 1332.0f, 764.0f } } };
 
-        TapeRot is the only casting where the header got SMALLER: it was 40 (and its meters 42, two
-        pixels taller than their own row-mates). Verified against the v1.0.8 plate rather than the
-        spec table: the LCD glass, the IN well and the OUT well all measure 64..96 there, which is
-        the 32px content box, so the border-box is 63..97 for all three. */
-    inline const juce::Rectangle<float> programLcd  { 416.2f,  63.0f, 470.0f, 34.0f };
-    /** The dropdown chevron, baked into the plate (delta v1.0.1 replaced a solid triangle with a
-        stroked one, "16x16 box, 14px in from the frame's inner edge"). Nothing draws it, but the
-        program name has to stop short of it or a long User Program name runs underneath.
+    //== §4, the wow/flutter scope ============================================
+    inline constexpr float scopeX = 16.0f, scopeY = 136.0f, scopeW = 1308.0f, scopeH = 164.0f;
+    inline constexpr float scopeGridX = 163.5f, scopeGridY = 41.0f;
+    inline constexpr float scopeZeroY = 82.0f;               // within the well
+    inline constexpr float scopeZeroDashOn = 3.0f, scopeZeroDashOff = 4.0f;
+    inline constexpr float scopeTraceThickness = 1.7f;
+    inline constexpr float scopeHaloRadius = 5.0f;
+    /** Measured off the delivered prototype rather than stated by §4: the four readouts sit 14 px
+        in from the well's left and right edges and 8 px from its top and bottom. §4 gives the
+        readouts' face, size and ink and does not place them, so these are the only source. */
+    inline constexpr float scopeReadoutInsetX = 14.0f, scopeReadoutInsetY = 8.0f;
+    inline constexpr float scopeFailLampDiameter = 9.0f;
 
-        This is the RIGHT-hand inner edge: 887 - 14 - 16. The v1.0.2 plate has both the chevron and
-        the bank-chip divider baked at the LEFT instead - chevron ink at x 457.5-468.0, rule at
-        x 444 - where they land on top of the FACT/USER chip (which renders at x 425-466). Confirmed
-        with the designers as an asset defect, so these coordinates stay as the spec describes them
-        and the plate moves to meet them. Do not "correct" this to 457. */
-    inline const juce::Rectangle<float> lcdChevron  { 857.0f,  72.0f,  16.0f, 16.0f };
+    //== §2, the sections. THE ORDER IS THE SIGNAL PATH =======================
+    /** §10 item 2: this replaced a grouping by control **type**, which is the reorganisation the
+        round made. Left to right is input to output. */
+    struct Section { const char* heading; float x; float width; };
+    inline constexpr std::array<Section, 6> sections { {
+        { "INPUT",      20.0f,  144.0f },
+        { "MACHINE",   172.0f,  168.0f },
+        { "TRANSPORT", 348.0f,  304.0f },
+        { "NOISE",     660.0f,  162.0f },
+        { "DECAY",     830.0f,  168.0f },
+        { "OUTPUT",   1006.0f,  314.0f } } };
 
-    /** The baked rule separating the bank chip from the program name, measured off the v1.0.3
-        plate at x 491.0. The chip centres in the glass's left edge to here; the name starts a
-        fixed gap past it. Both were guessed before this rule existed, which left FACT sitting
-        8.5px left of centre in its own field. */
-    inline constexpr float lcdDivider    = 491.0f;
-    inline constexpr float lcdNameInset  =  19.0f;
+    inline constexpr float sectionHeadingY = 326.0f;
+    inline constexpr std::array<float, 5> dividerX { { 168.0f, 344.0f, 656.0f, 826.0f, 1002.0f } };
+    inline constexpr float dividerY = 316.0f, dividerH = 420.0f, dividerW = 2.0f;
 
-    /** SAVE and DELETE/CANCEL. Delta v1.0.7 cleared both from the plate and moved every state into
-        sprites, so these are the only header controls drawn rather than baked. Plate is 76 x 40
-        with a 3px shadow bleed, hence an 82 x 46 sprite whose top-left is 3px up and left of the
-        plate's - the same convention as the two-state buttons in spec section 3. */
-    inline constexpr float headerButtonW = 82.0f;
-    inline constexpr float headerButtonH = 40.0f;
-    inline constexpr juce::Point<float> saveSpriteTopLeft   { 893.2f, 60.0f };
-    inline constexpr juce::Point<float> deleteSpriteTopLeft { 979.2f, 60.0f };
-    /** The plate rects, which are the hit areas - the sprite's bleed must not be clickable. */
-    inline const juce::Rectangle<float> saveHitArea   { 896.2f, 63.0f, 76.0f, 34.0f };
-    inline const juce::Rectangle<float> deleteHitArea { 982.2f, 63.0f, 76.0f, 34.0f };
-    inline const juce::Rectangle<float> scopeWell   {  43.0f, 158.5f, 1250.0f, 70.0f };
-    /** The two legend rows above and below the well. They carry live values - deviation range, wow
-        and flutter rates, GEN - so spec section 6 lists them as runtime drawn. The v1.0.1 plate had
-        them baked in as well, with the mock's sample values, and the two doubled up; delta v1.0.2
-        cleared both rows from the plate, static words included, and quotes the runtime geometry by
-        BASELINE rather than by box (see Text::rowAtBaseline). */
-    inline constexpr float scopeLegendLeft           =   43.0f;
-    inline constexpr float scopeLegendRight          = 1293.0f;
-    inline constexpr float scopeLegendBaselineTop    =  151.0f;
-    inline constexpr float scopeLegendBaselineBottom =  244.0f;
+    //== §3, the control row ==================================================
+    /** §3.1. The Ø104 and Ø76 controls share pivot y **444** and one label line at y **516**.
+        MODEL's Ø104 body would put its label 14 px lower, so **its label is pinned to 516** — the
+        same outcome the suite's registration rule reaches by `dy = (larger - smaller) / 2` on a
+        shared box. TapeRot arrived at it independently and §9 records it as already conformant. */
+    inline constexpr float mainRowPivotY = 444.0f;
+    inline constexpr float mainRowLabelY = 516.0f;
 
-    /** GEN sits this far left of the FAIL LED sprite; the LED and its label close the row out on
-        the right. Spec: "GEN n, then an 18 px gap, then the FAIL LED and its label". */
-    inline constexpr float scopeGenToLedGap = 18.0f;
+    inline constexpr float knobSweepDegrees   = 270.0f;
+    inline constexpr float knobNumeralRadiusOffset = 29.5f;      // §3: numeral ring at r + 29.5
+    inline constexpr float knobMajorTickLength = 9.0f, knobMajorTickWidth = 2.0f;
+    inline constexpr float knobMinorTickLength = 5.0f, knobMinorTickWidth = 1.5f;
+    inline constexpr float knobSweepArcInset   = 6.0f;           // arc sits at r + 6
+    inline constexpr float knobSweepArcWidth   = 1.4f;
+    inline constexpr float knobPointerWidth    = 3.0f, knobPointerInset = 8.0f;
+    inline constexpr float knobLabelGap        = 0.0f;
 
-    /** The regions v1.0.2 cleared, verbatim. Only used to size the scope component - the text
-        inside them is placed off the baselines above, not off these boxes. */
-    inline const juce::Rectangle<float> scopeLegendTopRow
-        { scopeLegendLeft, 140.0f, scopeLegendRight - scopeLegendLeft, 14.0f };
-    inline const juce::Rectangle<float> scopeLegendBottomRow
-        { scopeLegendLeft, 233.0f, scopeLegendRight - scopeLegendLeft, 14.0f };
-    inline const juce::Rectangle<float> modelReadout{ 508.5f, 476.5f, 134.0f, 27.0f };
-    /** 34 tall on y 63, like every other part of the band. These were 42 at y 47 - two pixels
-        taller than the LCD and the buttons they sit beside, which is the drift the suite audit
-        found in four castings and nobody had noticed by eye. */
-    inline const juce::Rectangle<float> inMeter     { 1132.4f, 63.0f,  80.8f, 34.0f };
-    inline const juce::Rectangle<float> outMeter    { 1225.2f, 63.0f,  80.8f, 34.0f };
-
-    //==========================================================================
-    /** **270 degrees, -135 to +135, and it is a CONSTANT now rather than only prose.**
-
-        It is baked into every filmstrip, so it is a property of the artwork - but nothing was
-        telling JUCE. With paint() fully overridden and RotaryVerticalDrag in use the default arc
-        never rendered, so the figure survived only in the comment below, and anything later
-        reading the Slider's own rotary parameters would have got JUCE's default and been quietly
-        wrong. Elmer is the one casting that is not 270; BRAND.md records that as explicit
-        per-casting freedom, which only means anything if the other five state their figure. */
-    inline constexpr float knobSweepDegrees = 270.0f;
-
-    /** 190px of vertical drag spans the full range, 760 while Shift is held. Both are suite
-        figures: six castings had six drag feels - this one was on JUCE's untouched 250 - so the
-        same hand got a different response from each. 190 is the plurality; the Shift fine mode
-        comes from Reflect-84, because a player who learns it on one casting expects it on the
-        next. */
-    inline constexpr int knobDragPixels = 190;
+    inline constexpr int knobDragPixels     = 190;
     inline constexpr int knobFineDragPixels = 760;
 
-    /** Knob filmstrips. Frame index = round(value01 * 127); the pointer sweeps -135 to +135
-        degrees, baked frame by frame. The sprite is the CAP ONLY - ticks, numerals, unit and the
-        control's name are in the plate.
+    enum class Cap { signature, primary, standard };
 
-        MODEL is the exception: 9 frames, indexed directly by model index with no interpolation.
-        Nine is correct - TapeModelData.h holds NONE plus eight machines, and the spec's open
-        question about dropping one is answered by the code. */
-    enum class Cap { large, small, model };
-
-    inline constexpr int    largeFrames = 128;
-    inline constexpr float  largeFrame  = 90.0f;
-    inline constexpr int    smallFrames = 128;
-    inline constexpr float  smallFrame  = 52.0f;
-    inline constexpr int    modelFrames = 9;
-
-    struct KnobSpec
+    inline constexpr float diameterFor (Cap c) noexcept
     {
-        const char* paramId;
-        juce::Point<float> spriteTopLeft;
-        Cap cap;
-    };
-
-    /** Sprite top-left. The y values here are 7.27px HIGHER than every handoff before delta
-        v1.0.5 stated, and that correction is the fix for the whole "needle doesn't line up"
-        investigation - not the sweep angle, which was a red herring.
-
-        The spec's old "cap centre" column measured the centre of the whole knob ELEMENT (dial box
-        plus the control name printed beneath it), so the name dragged it 7.27px below the actual
-        tick-arc centre. Blitting the cap there put the needle's pivot below the arc it sweeps, and
-        the tip then landed ~7 degrees past the printed end mark - which reads as the knob showing a
-        small negative value at minimum.
-
-        Dial centre = this point + frameSize/2, i.e. y 386.0 (large row) and y 531.6 (small row).
-        Tick arc radius is 46 (large) and 27 (small) from that centre. */
-    inline constexpr std::array<KnobSpec, 11> knobs { {
-        { "drive",   {   50.5f, 341.0f }, Cap::large },
-        { "wow",     {  205.8f, 341.0f }, Cap::large },
-        { "flutter", {  353.8f, 341.0f }, Cap::large },
-        { "model",   {  530.5f, 341.0f }, Cap::model },
-        { "noise",   {  678.5f, 341.0f }, Cap::large },
-        { "failure", {  864.3f, 341.0f }, Cap::large },
-        { "mix",     { 1038.0f, 341.0f }, Cap::large },
-        { "output",  { 1186.0f, 341.0f }, Cap::large },
-        { "lp",      { 1031.0f, 505.6f }, Cap::small },
-        { "ramp",    { 1131.0f, 505.6f }, Cap::small },
-        { "hp",      { 1231.0f, 505.6f }, Cap::small } } };
-
-    inline constexpr float frameSizeFor (Cap c) noexcept
-    {
-        return c == Cap::small ? smallFrame : largeFrame;
-    }
-
-    inline constexpr int frameCountFor (Cap c) noexcept
-    {
-        return c == Cap::model ? modelFrames : (c == Cap::small ? smallFrames : largeFrames);
-    }
-
-    //==========================================================================
-    /** Two-state buttons. The plate is 98 x 25 with a 2 px shadow bleed, so the sprite is 102 x 29
-        and its top-left is 2 px up and left of the plate's. Lit state is an amber LED plus its
-        glow; the plate itself does not change. Each group is exclusive-select. */
-    inline constexpr float buttonW = 102.0f;
-    inline constexpr float buttonH = 29.0f;
-
-    struct ButtonSpec
-    {
-        const char* paramId;
-        int choiceIndex;             // the value this member selects
-        bool isBoolParam;            // bool params take 0/1; noiseCharacter is a 3-way choice
-        juce::Point<float> spriteTopLeft;
-    };
-
-    inline constexpr std::array<ButtonSpec, 9> buttons { {
-        // SWITCHING - switchMode is a bool: false FADE, true CLUNK
-        { "switchMode",     0, true,  { 482.5f, 534.5f } },
-        { "switchMode",     1, true,  { 482.5f, 566.0f } },
-        // NOISE BED - noiseCharacter is a 3-way choice, TAPE/VCR/DUST
-        { "noiseCharacter", 0, false, { 598.5f, 534.5f } },
-        { "noiseCharacter", 1, false, { 598.5f, 566.0f } },
-        { "noiseCharacter", 2, false, { 598.5f, 597.5f } },
-        // HUM - bool: false OFF, true ON
-        { "hum",            0, true,  { 714.5f, 534.5f } },
-        { "hum",            1, true,  { 714.5f, 566.0f } },
-        // SPREAD - bool: false LINKED, true STEREO
-        { "spread",         0, true,  { 858.3f, 499.5f } },
-        { "spread",         1, true,  { 858.3f, 531.0f } } } };
-
-    //==========================================================================
-    /** GENERATION: 8 segments, 20 x 17 with a 3 px glow bleed, so the sprite is 26 x 23. Two files
-        serve all eight positions; the 1-8 numerals underneath are printed in the plate. Segments
-        1..GEN are lit. */
-    inline constexpr float genSegmentW = 26.0f;
-    inline constexpr float genSegmentH = 23.0f;
-    inline constexpr float genSegmentY = 493.5f;
-    inline constexpr float genSegmentX0 = 224.3f;
-    inline constexpr float genSegmentPitch = 25.0f;
-    inline constexpr int   genSegmentCount = 8;
-
-    /** FAULT ACTIVITY dots and the FAIL buttons share the same diameter-22 lamp: a 34 x 34 sprite
-        after its 6 px bleed. One on/off pair covers all seven, which is why the asset list embeds
-        two lamp files rather than fourteen. */
-    inline constexpr float lampSize = 34.0f;
-
-    inline constexpr float faultDotY = 567.5f;
-    inline constexpr std::array<float, 4> faultDotX { { 839.4f, 874.4f, 909.4f, 944.8f } };
-    /** DRP, SNG, CRK, WBL - the order FailureEventType already uses. */
-    inline constexpr std::array<const char*, 4> faultParamIds { {
-        "failureDropouts", "failureSnags", "failureCrinkles", "failureImbalance" } };
-    inline constexpr int faultFlashMs = 260;
-
-    inline constexpr float failButtonY = 490.5f;
-    inline constexpr std::array<float, 3> failButtonX { { 44.5f, 78.8f, 112.8f } };
-    /** STP, FLT, FAI - momentary. */
-    inline constexpr std::array<const char*, 3> failParamIds { { "stop", "filterAux", "failAux" } };
-
-    /** The scope strip's FAIL LED: a diameter-8 lamp, 18 x 18 after its 5 px bleed. Lit while any
-        of STP/FLT/FAI is held. */
-    inline constexpr juce::Point<float> failLedTopLeft { 1241.9f, 230.3f };
-    inline constexpr float failLedSize = 18.0f;
-
-    //==========================================================================
-    // --- runtime type (spec section 6) ------------------------------------------------------
-    inline constexpr float lcdTextSize      = 18.0f;
-    inline constexpr float lcdTracking      = 2.0f;
-    inline constexpr float modelTextSize    = 12.5f;
-    inline constexpr float modelTracking    = 1.2f;
-    inline constexpr float meterTextSize    = 19.0f;
-    inline constexpr float scopeLegendSize  = 12.0f;
-    inline constexpr float scopeLegendTracking = 1.3f;
-
-    /** **The readout revert lives in core now - `nf::ReadoutFormat::revertMs`, 900 ms.**
-
-        It was 1100 here. The suite ran 800 / 900 / 1100 / 1200 under three different constant names
-        and two mechanisms, and no spec anywhere justified any of them; 900 is what three castings
-        already had. `ProgramHeader::readoutFormat()` is where this panel states its readout
-        spelling, and the delay comes with it rather than being a separate number here that nothing
-        binds to the others.
-
-        Left as a comment rather than deleted silently, because a reader looking for the old
-        constant should find out where it went rather than conclude the revert was removed. */
-
-    inline constexpr int animationHz = 60;
-
-    // --- scope ------------------------------------------------------------------------------
-    inline constexpr float scopeTraceThickness = 1.7f;
-    inline constexpr float scopeHaloThickness  = 5.0f;
-    inline constexpr int   scopeGridColumns = 8;
-    inline constexpr int   scopeGridRows = 4;
-    /** 8 columns across the well, labelled 500 ms / DIV, so the visible span is four seconds. */
-    inline constexpr float scopeMsPerDivision = 500.0f;
-    inline constexpr float scopeSpanSeconds =
-        scopeMsPerDivision * (float) scopeGridColumns / 1000.0f;
-
-    // --- window -----------------------------------------------------------------------------
-    /** 0.5x to 2x, per BRAND.md: the scaling range has to be a genuine accessibility lever, not a
-        token 10-15%. */
-    inline constexpr float minScale = 0.5f;
-    inline constexpr float maxScale = 2.0f;
-
-    /** **How this panel spells the LCD parameter readout.**
-
-        A presentation decision, so it lives with the other presentation constants rather than in
-        ProgramHeader - and that placement is load-bearing for the test: ProgramHeader.h reaches the
-        processor, whose JucePlugin_* macros exist only in the plugin target, so a test reading the
-        format from there cannot link. The test must read the SHIPPING format rather than a copy, or
-        it asserts against itself. All six castings state it in the same place for that reason.
-    */
-    /** This casting's spelling of the readout: `NAME: VALUE UNIT`, re-cased nowhere.
-
-        **This panel carried `ValueCase::wordsOnly` until 2026-08-13, and the enum is gone.** The
-        ruling is that case belongs at the SOURCE, never at a display site: a choice that should
-        read `PLATE` is authored that way in `Parameters.h`, so the panel and the host's automation
-        lane print the same string. Re-casing here made this the only site that did.
-
-        **The re-authoring that ruling requires has NOT been done in this casting yet** - see the
-        suite-level note in `../CLAUDE.md` under "Case belongs at the source". Until the `name`
-        arguments and the choice strings in `Parameters.h` are in caps, this panel's readout prints
-        them as authored, which is a visible change from what shipped.
-
-        The revert is core's 900 ms, where this panel carried 1100. */
-    inline nf::ReadoutFormat readoutFormat()
-    {
-        nf::ReadoutFormat f;
-        f.nameCharacterBudget = 24;
-        return f;
+        return c == Cap::signature ? 104.0f : (c == Cap::primary ? 76.0f : 56.0f);
     }
 }
 
 //==============================================================================
-/** Maps a role to its embedded sprite. Several controls deliberately share one asset - all seven
-    large knobs are the same cap, all three small ones likewise, and one lamp serves both the fault
-    dots and the FAIL buttons. The handoff ships those as separate identical files; only one copy of
-    each is embedded. */
-namespace Asset
+/** §3.2's mark lists.
+
+    **A mark stores its VALUE, never its rotation fraction.** BRAND.md makes this a rule and the
+    reason is mechanical: a value drawn through the parameter's own `NormalisableRange` moves *with*
+    the pointer when a taper changes, where a stored fraction keeps pointing at the old angle while
+    the pointer leaves. The delivered prototype stores fractions because a prototype has no
+    `NormalisableRange` to read; converting all 60 of them back through the ranges returns
+    **1000 / 1200 / 1500 / 2000 / 3000 / 4000 / 5000 / 7000 / 10k / 15k / 20k** for LP and a clean
+    1-1.5-2-3-5-7 decade series for HP and RAMP, which is the evidence that they were authored as
+    values and published as derived output.
+
+    A numeral is a **major** tick (2 x 9); an empty string is a **minor** (1.5 x 5). §3.2: "the
+    demoted values keep their ticks - what is dropped is the numeral, not the mark."
+*/
+namespace Marks
 {
-    inline juce::Image load (const char* data, int size)
+    struct Mark
     {
-        return juce::ImageCache::getFromMemory (data, size);
-    }
+        float value;
+        const char* numeral;      // empty => a minor tick at a real value
+        constexpr bool major() const noexcept { return numeral[0] != '\0'; }
+    };
 
-    inline const juce::Image& panel()
-    {
-        static const juce::Image i = load (BinaryData::panel_background_2x_png,
-                                           BinaryData::panel_background_2x_pngSize);
-        return i;
-    }
+    /** §3.2. **DRIVE and FLUTTER share one legend** - 0-100 % at skew 0.2, five numerals and six
+        minors. The marks bunch heavily toward the clockwise end and **that is intended**: it is what
+        a skew of 0.2 looks like drawn honestly. Five is the primary-class ceiling and this ring is
+        at it. */
+    inline constexpr std::array<Mark, 11> driveAndFlutter { {
+        { 0.0f, "0" }, { 0.1f, "" }, { 0.5f, "" }, { 1.0f, "1" }, { 2.0f, "" }, { 5.0f, "5" },
+        { 10.0f, "" }, { 25.0f, "25" }, { 50.0f, "" }, { 75.0f, "" }, { 100.0f, "100" } } };
 
-    inline const juce::Image& capStrip (Layout::Cap c)
-    {
-        static const juce::Image large = load (BinaryData::knob_large_2x_png,
-                                               BinaryData::knob_large_2x_pngSize);
-        static const juce::Image small = load (BinaryData::knob_small_2x_png,
-                                               BinaryData::knob_small_2x_pngSize);
-        static const juce::Image model = load (BinaryData::knob_model_2x_png,
-                                               BinaryData::knob_model_2x_pngSize);
+    /** Even fifths, for the three genuinely **linear** percentage controls.
 
-        switch (c)
-        {
-            case Layout::Cap::small: return small;
-            case Layout::Cap::model: return model;
-            case Layout::Cap::large:
-            default:                 return large;
-        }
-    }
+        **WOW is not one of them and must not read this table.** The delivered prototype gives all
+        four the same `pct` list, which is correct for NOISE, FAILURE and MIX and wrong for WOW,
+        whose range carries skew 0.3 for a documented DSP reason (`Parameters.h`). Nothing at a
+        shared call site distinguishes them, which is why WOW gets its own name below rather than a
+        comment here. */
+    inline constexpr std::array<Mark, 5> evenFifthsPercent { {
+        { 0.0f, "0" }, { 25.0f, "25" }, { 50.0f, "50" }, { 75.0f, "75" }, { 100.0f, "100" } } };
 
-    inline const juce::Image& lamp (bool lit)
-    {
-        static const juce::Image on  = load (BinaryData::lamp_on_2x_png,
-                                             BinaryData::lamp_on_2x_pngSize);
-        static const juce::Image off = load (BinaryData::lamp_off_2x_png,
-                                             BinaryData::lamp_off_2x_pngSize);
-        return lit ? on : off;
-    }
+    /** §3.2 legends WOW as even fifths, and the panel draws these **values** through WOW's own
+        skew-0.3 range, so the pointer lands on each printed numeral by construction.
 
-    inline const juce::Image& lampPressed()
-    {
-        static const juce::Image i = load (BinaryData::lamp_press_2x_png,
-                                           BinaryData::lamp_press_2x_pngSize);
-        return i;
-    }
+        **What that costs is that the ring does not look like the delivered prototype**, which drew
+        the numerals at even ANGLES: 25 moves from -67.50 deg to -37.86, 50 from 0.00 to +84.31,
+        75 from +67.50 to +112.68. Measured against the build's range, the prototype's ring puts
+        **0.98 at the printed 25, 9.92 at the printed 50 and 38.33 at the printed 75** - a
+        five-fold error at mid-travel, which is exactly the defect BRAND.md makes a correctness
+        requirement.
 
-    inline const juce::Image& genSegment (bool lit)
-    {
-        static const juce::Image on  = load (BinaryData::gen_seg_on_2x_png,
-                                             BinaryData::gen_seg_on_2x_pngSize);
-        static const juce::Image off = load (BinaryData::gen_seg_off_2x_png,
-                                             BinaryData::gen_seg_off_2x_pngSize);
-        return lit ? on : off;
-    }
+        Held as its own array rather than corrected in the shared one so that a future re-cut
+        changes the printed VALUES here, not the angles. `design-asks/taperot-wow-ring.md` asks
+        whether even fifths are still the right five numerals now that they are honestly placed -
+        which is a legibility question, not this correctness one. */
+    inline constexpr std::array<Mark, 5> wowPercent { {
+        { 0.0f, "0" }, { 25.0f, "25" }, { 50.0f, "50" }, { 75.0f, "75" }, { 100.0f, "100" } } };
 
-    /** **Each Program button is one three-frame strip, and the order is fixed.**
+    /** §3.2, "leading plus kept" - which is a decision about the numeral, and `Text::signedDb`
+        is where it is spelled. The minus is U+2212, not a hyphen. */
+    inline constexpr std::array<Mark, 5> outputDb { {
+        { -24.0f, "-24" }, { -12.0f, "-12" }, { 0.0f, "0" }, { 12.0f, "+12" }, { 24.0f, "+24" } } };
 
-        Both buttons carry two permanently printed legends - SAVE above STORE, DELETE above CANCEL -
-        and never change their face. Only which legend is backlit changes, so the three frames are
-        lighting states rather than labels:
+    /** §3.2: standard class carries three numerals, and LP / HP / RAMP are logarithmic - "their
+        fractions are the contract and must not be evened out". Storing the values is what honours
+        that: the contract is the taper, and the taper is in the range. */
+    inline constexpr std::array<Mark, 11> lpKilohertz { {
+        { 1000.0f, "1" }, { 1200.0f, "" }, { 1500.0f, "" }, { 2000.0f, "" }, { 3000.0f, "3" },
+        { 4000.0f, "" }, { 5000.0f, "" }, { 7000.0f, "" }, { 10000.0f, "" }, { 15000.0f, "" },
+        { 20000.0f, "20" } } };
 
-        | Frame | Backlight  | SAVE means                | DELETE means                    |
-        |-------|------------|---------------------------|---------------------------------|
-        | 0     | both dark  | nothing to do             | nothing to do (Factory or INIT) |
-        | 1     | top lit    | SAVE live                 | DELETE live (a User Program)    |
-        | 2     | bottom lit | STORE live (commit name)  | CANCEL live (abandon name)      |
+    inline constexpr std::array<Mark, 14> hpHertz { {
+        { 20.0f, "20" }, { 30.0f, "" }, { 40.0f, "" }, { 50.0f, "" }, { 70.0f, "" },
+        { 100.0f, "" }, { 150.0f, "" }, { 200.0f, "200" }, { 300.0f, "" }, { 500.0f, "" },
+        { 700.0f, "" }, { 1000.0f, "" }, { 1500.0f, "" }, { 2000.0f, "2k" } } };
 
-        Both legends lit is not a state and is deliberately not exported: the two functions are
-        mutually exclusive, so a fourth face could only ever indicate a bug.
+    inline constexpr std::array<Mark, 13> rampSeconds { {
+        { 0.05f, "0.05" }, { 0.07f, "" }, { 0.1f, "" }, { 0.15f, "" }, { 0.2f, "" }, { 0.3f, "" },
+        { 0.5f, "0.5" }, { 0.7f, "" }, { 1.0f, "" }, { 1.5f, "" }, { 2.0f, "" }, { 3.0f, "" },
+        { 4.0f, "4" } } };
 
-        **Frame 0 is inert in code as well as in appearance.** A button showing both legends dark
-        must not act when clicked, or the backlight is claiming something the control contradicts.
-
-        This replaces `saveButton(bool)` and a `DeleteFace` enum whose third value was a *relabel* -
-        the sprite that said CANCEL where the other said DELETE. A printed panel legend cannot
-        rewrite itself, which is what the second legend exists to solve. The old two-face SAVE also
-        had no STORE at all, so naming left it reading SAVE while acting as STORE. */
-    enum class ProgramButtonFrame { bothDark = 0, topLit = 1, bottomLit = 2 };
-
-    inline const juce::Image& saveButtonStrip()
-    {
-        static const juce::Image strip = load (BinaryData::btn_save_strip_2x_png,
-                                               BinaryData::btn_save_strip_2x_pngSize);
-        return strip;
-    }
-
-    inline const juce::Image& deleteButtonStrip()
-    {
-        static const juce::Image strip = load (BinaryData::btn_delete_strip_2x_png,
-                                               BinaryData::btn_delete_strip_2x_pngSize);
-        return strip;
-    }
-
-    inline const juce::Image& failLed (bool lit)
-    {
-        static const juce::Image on  = load (BinaryData::led_fail_on_2x_png,
-                                             BinaryData::led_fail_on_2x_pngSize);
-        static const juce::Image off = load (BinaryData::led_fail_off_2x_png,
-                                             BinaryData::led_fail_off_2x_pngSize);
-        return lit ? on : off;
-    }
+    /** §3.3. Nine detents, **every one a major tick, none numeralled** - the machine names print in
+        the MACHINE readout, not on the fascia, because nine names around a Ø104 dial would not fit
+        at the type floor and the readout has to exist anyway. The marks carry no text and full
+        length, which is why `major()` reading the numeral would get this wrong; the ring is drawn
+        from `modelDetentCount` rather than from a table. */
+    inline constexpr int modelDetentCount = 9;
 }
 
-} // namespace TapeRotTheme
+//==============================================================================
+/** §5.1's shoes, §5.2's scope-clause exception, §5.3's lamp buttons and §5.4's ladder. */
+namespace Switches
+{
+    /** §4B's two-state shoe at the part's **128 x 32 in two 64 halves**. §10 item 4 records that
+        all three were drawn 6 px short at 128 x 26 in the first pass and are now 32, "which moves
+        nothing: NOISE BED at y 548 and HUM at y 622 still clear". */
+    inline constexpr float shoeW = 128.0f, shoeH = 32.0f, shoeHalfW = 64.0f, shoeRadius = 3.0f;
+
+    /** §5.1: legends are printed once per position, centred under their own segment, and **never
+        re-inked and never moved - the shoe carries the state**. That is why a legend is not part of
+        the switch's own state matrix: §7.2 is six cells with one rule and no legend changes in any
+        of them. */
+    struct Shoe { const char* caption; const char* left; const char* right; float x, captionY, shoeY; };
+
+    inline constexpr std::array<Shoe, 3> shoes { {
+        { "SWITCHING", "FADE",   "CLUNK",  436.0f, 622.0f, 642.0f },
+        { "HUM",       "OFF",    "ON",     677.0f, 622.0f, 642.0f },
+        { "SPREAD",    "LINKED", "STEREO", 850.0f, 548.0f, 568.0f } } };
+
+    /** The gap between a shoe's bottom edge and its legend row, **measured off the delivered
+        prototype at all three shoes**: SWITCHING and HUM both sit at 674 with legends at 680, and
+        SPREAD at 600 with legends at 606.
+
+        It was written as 26 on the first pass - a figure with no run behind it, in a file whose own
+        header says every figure below is measured. It collided FAULT ACTIVITY's caption with
+        SPREAD's legends, which is the only reason it was caught: a wrong gap that happened to land
+        in clear fascia would have looked deliberate. */
+    inline constexpr float shoeLegendY = 6.0f;
+
+    /** §5.3. Ø26 dark caps each with an Ø11 lamp in the face and its legend below.
+
+        **NOISE BED is here rather than in `shoes` and that is §4B's scope clause, not a lapse.**
+        It is a three-state control in a 162 px section (x 660 -> 822) with the group at x 677, so
+        the part's 168 x 45 three-state footprint does not fit. Widening the section would move the
+        divider at 826 and with it FAULT ACTIVITY's 176 px group, on the densest panel in the
+        suite - re-planning a casting's layout to satisfy a footprint, which inverts the round's
+        scope: the header is the part, body layout is the casting's. TapeRot is the clause's
+        **named instance**, so this is the shape the part anticipates rather than an exception. */
+    inline constexpr float lampButtonDiameter = 26.0f, lampDiameter = 11.0f;
+    inline constexpr float lampGlowRadius = 7.0f;
+
+    struct LampGroup
+    {
+        const char* caption;
+        float captionY, buttonY, legendY;
+        std::array<const char*, 4> legends;   // trailing nulls where a group is shorter
+        std::array<float, 4> buttonX;
+        int count;
+    };
+
+    inline constexpr std::array<LampGroup, 3> lampGroups { {
+        { "FAIL",           548.0f, 565.0f, 597.0f, { "STP", "FLT", "FAI", nullptr },
+          { 37.0f, 79.0f, 121.0f, 0.0f }, 3 },
+        { "NOISE BED",      548.0f, 568.0f, 600.0f, { "TAPE", "VCR", "DUST", nullptr },
+          { 686.0f, 728.0f, 770.0f, 0.0f }, 3 },
+        { "FAULT ACTIVITY", 622.0f, 642.0f, 674.0f, { "DRP", "SNG", "CRK", "WBL" },
+          { 844.0f, 882.0f, 920.0f, 958.0f }, 4 } } };
+
+    /** §5.4. "The selector is a stage ladder rather than a knob because the parameter is an integer
+        count of tape generations, and a pointer implies interpolation between them." */
+    inline constexpr float genStageW = 20.0f, genStageH = 20.0f, genStageRadius = 3.0f;
+    inline constexpr float genStageX0 = 392.0f, genStagePitch = 28.0f;
+    inline constexpr float genStageY = 568.0f, genCaptionY = 548.0f, genNumeralY = 594.0f;
+    inline constexpr int   genStageCount = 8;
+    inline constexpr float genNumeralCssPx = 11.0f;   // Share Tech Mono, untracked - §8 has no row
+}
+
+//==============================================================================
+namespace Readouts
+{
+    /** §3.3, stated exactly: 134 x 27 at (189, 566), Share Tech Mono 12.5 / 16, `#f2b25c` on the
+        LCD material. **The readout is the label**, which is what lets §3.3 leave the fascia bare. */
+    inline constexpr float machineX = 189.0f, machineY = 566.0f, machineW = 134.0f, machineH = 27.0f;
+    inline constexpr float machineRadius = 2.0f;
+
+    /** §1's footer row, both ends. The middle dot is U+00B7 built from its codepoint. */
+    inline constexpr float footerY = 752.0f;
+    inline constexpr float footerLeftX = 26.0f, footerRightCentre = 914.0f;
+    inline constexpr float footerCssPx = 10.0f, footerLineBox = 13.0f, footerTrackingEm = 0.18f;
+    inline const juce::Colour footerInk { 0xFF5F5749 };
+}
+
+//==============================================================================
+/** The shared header part. Every figure is `nf::HeaderGeometry`'s - **aliased, not transcribed.**
+
+    Chorus-60's header pass is the reason this is spelled out: it aliased its LCD to the part and
+    left SAVE, DELETE and both meter wells as literals from the previous canvas, **29 px right and
+    29 px down**, invisible for as long as the plate baked those faces. A literal that happens to
+    agree with core is indistinguishable from an alias by reading, which is why there are no
+    numbers in this namespace.
+*/
+namespace Header
+{
+    inline constexpr float blockX = (float) nf::HeaderGeometry::blockX;
+    inline constexpr float blockY = (float) nf::HeaderGeometry::blockY;
+    inline constexpr float blockW = (float) nf::HeaderGeometry::blockW;
+    inline constexpr float blockH = (float) nf::HeaderGeometry::blockH;
+    inline constexpr float blockRadius = 5.0f;      // material, and this casting's
+
+    /** §9's Dymo strip. **The wordmark ships as artwork and the font does not** - Impact Label
+        Reversed is donationware and cannot be embedded, which is *absent by licensing, not
+        missing*; `design/fonts/ABSENT.md` records it so nobody "fixes" it by substituting a face,
+        which would move every measurement taken from the nameplate.
+
+        The delivered cut is **694 x 150** and it is a **44 px plate rotated -1.5 deg**: a
+        230.2 x 44 strip at that angle has a bounding box of 693.8 x 150.0 at 3x. That arithmetic
+        is what settles the anchor. Core records TapeRot's published §4 stack as
+        `30 + 38 + 4 = 72`, six short of the shared `descriptorY` of 78, and the delivered
+        prototype draws the descriptor at **84**, six past it. Neither matches; the cut does:
+        `30 + 44 + 4 = 78`, exactly. So the plate is 44, and §9's own construction (a 40 px line
+        box with 2 x 18 padding) says 44 too.
+
+        Asserted below rather than trusted, because three sources disagreeing is precisely the case
+        where a figure gets transcribed from whichever one was open. */
+    inline constexpr float dymoPlateW = 230.2f, dymoPlateH = 44.0f;
+    inline constexpr float dymoLeading = 4.0f;
+    inline constexpr float dymoRotationDegrees = -1.5f;
+    inline constexpr float dymoRadius = 2.0f;
+    inline constexpr float dymoCutW = 694.0f, dymoCutH = 150.0f;   // the shipped bitmap, at 3x
+
+    static_assert (nf::HeaderGeometry::landsOnDescriptorAnchor (nf::HeaderGeometry::nameplateY,
+                                                                (int) dymoPlateH,
+                                                                (int) dymoLeading),
+                   "TapeRot's nameplate stack must land the function descriptor on the shared "
+                   "anchor. See HEADER-PART.md §4 and the cut arithmetic above.");
+
+    //== The band's cells, every one of them core's ==========================
+    inline juce::Rectangle<float> lcd()          { return nf::HeaderGeometry::lcd().toFloat(); }
+    inline juce::Rectangle<float> saveButton()   { return nf::HeaderGeometry::saveButton().toFloat(); }
+    inline juce::Rectangle<float> deleteButton() { return nf::HeaderGeometry::deleteButton().toFloat(); }
+    inline juce::Rectangle<float> inWell()       { return nf::HeaderGeometry::inWell().toFloat(); }
+    inline juce::Rectangle<float> outWell()      { return nf::HeaderGeometry::outWell().toFloat(); }
+    inline juce::Rectangle<float> nameplate()    { return nf::HeaderGeometry::nameplate().toFloat(); }
+
+    inline constexpr float captionY = (float) nf::HeaderGeometry::captionY;
+    inline constexpr float captionH = (float) nf::HeaderGeometry::captionH;
+    inline constexpr float bandY    = (float) nf::HeaderGeometry::bandY;
+    inline constexpr float bandH    = (float) nf::HeaderGeometry::bandH;
+
+    /** §5's bank cell, and the inset between it and the name. The LCD's own box is core's; how it
+        is DIVIDED is this casting's, because what a Program shows is the casting's. */
+    inline constexpr float bankCellW = 73.0f;
+    inline constexpr float nameInset = 19.0f;
+
+    /** §10 item 6: **the chevron is the shared 14 x 8 stroked path now**, replacing this casting's
+        own 9 x 9 rotated box.
+
+        It also means this panel can invert it while the list is open, which it could not before:
+        root `CLAUDE.md` records TapeRot and Gatecrasher as the two castings that "cannot do this -
+        their chevrons are printed in the plate, so there is nothing at runtime to invert", and adds
+        that neither carries a `menuOpen` flag "because it would be dead state". **Both plates are
+        gone.** The state stopped being dead in the same commit that deleted the pixels. */
+    inline constexpr float chevronW = 14.0f, chevronH = 8.0f;
+    inline constexpr float chevronRightInset = 30.0f;
+
+    inline juce::Rectangle<float> chevron()
+    {
+        const auto glass = lcd();
+        return { glass.getRight() - chevronRightInset - chevronW,
+                 glass.getCentreY() - chevronH * 0.5f, chevronW, chevronH };
+    }
+
+    inline juce::Rectangle<float> bankCell() { return lcd().withWidth (bankCellW); }
+
+    inline juce::Rectangle<float> nameCell()
+    {
+        return lcd().withTrimmedLeft (bankCellW + nameInset)
+                    .withRight (chevron().getX() - 8.0f);
+    }
+
+    /** §7.1's two-legend Program buttons: each carries **two** legends stacked, and which of the
+        four is lit is that matrix. BRAND.md forbids the older form where a button relabelled itself
+        STORE / CANCEL - a control whose legend changes is one the player has to read before
+        pressing. */
+    inline constexpr float legendUpperY = 65.0f, legendLowerY = 78.0f;
+}
+
+//==============================================================================
+namespace Runtime
+{
+    inline constexpr int animationHz = 60;
+
+    /** The readout's spelling lives in the THEME, never in `ProgramHeader`. That header reaches
+        `PluginProcessor.h`, whose `JucePlugin_*` macros exist only in the plugin target, so a test
+        reading the format from there cannot link - and a test declaring its own copy asserts
+        against itself and passes while the panel prints something else. */
+    inline nf::ReadoutFormat readoutFormat() { return {}; }
+}
+
+}  // namespace TapeRotTheme

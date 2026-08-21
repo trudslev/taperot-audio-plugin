@@ -1,10 +1,13 @@
 #pragma once
 
-#include "KnobFilmstrip.h"
-#include "LampStrip.h"
+#include "GenerationLadder.h"
+#include "KnobComponent.h"
+#include "LampButtonGroup.h"
+#include "MachineReadout.h"
 #include "PitchScope.h"
 #include "ProgramHeader.h"
-#include "SpriteButton.h"
+#include "ShoeSwitch.h"
+#include "TapeRotPanelBackground.h"
 #include "TapeRotTheme.h"
 
 #include <memory>
@@ -13,29 +16,40 @@
 class TapeRotAudioProcessor;
 
 /**
-    The fixed 1336 x 679 reference canvas. PluginEditor applies one uniform scale transform above
-    this; nothing below ever sees it.
+    The fixed **1340 x 790** reference canvas. `PluginEditor` applies one uniform scale transform
+    above this; nothing below ever sees it.
 
-    Draw order is the plate, then everything that sits on it. The plate is a BARE panel - it carries
-    the printed labels, scale legends, tick marks and the nameplate, but none of the live controls,
-    so no element here sits over a baked copy of itself.
+    **Everything on it is drawn.** Revision 1 blitted a plate and placed 30 sprites over it; call 5
+    retired both, so the draw order is a background component and then the controls that sit on it,
+    with no element over a baked copy of itself.
+
+    §2's section order **is the signal path** - INPUT, MACHINE, TRANSPORT, NOISE, DECAY, OUTPUT -
+    and the control tables below are written in that order for the same reason: a reader looking for
+    where FLUTTER lives should find it where the signal does.
 */
 class TapeRotEditorContent final : public juce::Component,
                                    private juce::Timer
 {
 public:
-    explicit TapeRotEditorContent(TapeRotAudioProcessor&);
+    explicit TapeRotEditorContent (TapeRotAudioProcessor&);
     ~TapeRotEditorContent() override;
 
-    void paint(juce::Graphics&) override;
+    void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
 
 private:
     void timerCallback() override;
+    void buildKnobs();
+    void buildShoes();
+    void buildLampGroups();
+    void refreshLampStates();
 
     TapeRotAudioProcessor& processorRef;
 
-    LampStrip lamps;
+    TapeRotPanelBackground background;
     PitchScope scope;
+    MachineReadout machineReadout;
+    GenerationLadder generation;
     ProgramHeader header;
 
     /** Paints nothing and claims no clicks of its own; it exists so the Program list has a parent
@@ -43,9 +57,17 @@ private:
         see the constructor, and ../../CLAUDE.md's "The Program dropdown". */
     juce::Component menuHost;
 
-    std::vector<std::unique_ptr<KnobFilmstrip>> knobs;
+    std::vector<std::unique_ptr<KnobComponent>> knobs;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> attachments;
-    std::vector<std::unique_ptr<SpriteButton>> buttons;
+    std::vector<std::unique_ptr<ShoeSwitch>> shoes;
+    std::vector<std::unique_ptr<LampButtonGroup>> lampGroups;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TapeRotEditorContent)
+    /** §7.3's "currently sounding" held briefly past each event, because the failure FIFO reports
+        instants and a lamp lit for one frame per event reads as noise rather than as a state.
+        260 ms is revision 1's own fault-flash figure, kept so the two rounds agree about how long
+        an event stays visible. */
+    juce::uint32 failSoundingUntil = 0;
+    static constexpr int failLampHoldMs = 260;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TapeRotEditorContent)
 };

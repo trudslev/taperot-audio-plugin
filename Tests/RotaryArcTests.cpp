@@ -1,4 +1,4 @@
-#include "../Source/GUI/KnobFilmstrip.h"
+#include "../Source/GUI/KnobComponent.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -12,12 +12,17 @@
     clockwise from twelve. Same span, opposite direction — so any test asserting the sweep width
     would have passed it, and did not exist to.
 
-    **Nothing on the panel showed it either.** `paint()` is fully overridden and blits a baked
-    filmstrip frame chosen by `valueToProportionOfLength`, so the Slider's rotary parameters reach no
-    pixel in the shipping build. They reach an accessibility client, a look-and-feel, and any JUCE
-    default paint path someone later reinstates. A defect that is invisible in the artefact and
-    visible only to a consumer nobody has written yet is exactly the kind this suite files under
-    "nothing else reads it yet" — a fact about today, not a property of the code.
+    **Nothing on the panel showed it either, and that is still true after the rewrite.** `paint()`
+    is fully overridden and draws the pointer from the mark table's own sweep, so the Slider's
+    rotary parameters reach no pixel in the shipping build. They reach an accessibility client, a
+    look-and-feel, and any JUCE default paint path someone later reinstates.
+
+    The reason this file survived call 5 is worth stating: it was written against a component that
+    blitted a filmstrip, and the filmstrip is gone. What it asserts was never about the artwork - it
+    is about the Slider's own rotary parameters agreeing with the sweep the panel draws, and both
+    halves of that outlived the sheets. A defect visible only to a consumer nobody has written yet
+    is exactly the kind this suite files under "nothing else reads it yet" - a fact about today, not
+    a property of the code.
 
     `nf::printedScaleDefects` cannot reach it: it checks a ring's printed marks against the
     parameter's own `NormalisableRange`, and an arc is neither a mark nor a range.
@@ -34,7 +39,11 @@ public:
 
         beginTest ("The arc is symmetric about TWELVE o'clock and spans the artwork's sweep");
         {
-            KnobFilmstrip knob { TapeRotTheme::Layout::Cap::large };
+            const KnobComponent::Spec spec { "DRIVE", "%", TapeRotTheme::Layout::Cap::primary,
+                                             { 92.0f, 444.0f }, 516.0f,
+                                             TapeRotTheme::Marks::driveAndFlutter.data(),
+                                             (int) TapeRotTheme::Marks::driveAndFlutter.size() };
+            KnobComponent knob { spec };
             const auto p = knob.getRotaryParameters();
 
             const float span = p.endAngleRadians - p.startAngleRadians;
@@ -50,7 +59,7 @@ public:
                             + " deg off twelve");
 
             expectWithinAbsoluteError (juce::radiansToDegrees (span), sweep, 0.001f,
-                                       "the arc does not span the sweep the filmstrip is cut at");
+                                       "the arc does not span the sweep the ring is drawn at");
 
             // **This is the assertion that catches the defect.** The span passes either way.
             expectWithinAbsoluteError (juce::radiansToDegrees (offTwelve), 0.0f, 0.001f,

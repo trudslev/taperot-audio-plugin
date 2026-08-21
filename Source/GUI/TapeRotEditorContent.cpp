@@ -5,128 +5,361 @@ using namespace TapeRotTheme;
 
 namespace
 {
-    struct ButtonAssets { const char* on; int onSize; const char* off; int offSize; };
+    /*  §2 and §3, in signal-path order. Every pivot and label line is measured off the delivered
+        prototype; §3.1's shared pivot y 444 and label line y 516 hold for the whole Ø104/Ø76 row,
+        and the three Ø56 controls carry their own.
 
-    // Index-matched to Layout::buttons.
-    const std::array<ButtonAssets, 9> buttonAssets { {
-        { BinaryData::btn_fade_on_2x_png,   BinaryData::btn_fade_on_2x_pngSize,
-          BinaryData::btn_fade_off_2x_png,  BinaryData::btn_fade_off_2x_pngSize },
-        { BinaryData::btn_clunk_on_2x_png,  BinaryData::btn_clunk_on_2x_pngSize,
-          BinaryData::btn_clunk_off_2x_png, BinaryData::btn_clunk_off_2x_pngSize },
-        { BinaryData::btn_tape_on_2x_png,   BinaryData::btn_tape_on_2x_pngSize,
-          BinaryData::btn_tape_off_2x_png,  BinaryData::btn_tape_off_2x_pngSize },
-        { BinaryData::btn_vcr_on_2x_png,    BinaryData::btn_vcr_on_2x_pngSize,
-          BinaryData::btn_vcr_off_2x_png,   BinaryData::btn_vcr_off_2x_pngSize },
-        { BinaryData::btn_dust_on_2x_png,   BinaryData::btn_dust_on_2x_pngSize,
-          BinaryData::btn_dust_off_2x_png,  BinaryData::btn_dust_off_2x_pngSize },
-        { BinaryData::btn_off_on_2x_png,    BinaryData::btn_off_on_2x_pngSize,
-          BinaryData::btn_off_off_2x_png,   BinaryData::btn_off_off_2x_pngSize },
-        { BinaryData::btn_on_on_2x_png,     BinaryData::btn_on_on_2x_pngSize,
-          BinaryData::btn_on_off_2x_png,    BinaryData::btn_on_off_2x_pngSize },
-        { BinaryData::btn_linked_on_2x_png, BinaryData::btn_linked_on_2x_pngSize,
-          BinaryData::btn_linked_off_2x_png,BinaryData::btn_linked_off_2x_pngSize },
-        { BinaryData::btn_stereo_on_2x_png, BinaryData::btn_stereo_on_2x_pngSize,
-          BinaryData::btn_stereo_off_2x_png,BinaryData::btn_stereo_off_2x_pngSize } } };
+        **RAMP is in OUTPUT, not DECAY, and that disagrees with §2's contents column.** The
+        delivered prototype puts its pivot at (1163, 580) - dead centre of the OUTPUT section and
+        directly under its heading - while §2's table lists it under DECAY. The position is
+        unambiguous in the artefact and ambiguous only in the prose, so the artefact is what is
+        built; `design-asks/taperot-ramp-section.md` carries the disagreement. Nothing else about
+        the panel changes either way, because a section is a heading and two dividers, not a
+        container.  */
+    struct KnobEntry
+    {
+        const char* paramId;
+        const char* label;
+        const char* unit;
+        Layout::Cap cap;
+        float pivotX, pivotY, labelY;
+        const Marks::Mark* marks;
+        int markCount;
+    };
+
+    const std::array<KnobEntry, 11> knobTable { {
+        // INPUT
+        { "drive",   "DRIVE",   "%",   Layout::Cap::primary,     92.0f, 444.0f, 516.0f,
+          Marks::driveAndFlutter.data(), (int) Marks::driveAndFlutter.size() },
+        // MACHINE - §3.3: nine detents, no numerals, the readout is the label
+        { "model",   "MODEL",   "",    Layout::Cap::signature,  256.0f, 444.0f, 516.0f, nullptr, 0 },
+        // TRANSPORT
+        { "wow",     "WOW",     "%",   Layout::Cap::primary,    438.0f, 444.0f, 516.0f,
+          Marks::wowPercent.data(), (int) Marks::wowPercent.size() },
+        { "flutter", "FLUTTER", "%",   Layout::Cap::primary,    562.0f, 444.0f, 516.0f,
+          Marks::driveAndFlutter.data(), (int) Marks::driveAndFlutter.size() },
+        // NOISE
+        { "noise",   "NOISE",   "%",   Layout::Cap::primary,    741.0f, 444.0f, 516.0f,
+          Marks::evenFifthsPercent.data(), (int) Marks::evenFifthsPercent.size() },
+        // DECAY
+        { "failure", "FAILURE", "%",   Layout::Cap::primary,    914.0f, 444.0f, 516.0f,
+          Marks::evenFifthsPercent.data(), (int) Marks::evenFifthsPercent.size() },
+        // OUTPUT
+        { "mix",     "MIX",     "%",   Layout::Cap::primary,   1089.0f, 444.0f, 516.0f,
+          Marks::evenFifthsPercent.data(), (int) Marks::evenFifthsPercent.size() },
+        { "output",  "OUTPUT",  "dB",  Layout::Cap::primary,   1237.0f, 444.0f, 516.0f,
+          Marks::outputDb.data(), (int) Marks::outputDb.size() },
+        { "ramp",    "RAMP",    "s",   Layout::Cap::standard,  1163.0f, 580.0f, 642.0f,
+          Marks::rampSeconds.data(), (int) Marks::rampSeconds.size() },
+        { "lp",      "LP",      "kHz", Layout::Cap::standard,  1069.0f, 640.0f, 702.0f,
+          Marks::lpKilohertz.data(), (int) Marks::lpKilohertz.size() },
+        { "hp",      "HP",      "Hz",  Layout::Cap::standard,  1257.0f, 640.0f, 702.0f,
+          Marks::hpHertz.data(), (int) Marks::hpHertz.size() } } };
+
+    /** Index-matched to `Switches::shoes`. `true` selects the RIGHT half in every case. */
+    const std::array<const char*, 3> shoeParams { { "switchMode", "hum", "spread" } };
+
+    /** Index-matched to `Switches::lampGroups`. The FAIL trio are momentary triggers; the four
+        fault categories are independent toggles; NOISE BED is a three-state selector and is driven
+        from its choice parameter rather than from a list of three. */
+    const std::array<const char*, 3> failTriggers { { "stop", "filterAux", "failAux" } };
+    const std::array<const char*, 4> faultToggles { { "failureDropouts", "failureSnags",
+                                                      "failureCrinkles", "failureImbalance" } };
 }
 
-TapeRotEditorContent::TapeRotEditorContent(TapeRotAudioProcessor& p)
-    : processorRef(p), lamps(p), scope(p, lamps), header(p)
+TapeRotEditorContent::TapeRotEditorContent (TapeRotAudioProcessor& p)
+    : processorRef (p), scope (p), header (p)
 {
-    setSize((int) Layout::canvasWidth, (int) Layout::canvasHeight);
+    setSize ((int) Layout::canvasWidth, (int) Layout::canvasHeight);
 
-    addAndMakeVisible(scope);
-    addAndMakeVisible(lamps);
-    addAndMakeVisible(header);
+    background.setBounds (getLocalBounds());
+    addAndMakeVisible (background);
 
-    for (const auto& spec : Layout::knobs)
+    scope.setBounds (PitchScope::canvasBounds());
+    addAndMakeVisible (scope);
+
+    machineReadout.setBounds (MachineReadout::canvasBounds());
+    addAndMakeVisible (machineReadout);
+
+    generation.setBounds (generation.canvasBounds());
+    generation.onGenerationChanged = [this] (int stage)
     {
-        auto knob = std::make_unique<KnobFilmstrip>(spec.cap);
-        knob->setSpriteTopLeft(spec.spriteTopLeft);
+        processorRef.userEdits.noteUserEdit();
 
-        const juce::String paramId { spec.paramId };
-        auto* raw = knob.get();
-
-        knob->onDragStart = [this, paramId] { header.showParameter(paramId); };
-        knob->onDragEnd   = [this] { header.releaseParameter(); };
-
-        // Guarded on the drag state: a SliderAttachment fires this on Program apply and on every
-        // host automation step too, and without the guard the LCD latches and flickers.
-        //
-        // The same guard now disarms the processor's stale-replay gate, because this is the only
-        // place that knows a change came from a PERSON. It deliberately does not fire for
-        // automation: a host may write automation on session load before replaying its remembered
-        // program index, and disarming there would let that replay land on the restored state. One
-        // call rather than two adjacent ones, so the disarm cannot be written without the hand-off -
-        // see nf/UserEditGate.h.
-        nf::connectUserEdit(*raw, processorRef.userEdits,
-                            [this, paramId] { header.showParameter(paramId); });
-
-        addAndMakeVisible(*knob);
-        attachments.push_back(std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            processorRef.apvts, paramId, *knob));
-        knobs.push_back(std::move(knob));
-    }
-
-    for (size_t i = 0; i < Layout::buttons.size(); ++i)
-    {
-        const auto& a = buttonAssets[i];
-        auto b = std::make_unique<SpriteButton>(processorRef.apvts, Layout::buttons[i],
-                                                a.on, a.onSize, a.off, a.offSize);
-        // **The one control in the suite that does not go through nf::connectUserEdit**, and it is
-        // shape rather than preference: SpriteButton is a plain Component with an
-        // onInteraction(const juce::String&), not a Slider with an onValueChange, so there is no
-        // drag state to guard on and no matching callback to install.
-        //
-        // It does not need one. onInteraction fires only on a real click, so it is user-originated
-        // by construction — which is the property connectUserEdit's isMouseButtonDown check exists
-        // to establish for controls a SliderAttachment also writes to. Disarming here is right for
-        // exactly the reason the knobs' guarded callback is.
-        b->onInteraction = [this](const juce::String& id)
+        if (auto* param = processorRef.apvts.getParameter ("gen"))
         {
-            processorRef.userEdits.noteUserEdit();
-            header.showParameter(id);
-            header.releaseParameter();
-        };
-        addAndMakeVisible(*b);
-        buttons.push_back(std::move(b));
-    }
+            param->beginChangeGesture();
+            param->setValueNotifyingHost (param->convertTo0to1 ((float) stage));
+            param->endChangeGesture();
+        }
 
-    // The lamps and header both cover the whole canvas and paint sparsely, so they must not sit
-    // over the knobs and buttons that carry the mouse.
-    lamps.toBack();
+        header.showParameter ("gen");
+        header.releaseParameter();
+    };
+    addAndMakeVisible (generation);
+
+    buildKnobs();
+    buildShoes();
+    buildLampGroups();
+
+    addAndMakeVisible (header);
+
+    /*  The header covers the whole canvas and paints sparsely across it, so it must sit BEHIND the
+        controls that carry the mouse. Its own `hitTest` narrows it to the LCD and the two Program
+        buttons; ordering is what stops it swallowing anything else.  */
+    background.toBack();
     header.toBack();
-    scope.toBack();
+    background.toBack();
 
-    // The Program list opens inside this, so it can neither move its top edge nor grow past the
-    // panel. Added after the toBack() calls and pushed to the FRONT, which is the opposite of what
-    // the header itself wants: the header paints sparsely across the whole canvas and must sit
-    // behind the controls, but the list it opens has to cover them.
-    //
-    // A SIBLING of header, never a child: header narrows its hitTest to the glass and the two
-    // buttons, and JUCE stops searching a component's children once its own hitTest rejects the
-    // point, so a list parented there would be dead everywhere except the cell it drops from.
+    /*  The Program list opens inside this, so it can neither move its top edge nor grow past the
+        panel. A **SIBLING** of the header, never a child: the header narrows its `hitTest` to the
+        glass and the two buttons, and JUCE stops searching a component's children once its own
+        `hitTest` rejects the point - so a list parented there would be dead everywhere except the
+        cell it drops from.  */
     const int hostTop = ProgramHeader::menuHostTop();
-    menuHost.setBounds(0, hostTop, getWidth(), getHeight() - hostTop);
-    menuHost.setInterceptsMouseClicks(false, true);
-    addAndMakeVisible(menuHost);
-    menuHost.toFront(false);
-    header.setMenuParent(&menuHost);
+    menuHost.setBounds (0, hostTop, getWidth(), getHeight() - hostTop);
+    menuHost.setInterceptsMouseClicks (false, true);
+    addAndMakeVisible (menuHost);
+    menuHost.toFront (false);
+    header.setMenuParent (&menuHost);
 
-    startTimerHz(Layout::animationHz);
+    startTimerHz (Runtime::animationHz);
 }
 
 TapeRotEditorContent::~TapeRotEditorContent() = default;
 
-void TapeRotEditorContent::timerCallback()
+void TapeRotEditorContent::buildKnobs()
 {
-    // The header's IN/OUT numerals and the lamps' GEN segments both follow values that change
-    // without any user action, so they need a poll rather than a callback.
-    header.refresh();
-    lamps.repaint();
+    for (const auto& entry : knobTable)
+    {
+        KnobComponent::Spec spec { entry.label, entry.unit, entry.cap,
+                                   { entry.pivotX, entry.pivotY }, entry.labelY,
+                                   entry.marks, entry.markCount };
+
+        auto knob = std::make_unique<KnobComponent> (spec);
+        knob->setBounds (knob->canvasBounds());
+
+        const juce::String paramId { entry.paramId };
+
+        /*  One call, not two adjacent ones. `nf::connectUserEdit` couples the LCD hand-off to the
+            stale-replay disarm **because writing the hand-off and forgetting the disarm was the
+            actual shape of the defect** - Reflect-84 shipped the guard with zero call sites for it.
+            The guard fires only while a control is genuinely dragged, so a Program apply and a host
+            automation step, which also raise a SliderAttachment's callback, do not disarm it. That
+            matters on session load, where a host may write automation BEFORE replaying its
+            remembered program index.  */
+        nf::connectUserEdit (*knob, processorRef.userEdits,
+                             [this, paramId] { header.showParameter (paramId); });
+
+        knob->onDragEnd = [this] { header.releaseParameter(); };
+
+        addAndMakeVisible (*knob);
+        attachments.push_back (std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
+            processorRef.apvts, paramId, *knob));
+        knobs.push_back (std::move (knob));
+    }
 }
 
-void TapeRotEditorContent::paint(juce::Graphics& g)
+void TapeRotEditorContent::buildShoes()
 {
-    g.setImageResamplingQuality(juce::Graphics::highResamplingQuality);
-    g.drawImage(Asset::panel(), juce::Rectangle<float>(Layout::canvasWidth, Layout::canvasHeight));
+    for (size_t i = 0; i < Switches::shoes.size(); ++i)
+    {
+        auto shoe = std::make_unique<ShoeSwitch> (Switches::shoes[i]);
+        shoe->setBounds (shoe->canvasBounds());
+
+        const juce::String paramId { shoeParams[i] };
+
+        if (auto* param = processorRef.apvts.getParameter (paramId))
+            shoe->setRightSelected (param->getValue() > 0.5f);
+
+        shoe->onSelectionChanged = [this, paramId] (bool right)
+        {
+            /*  A shoe is a plain Component rather than a Slider, so there is no drag state to guard
+                on and `nf::connectUserEdit` has no matching callback to install. It does not need
+                one: `onSelectionChanged` fires only on a real click, so it is user-originated by
+                construction - which is exactly the property the drag guard exists to establish for
+                controls an attachment also writes to.  */
+            processorRef.userEdits.noteUserEdit();
+
+            if (auto* param = processorRef.apvts.getParameter (paramId))
+            {
+                param->beginChangeGesture();
+                param->setValueNotifyingHost (right ? 1.0f : 0.0f);
+                param->endChangeGesture();
+            }
+
+            header.showParameter (paramId);
+            header.releaseParameter();
+        };
+
+        addAndMakeVisible (*shoe);
+        shoes.push_back (std::move (shoe));
+    }
+}
+
+void TapeRotEditorContent::buildLampGroups()
+{
+    for (size_t i = 0; i < Switches::lampGroups.size(); ++i)
+    {
+        auto group = std::make_unique<LampButtonGroup> (Switches::lampGroups[i]);
+        group->setBounds (group->canvasBounds());
+
+        const int which = (int) i;
+
+        group->onPressed = [this, which] (int index)
+        {
+            processorRef.userEdits.noteUserEdit();
+
+            if (which == 0)
+            {
+                /*  §7.3's FAIL trio are **momentary triggers**. Root `CLAUDE.md`'s rule is that a
+                    momentary wants neither storage nor a dirty-check entry but a forced-off on
+                    every Program apply, so no Program can load one stuck engaged - which
+                    `applyProgramSnapshot` does for exactly these three.  */
+                if (auto* param = processorRef.apvts.getParameter (failTriggers[(size_t) index]))
+                {
+                    param->beginChangeGesture();
+                    param->setValueNotifyingHost (1.0f);
+                }
+            }
+            else if (which == 1)
+            {
+                // NOISE BED: a three-state selector, so exactly one is lit and the parameter is a
+                // choice rather than three bools.
+                if (auto* param = processorRef.apvts.getParameter ("noiseCharacter"))
+                {
+                    param->beginChangeGesture();
+                    param->setValueNotifyingHost (param->convertTo0to1 ((float) index));
+                    param->endChangeGesture();
+                }
+            }
+            else
+            {
+                if (auto* param = processorRef.apvts.getParameter (faultToggles[(size_t) index]))
+                {
+                    const bool now = param->getValue() > 0.5f;
+                    param->beginChangeGesture();
+                    param->setValueNotifyingHost (now ? 0.0f : 1.0f);
+                    param->endChangeGesture();
+                }
+            }
+        };
+
+        group->onReleased = [this, which] (int index)
+        {
+            if (which != 0)
+                return;
+
+            if (auto* param = processorRef.apvts.getParameter (failTriggers[(size_t) index]))
+            {
+                param->setValueNotifyingHost (0.0f);
+                param->endChangeGesture();
+            }
+        };
+
+        addAndMakeVisible (*group);
+        lampGroups.push_back (std::move (group));
+    }
+}
+
+/*  §7.3 is the ONE authority for every lamp on this panel, which is why they are all refreshed from
+    one place rather than each component deciding for itself. Three different behaviours - engine
+    state, an exclusive selection and independent toggles - reading one table.  */
+void TapeRotEditorContent::refreshLampStates()
+{
+    const auto value = [this] (const char* id)
+    {
+        auto* param = processorRef.apvts.getParameter (id);
+        return param != nullptr && param->getValue() > 0.5f;
+    };
+
+    for (int i = 0; i < 3; ++i)
+        lampGroups[0]->setLit (i, value (failTriggers[(size_t) i]));
+
+    if (auto* character = processorRef.apvts.getParameter ("noiseCharacter"))
+    {
+        const int selected = juce::roundToInt (character->convertFrom0to1 (character->getValue()));
+        for (int i = 0; i < 3; ++i)
+            lampGroups[1]->setLit (i, i == selected);
+    }
+
+    for (int i = 0; i < 4; ++i)
+        lampGroups[2]->setLit (i, value (faultToggles[(size_t) i]));
+
+    /*  §7.3: the scope's FAIL lamp is lit "when any failure is currently sounding", which is an
+        EVENT, where the four FAULT ACTIVITY lamps above are lit "when that fault category is
+        enabled", which is a parameter. Two different questions about the same engine, and the
+        reorganisation is what separated them - revision 1 flashed the fault lamps off this FIFO and
+        had no lamp for the first question at all.
+
+        This is the FIFO's single consumer. `popEvents` drains, so a second reader would take events
+        the first never sees.  */
+    {
+        FailureEvent events[64];
+        const int n = processorRef.getFailureEngine().popEvents (events, 64);
+        const auto now = juce::Time::getMillisecondCounter();
+
+        if (n > 0)
+            failSoundingUntil = now + (juce::uint32) failLampHoldMs;
+
+        scope.setFailLampLit (failSoundingUntil != 0 && now < failSoundingUntil);
+    }
+}
+
+void TapeRotEditorContent::timerCallback()
+{
+    // The header's IN/OUT numerals, the lamps and the MACHINE readout all follow values that change
+    // without any user action, so they need a poll rather than a callback.
+    header.refresh();
+    refreshLampStates();
+
+    if (auto* model = processorRef.apvts.getParameter ("model"))
+    {
+        const int index = juce::roundToInt (model->convertFrom0to1 (model->getValue()));
+        machineReadout.setMachineName (model->getCurrentValueAsText());
+        juce::ignoreUnused (index);
+    }
+
+    for (size_t i = 0; i < shoes.size(); ++i)
+        if (auto* param = processorRef.apvts.getParameter (shoeParams[i]))
+            shoes[i]->setRightSelected (param->getValue() > 0.5f);
+
+    if (auto* gen = processorRef.apvts.getParameter ("gen"))
+        generation.setGeneration (juce::roundToInt (gen->convertFrom0to1 (gen->getValue())));
+}
+
+void TapeRotEditorContent::paint (juce::Graphics&)
+{
+    // The background component draws the fascia. Nothing is painted here, and that is the whole
+    // difference from revision 1, which blitted a plate at this point.
+}
+
+/*  §7.5's bypass: a full-bleed 0.50 `#808080` **multiply** over the whole panel.
+
+    Pointers do not move, the scope freezes, every lamp goes out, no caption, no desaturation - and
+    §6 states in as many words that the legibility floors do not apply in this state, which is what
+    makes a flat multiply the right treatment rather than a dimmed redraw. Drawn over the children
+    rather than under them, because a veil that is not on top is not a veil.  */
+void TapeRotEditorContent::paintOverChildren (juce::Graphics& g)
+{
+    /*  **This casting has no bypass parameter, so this veil never draws today** - and that is a
+        conflict worth stating rather than a branch worth deleting.
+
+        `PluginProcessor.h` records the decision at length: *"this effect is a tape path, and a
+        bypass would be the tape being out of the machine"*, with Reflect-84 named as the reference
+        if it is ever reversed. §7.5 of this round's spec describes a host-driven bypass with a
+        full-bleed 0.50 multiply and no on-panel control. `getBypassParameter()` returns nullptr
+        here, so the state is unreachable.
+
+        Written as the spec asks and driven from the parameter that would enable it, so that
+        reversing the decision is one override rather than a panel change.
+        `design-asks/taperot-bypass-state.md` carries it.  */
+    auto* bypass = processorRef.getBypassParameter();
+
+    if (bypass == nullptr || bypass->getValue() <= 0.5f)
+        return;
+
+    juce::Graphics::ScopedSaveState state (g);
+    g.setColour (Colour::bypassVeil.withAlpha (Colour::bypassAlpha));
+    g.fillRect (getLocalBounds());
 }
