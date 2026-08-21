@@ -11,6 +11,12 @@
 it landed. Share Tech Mono was already here, so this casting was never behind the §11 type-adoption
 gate; it is now clear of both.
 
+**Barlow Condensed Medium (500) is owed and not here.** §8 asks for it in two rows (scale numeral,
+and the unit row via §3.2); the build draws both in SemiBold and says so at the constant. Ruled
+2026-08-21 that the weight stands and the file ships — same OFL file already cut for Fifth Member.
+This is an **absence by omission**, not by decision, and closes when the next bundle carries
+`BarlowCondensed-Medium.ttf` into this directory. Register: `shared/FONTS.md`.
+
 **This file stays after the omission closed, and that is deliberate.** The directory holds one face
 and is missing another on purpose; without a marker, the shortness reads as the omission that just got
 fixed. Register: `shared/FONTS.md`.

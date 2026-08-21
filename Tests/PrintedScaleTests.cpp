@@ -151,7 +151,15 @@ public:
 
                 logMessage (juce::String ("  ") + id + ": worst disagreement "
                                 + juce::String (worst, 4) + " deg");
-                expect (worst < 0.05f,
+                /*  0.1 deg, not 0.05. The prototype publishes DERIVED fractions and one of
+                    WOW's is 1.8e-4 out — 0.759836 where (0.4)^0.3 is 0.759658, which is 0.048 deg.
+                    §3.2's own stated angle for that mark is +70.11, which is what the correct
+                    fraction gives, so the spec is right and the prototype's transcription is a
+                    rounding away from it. Harmless here because the build stores VALUES and asks
+                    the range for the angle — but a 0.05 bound would sit 0.002 deg from failing on
+                    somebody else's rounding, which is a bound that reports the transcription rather
+                    than the ring.  */
+                expect (worst < 0.1f,
                         juce::String (id) + " disagrees with the delivered prototype by "
                             + juce::String (worst, 4) + " deg");
             };
@@ -171,6 +179,9 @@ public:
 
             compare ("drive",   Marks::driveAndFlutter.data(), (int) Marks::driveAndFlutter.size(), driveF);
             compare ("flutter", Marks::driveAndFlutter.data(), (int) Marks::driveAndFlutter.size(), driveF);
+            const std::vector<float> wowF { 0.0f, 0.251189f, 0.501187f, 0.759836f, 1.0f };
+
+            compare ("wow",     Marks::wowPercent.data(),        (int) Marks::wowPercent.size(),        wowF);
             compare ("noise",   Marks::evenFifthsPercent.data(), (int) Marks::evenFifthsPercent.size(), even5);
             compare ("failure", Marks::evenFifthsPercent.data(), (int) Marks::evenFifthsPercent.size(), even5);
             compare ("mix",     Marks::evenFifthsPercent.data(), (int) Marks::evenFifthsPercent.size(), even5);
@@ -180,62 +191,46 @@ public:
             compare ("ramp",    Marks::rampSeconds.data(),     (int) Marks::rampSeconds.size(),     rampF);
         }
 
-        //== WOW: the one ring that deliberately does NOT match the prototype =
-        /*  §3.2 legends WOW as even fifths and the prototype draws them at even ANGLES, sharing a
-            `pct` table with NOISE, FAILURE and MIX. Those three are linear and WOW is **skew 0.3**,
-            for a reason `Parameters.h` argues at length: WOW's realised deviation is about 5x
-            FLUTTER's, so matching exponents would put the same physical condition at different knob
-            positions.
+        //== WOW: the ring the round re-cut, and the guard that keeps it off ====
+        /*  **This arm asserted the DIVERGENCE until 2026-08-21, and inverting it is not relaxing
+            it.** It used to pin the gap between a build drawing WOW from its own taper and a
+            prototype drawing it at even angles — with the figures, so a re-cut could not happen
+            silently. §3.2 re-cut the ring and the gap is gone, so the old arm now asserts the
+            absence of a defect that no longer exists, which is a vacuity guard encoding the symptom.
 
-            So the shared table is correct for three of the four and wrong for the fourth, and
-            nothing at the call site distinguishes them - which is why WOW has its own array and
-            this arm exists rather than a comment.
-
-            **The divergence is asserted rather than tolerated.** Left unpinned it would be
-            invisible again the moment somebody re-cut the ring; pinned, a re-cut fails here and the
-            figures are on screen. `design-asks/taperot-wow-ring.md` asks which five numerals the
-            ring should carry now that they are honestly placed.  */
-        beginTest ("WOW's ring is drawn from its taper, and the prototype's is not");
+            What replaces it is the property the ruling actually bought: **WOW must not read the
+            shared even-fifths table.** That can still fail — one edit reaching for the obvious
+            shared constant puts back a ring printing 25 / 50 / 75 at 0.98 / 9.92 / 38.33 %, with
+            both endpoints agreeing so nothing shows. The old figures stay in the log line, because
+            what they characterise is what this guard is for.  */
+        beginTest ("WOW does not read the shared even-fifths table");
         {
             const auto range = rangeFor ("wow");
 
-            struct Expected { float value; float builtAngle; float prototypeAngle; };
-            const std::array<Expected, 3> interior { {
-                { 25.0f,  43.13f, -67.50f },
-                { 50.0f,  84.31f,   0.00f },
-                { 75.0f, 112.68f,  67.50f } } };
+            expect (Marks::wowPercent.data() != Marks::evenFifthsPercent.data(),
+                    "WOW is back on the shared percent table — its skew of 0.3 makes that ring "
+                    "print values the pointer never reaches");
 
-            for (const auto& e : interior)
+            expect (! juce::approximatelyEqual ((float) range.skew, 1.0f),
+                    "WOW's range is linear again. §3.2's decade series was chosen FOR skew 0.3; if "
+                    "the taper really has changed, the ring wants re-deriving, not this assertion "
+                    "removing");
+
+            // What the retired ring would have read on this range, kept as the reason for the guard.
+            for (const float v : { 25.0f, 50.0f, 75.0f })
             {
-                const float built = nf::sweepAngleDegrees (
-                    (float) range.convertTo0to1 (e.value), Layout::knobSweepDegrees);
-
-                logMessage ("  WOW " + juce::String ((int) e.value) + "%: built at "
-                                + juce::String (built, 2) + " deg, prototype drew it at "
-                                + juce::String (e.prototypeAngle, 2) + " deg");
-
-                expectWithinAbsoluteError (built, e.builtAngle, 0.05f,
-                                           "WOW's ring has moved off its own taper");
-
-                /*  What the prototype's ring would have MEANT, which is the reason this is a defect
-                    rather than a difference: at the printed 50 the pointer would be at 9.92 %.  */
-                const float meant = (float) range.convertFrom0to1 (
-                    (double) ((e.prototypeAngle + Layout::knobSweepDegrees * 0.5f)
-                              / Layout::knobSweepDegrees));
-
-                logMessage ("     the prototype's angle reads " + juce::String (meant, 2)
-                                + " % on this range");
-                expect (std::abs (meant - e.value) > 1.0f,
-                        "the prototype's WOW ring now agrees with the taper - if the range changed, "
-                        "this arm and the ring both want re-deriving");
+                const float f = (v + 0.0f) / 100.0f;
+                const float atEvenAngle = (float) range.convertFrom0to1 ((double) f);
+                logMessage ("  an even-fifths " + juce::String ((int) v) + " would sit at "
+                                + juce::String (atEvenAngle, 2) + " % on this range");
             }
 
-            // The endpoints agree in both, which is exactly why the defect is invisible: a ring
-            // wrong only in its interior looks like a ring.
-            expectWithinAbsoluteError (nf::sweepAngleDegrees ((float) range.convertTo0to1 (0.0f)),
-                                       -135.0f, 0.01f);
-            expectWithinAbsoluteError (nf::sweepAngleDegrees ((float) range.convertTo0to1 (100.0f)),
-                                       135.0f, 0.01f);
+            // And the ring that shipped instead, at its own honest angles.
+            for (const auto& m : Marks::wowPercent)
+                logMessage ("  " + juce::String (m.numeral) + " at "
+                                + juce::String (nf::sweepAngleDegrees (
+                                      (float) range.convertTo0to1 (m.value),
+                                      Layout::knobSweepDegrees), 2) + " deg");
         }
 
         //== §3.3's detents ===================================================

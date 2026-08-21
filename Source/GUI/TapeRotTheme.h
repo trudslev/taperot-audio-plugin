@@ -435,22 +435,26 @@ namespace Marks
     inline constexpr std::array<Mark, 5> evenFifthsPercent { {
         { 0.0f, "0" }, { 25.0f, "25" }, { 50.0f, "50" }, { 75.0f, "75" }, { 100.0f, "100" } } };
 
-    /** §3.2 legends WOW as even fifths, and the panel draws these **values** through WOW's own
-        skew-0.3 range, so the pointer lands on each printed numeral by construction.
+    /** §3.2's WOW ring, **re-cut by the designers 2026-08-21 and no longer even fifths**.
 
-        **What that costs is that the ring does not look like the delivered prototype**, which drew
-        the numerals at even ANGLES: 25 moves from -67.50 deg to -37.86, 50 from 0.00 to +84.31,
-        75 from +67.50 to +112.68. Measured against the build's range, the prototype's ring puts
-        **0.98 at the printed 25, 9.92 at the printed 50 and 38.33 at the printed 75** - a
-        five-fold error at mid-travel, which is exactly the defect BRAND.md makes a correctness
-        requirement.
+        It cannot take the shared `evenFifthsPercent` table: WOW's range carries skew 0.3, so even
+        ANGLES would print 25 / 50 / 75 at positions the pointer reaches at **0.98 / 9.92 / 38.33 %**
+        — a five-fold error at mid-travel, with both endpoints agreeing, which is why nothing showed
+        it. That was raised as `design-asks/taperot-wow-ring.md`.
 
-        Held as its own array rather than corrected in the shared one so that a future re-cut
-        changes the printed VALUES here, not the angles. `design-asks/taperot-wow-ring.md` asks
-        whether even fifths are still the right five numerals now that they are honestly placed -
-        which is a legibility question, not this correctness one. */
+        The ruling is better than the two answers the ask offered. Rather than keep the five numerals
+        and accept them bunching clockwise, §3.2 prints a **decade series — 0 / 1 / 10 / 40 / 100 —
+        chosen so the honestly-placed angles land within 3° of even fifths**: −135 / −67.18 / +0.32 /
+        +70.11 / +135. An even-LOOKING ring that is also true, where the old one only looked like one.
+
+        **WOW's skew of 0.3 is not to be changed** — §3.2 says so, and `Parameters.h` gives the
+        reason: the exponent is matched to FLUTTER's realised deviation, and five castings' transport
+        feel rests on it.
+
+        Stored as values, so the angles are the range's answer rather than this table's. That is what
+        made this a five-numeral edit instead of a re-derivation. */
     inline constexpr std::array<Mark, 5> wowPercent { {
-        { 0.0f, "0" }, { 25.0f, "25" }, { 50.0f, "50" }, { 75.0f, "75" }, { 100.0f, "100" } } };
+        { 0.0f, "0" }, { 1.0f, "1" }, { 10.0f, "10" }, { 40.0f, "40" }, { 100.0f, "100" } } };
 
     /** §3.2, "leading plus kept" - which is a decision about the numeral, and `Text::signedDb`
         is where it is spelled. The minus is U+2212, not a hyphen. */

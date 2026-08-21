@@ -40,8 +40,12 @@ band was already close to the part's.
 | MACHINE | 172 | 168 | MODEL Ø104 · machine readout |
 | TRANSPORT | 348 | 304 | WOW Ø76 · FLUTTER Ø76 · SWITCHING shoe |
 | NOISE | 660 | 162 | NOISE Ø76 · NOISE BED shoe · HUM shoe |
-| DECAY | 830 | 168 | FAILURE Ø76 · RAMP Ø56 · SPREAD shoe · FAULT ACTIVITY |
-| OUTPUT | 1006 | 314 | MIX Ø76 · OUTPUT Ø76 · LP Ø56 · HP Ø56 |
+| DECAY | 830 | 168 | FAILURE Ø76 · SPREAD shoe · FAULT ACTIVITY |
+| OUTPUT | 1006 | 314 | MIX Ø76 · OUTPUT Ø76 · LP Ø56 · HP Ø56 · **RAMP Ø56** |
+
+**RAMP is in OUTPUT** (pivot 1163 — the section's own centre, 1006 + 314/2), corrected here
+2026-08-21; this column previously listed it under DECAY and the prototype never did. The build
+followed the artefact and was right to. DECAY carries no Ø56.
 
 **The order is the signal path and it is the reorganisation this round made** — the previous
 arrangement grouped by control type. Section headings Barlow Condensed 600
@@ -94,8 +98,17 @@ answer if taken knowingly; five is the primary-class ceiling and this ring is at
 
 | Knob | Ø | Marks |
 |---|---|---|
-| WOW · NOISE · FAILURE · MIX | 76 | even fifths — **0 / 25 / 50 / 75 / 100** |
+| NOISE · FAILURE · MIX | 76 | even fifths — **0 / 25 / 50 / 75 / 100** (ranges are linear) |
+| WOW | 76 | **0** (f 0) · **1** (.2512) · **10** (.5012) · **40** (.7598) · **100** (1) — see below |
 | OUTPUT | 76 | even fifths — **−24 / −12 / 0 / +12 / +24** dB, leading plus kept |
+**WOW does not take the shared even-fifths legend** — its range is skew 0.3, so even angles
+would have printed 25 / 50 / 75 at positions the pointer reaches at 0.98 / 9.92 / 38.33 %.
+Ruled 2026-08-21: the ring prints a **decade series, 0 / 1 / 10 / 40 / 100**, chosen so the
+honestly-placed angles (−135 / −67.18 / +0.32 / +70.11 / +135) fall within 3° of even fifths —
+an even-looking ring that is also true, which the old one only looked like. **WOW's skew of
+0.3 is not to be changed**; the exponent is matched to FLUTTER's realised deviation and five
+castings' transport feel rests on it.
+
 | LP | 56 | **1** (f 0) · **3** (.5090) · **20** (1) kHz, eight minors between |
 | HP | 56 | **20** (f 0) · **200** (.4871) · **2k** (1) Hz, eleven minors between |
 | RAMP | 56 | **0.05** (f 0) · **0.5** (.4194) · **4** (1) s, ten minors between |
@@ -191,6 +204,12 @@ edge** — no halo on the fascia, and an unlit lamp is a dark lens, not a hole.
 Eight stages, lit stage in the accent, unlit in the dark lamp material. The selector is a
 stage ladder rather than a knob because the parameter is an integer count of tape
 generations, and a pointer implies interpolation between them.
+
+**Stages 1..GEN light, not GEN alone** — ruled 2026-08-21, confirming shipped behaviour. The
+reason is §5.4's own argument: a count of five reads as five lit stages, where one lit stage in
+the fifth position reads as a selector and re-implies the thing the ladder was chosen to avoid.
+"Lit stage" above means the topmost lit one. §7.4's two rows describe the FACE a stage wears,
+not how many wear it.
 
 ---
 
@@ -303,7 +322,17 @@ All five fault categories are carried; none was dropped in the reorganisation.
 | Selected | accent radial + `0 0 7px 1px rgba(240,169,75,.35)` |
 | Unselected | `radial-gradient(#4a423a, #2a251e 55%, #15120e)`, no glow |
 
-### 7.5 Bypass
+### 7.5 Bypass — **DOES NOT APPLY TO THIS CASTING**
+
+**TapeRot has no bypass, by decision** (`Source/PluginProcessor.h`: this effect is a tape path,
+and a bypass would be the tape being out of the machine). `getBypassParameter()` returns
+nullptr, so the state below is unreachable. Marked here rather than deleted, the way §6 marks
+Elmer's absent meter — a call in a spec the casting cannot enter is a gap §9 wants visible. The
+decision is **not** reversed. The build's veil stays implemented and driven from
+`getBypassParameter()`: it costs nothing, cannot rot, and is one override away if the processor
+decision ever changes.
+
+The specification, retained for the round:
 
 Host-driven, no on-panel control. Full-bleed **0.50 `#808080` multiply** over the whole
 panel. Pointers do not move, the scope freezes, every lamp goes out, no caption, no

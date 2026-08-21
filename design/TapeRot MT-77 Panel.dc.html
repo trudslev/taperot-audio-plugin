@@ -183,7 +183,15 @@ class Component extends DCLogic {
         [0.331659, '', 0], [0.381880, '', 0], [0.441757, '', 0], [0.487060, '200', 1],
         [0.556094, '', 0], [0.653691, '', 0], [0.725693, '', 0], [0.809782, '', 0],
         [0.916481, '', 0], [1, '2k', 1]], 'ivory'],
-      ['WOW', '%', 438, 444, 76, 0.30, pct, 'ivory'],
+      // NB the 0.30 below is WOW's DEMO POINTER FRACTION, like FLUTTER's .757858 — not its taper.
+      // WOW's skew lives in `Source/Parameters.h` and is 0.3 by coincidence of value only.
+      ['WOW', '%', 438, 444, 76, 0.30, [
+        // Skewed 0.3, so this ring CANNOT take `pct`: even angles would print numerals the
+        // pointer never reaches (25/50/75 sit at 0.98/9.92/38.33 %). Ruled 2026-08-21 to a
+        // decade series whose honest angles land near even fifths: −135 / −67.18 / +0.32
+        // / +70.11 / +135. Fractions are (v/100)^0.3 — recompute them, never even them out.
+        [0, '0', 1], [0.251189, '1', 1], [0.501187, '10', 1],
+        [0.759836, '40', 1], [1, '100', 1]], 'ivory'],
       ['FLUTTER', '%', 562, 444, 76, 0.757858, driveMarks, 'ivory'],
       ['NOISE', '%', 741, 444, 76, 0, pct, 'ivory'],
       ['FAILURE', '%', 914, 444, 76, 0, pct, 'ivory'],
