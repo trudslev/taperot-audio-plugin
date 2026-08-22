@@ -11,11 +11,19 @@
 it landed. Share Tech Mono was already here, so this casting was never behind the §11 type-adoption
 gate; it is now clear of both.
 
-**Barlow Condensed Medium (500) is owed and not here.** §8 asks for it in two rows (scale numeral,
-and the unit row via §3.2); the build draws both in SemiBold and says so at the constant. Ruled
-2026-08-21 that the weight stands and the file ships — same OFL file already cut for Fifth Member.
-This is an **absence by omission**, not by decision, and closes when the next bundle carries
-`BarlowCondensed-Medium.ttf` into this directory. Register: `shared/FONTS.md`.
+**Barlow Condensed Medium (500) is here — CLOSED, export 12.** It reached this casting's build on
+2026-08-22, placed directly rather than through a bundle, and reached **this** directory with the
+export; for a day in between the two were out of step, and a bundle-built installer would still have
+substituted while the build did not. **The build having a file and the bundle shipping it are two
+facts**, and only the second closes an omission.
+
+**The delivered file, from its own tables:** `BarlowCondensed-Medium.ttf`, **680 glyphs**, `usWeightClass` **500**, 1000 upem, typo ascender/descender 1000 / −200, version **1.408**, *Barlow Project Authors* / Tribby Type, **OFL**. This is TapeRot's cut rather than Fifth Member's 694-glyph one — the same cut now sits in both castings, which is a better outcome than the ruling asked for: one file, one metric set, two directories.
+
+One thing about the count is worth keeping. **§8 asks for 500 in one row, the scale numeral** —
+not two: the second was §3.2 restating that same role at the numeral ring, and counting mentions
+instead of rows is what produced the pair.
+
+Register: `shared/FONTS.md`. Nothing is absent from this directory by omission now.
 
 **This file stays after the omission closed, and that is deliberate.** The directory holds one face
 and is missing another on purpose; without a marker, the shortness reads as the omission that just got
