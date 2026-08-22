@@ -45,6 +45,23 @@ juce::Rectangle<int> KnobComponent::canvasBounds() const
     return juce::Rectangle<float> (knobSpec.pivot.x - halfW, top, halfW * 2.0f, bottom - top).toNearestInt();
 }
 
+/*  **Shift-fine, restored.** BRAND.md makes drag feel suite-wide rather than a per-casting
+    choice — *"190px vertical coarse, 760px on Shift for fine, everywhere… a player who learns
+    Shift-fine on one expects it on the next"* — and the panel rewrite dropped it: the old
+    `KnobFilmstrip::mouseDown` set it and `KnobComponent` carried the constant across without the
+    call. `Layout::knobFineDragPixels` sat declared and unread, which is the trace the audit found.
+
+    **Sensitivity has to be settled BEFORE `Slider::mouseDown` records its drag anchor.** JUCE
+    measures from that anchor and scales by the current sensitivity, so changing it mid-drag
+    rescales the distance already travelled and the value jumps. That comment came with the line
+    the rewrite deleted and comes back with it.  */
+void KnobComponent::mouseDown (const juce::MouseEvent& e)
+{
+    setMouseDragSensitivity (e.mods.isShiftDown() ? Layout::knobFineDragPixels
+                                                  : Layout::knobDragPixels);
+    juce::Slider::mouseDown (e);
+}
+
 bool KnobComponent::hitTest (int x, int y)
 {
     /*  Only the cap takes the drag. A component sized to its numeral ring that claimed the whole box

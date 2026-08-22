@@ -37,6 +37,7 @@ public:
     explicit KnobComponent (const Spec& spec);
 
     void paint (juce::Graphics&) override;
+    void mouseDown (const juce::MouseEvent&) override;
     void resized() override;
     bool hitTest (int x, int y) override;
 
