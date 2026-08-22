@@ -188,7 +188,8 @@ void KnobComponent::renderStaticLayer (float deviceScale)
     //== Numerals, at r + 29.5, counter-rotated to upright ====================
     if (knobSpec.marks != nullptr)
     {
-        const auto font = Font::label (Type::scaleNumeral.cssPx);
+        // §8's scale numeral is the panel's one 500-weight role — Font::numeral, not Font::label.
+        const auto font = Font::numeral (Type::scaleNumeral.cssPx);
         const float tracking = Font::trackingPx (Type::scaleNumeral.trackingEm, Type::scaleNumeral.cssPx);
         const float radius = r + Layout::knobNumeralRadiusOffset;
 

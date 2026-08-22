@@ -78,10 +78,21 @@ juce_add_binary_data(TapeRotBinaryData
         # §8's two faces. Barlow Condensed 600 is panel lettering; Share Tech Mono carries numerals,
         # units, the model line and both readouts, per call 7's split.
         #
-        # **§8 asks for Barlow Condensed 500 for scale numerals and no 500 weight has been
-        # delivered to any casting in this suite.** SemiBold stands in, which Gatecrasher's rewrite
-        # also did without recording it; `design-asks/barlow-condensed-500.md` asks for the cut.
         design/fonts/BarlowCondensed-SemiBold.ttf
+        # **Medium (500) landed 2026-08-22 and the substitution is over.** §8's scale-numeral row
+        # asks for 500 and this build drew SemiBold, stated at the constant while it was owed.
+        #
+        # Ruled by `shared/FONTS.md` that the weight stands and the file moves rather than §8's rows
+        # changing to 600. Verified against Fifth Member's copy before wiring rather than trusted:
+        # a DIFFERENT cut of the same release — 680 glyphs against 694 — but identical where it
+        # matters, same fontRevision, unitsPerEm 1000, weightClass 500, widthClass 3, ascender,
+        # descender and capHeight all equal, and **the same 525 codepoints**. Nothing this panel
+        # draws is in the 14 unmapped glyphs that differ.
+        #
+        # That check is the point rather than the paperwork: two cuts of one face agreeing on a
+        # NAME says nothing, and a type scale calibrated through `withPointHeight` moves with the
+        # metrics. They do not move here.
+        design/fonts/BarlowCondensed-Medium.ttf
         design/fonts/share-tech-mono/ShareTechMono-Regular.ttf)
 
 # AU is Apple-only; Windows only ever builds VST3 + Standalone. VST3_COPY_DIR/AU_COPY_DIR are only

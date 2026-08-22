@@ -158,6 +158,18 @@ namespace Font
         return t;
     }
 
+    /** §8's scale-numeral row, and **the only role on this panel in 500**.
+
+        A numeral sits one weight below the label it qualifies, and that step is the hierarchy — it
+        is why §8 asks for 500 here and 600 everywhere else, and why the ruling moved the file
+        rather than changing the row. */
+    inline juce::Typeface::Ptr barlowMedium()
+    {
+        static const juce::Typeface::Ptr t = juce::Typeface::createSystemTypefaceFor (
+            BinaryData::BarlowCondensedMedium_ttf, (size_t) BinaryData::BarlowCondensedMedium_ttfSize);
+        return t;
+    }
+
     inline juce::Typeface::Ptr mono()
     {
         static const juce::Typeface::Ptr t = juce::Typeface::createSystemTypefaceFor (
@@ -173,6 +185,12 @@ namespace Font
     inline juce::Font label (float cssPx)
     {
         return juce::Font (juce::FontOptions (barlowSemiBold()).withPointHeight (cssPx));
+    }
+
+    /** §8's scale numeral: Barlow Condensed **500**, not the 600 every other Barlow role uses. */
+    inline juce::Font numeral (float cssPx)
+    {
+        return juce::Font (juce::FontOptions (barlowMedium()).withPointHeight (cssPx));
     }
 
     inline juce::Font monoAt (float cssPx)
@@ -312,11 +330,16 @@ namespace Type
     inline constexpr float scopeReadoutCssPx    = 12.0f,  scopeReadoutLineBox    = 15.0f,  scopeReadoutTrackingPx   = 1.3f;
     inline constexpr float machineReadoutCssPx  = 12.5f,  machineReadoutLineBox  = 16.0f,  machineReadoutTrackingPx = 1.2f;
 
-    /** §8's scale numeral is **Barlow Condensed 500** and no bundle has delivered a 500 weight to
-        any casting in this suite — `design/fonts/` carries SemiBold (600) only, and Gatecrasher's
-        rewrite made the identical substitution without recording it. Drawn at 600 here, said out
-        loud rather than left to be discovered: `design-asks/barlow-condensed-500.md`. */
-    inline constexpr bool scaleNumeralIsSubstituted = true;
+    /** §8's scale numeral is **Barlow Condensed 500, and it is drawn in 500** as of 2026-08-22.
+
+        It was SemiBold for as long as the file was owed, stated here rather than left to be
+        discovered — which is what the ruling asked for and what Gatecrasher's rewrite had not done.
+        The constant stays, reading false, because a reader who finds `Font::numeral` using a
+        different face from `Font::label` should find the reason next to it rather than in a commit.
+
+        `design-asks/barlow-condensed-500.md` closes for this casting; **Gatecrasher is still
+        owed the same file** for five roles, and `tools/check_font_sets.py` is what says so. */
+    inline constexpr bool scaleNumeralIsSubstituted = false;
 }
 
 //==============================================================================
