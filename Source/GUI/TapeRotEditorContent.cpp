@@ -206,7 +206,26 @@ void TapeRotEditorContent::buildLampGroups()
 
         const int which = (int) i;
 
-        group->onPressed = [this, which] (int index)
+        /*  **BRAND.md: "Every control that changes a parameter reports there — switches
+            included."** These ten did not, between the panel rewrite and 2026-08-22. The old
+            `SpriteButton::onInteraction` did `noteUserEdit()`, `showParameter()` and
+            `releaseParameter()`; the rewrite replaced that class, kept the first and dropped the
+            other two here — while keeping all three on the shoes and the GENERATION ladder, which
+            is why it read as done.
+
+            The rule's own justification is these controls exactly: *"some switch changes are the
+            least obvious things on a panel… Turning a knob explains itself; flipping a switch does
+            not."* A lamp going on tells you something changed and not what it was called.
+
+            A switch settles the moment it is thrown, so it announces and releases in the one
+            callback — there is no drag to end. Gatecrasher's `reportSwitch` says the same thing.  */
+        const auto report = [this] (const char* paramId)
+        {
+            header.showParameter (paramId);
+            header.releaseParameter();
+        };
+
+        group->onPressed = [this, which, report] (int index)
         {
             processorRef.userEdits.noteUserEdit();
 
@@ -220,6 +239,7 @@ void TapeRotEditorContent::buildLampGroups()
                 {
                     param->beginChangeGesture();
                     param->setValueNotifyingHost (1.0f);
+                    report (failTriggers[(size_t) index]);
                 }
             }
             else if (which == 1)
@@ -231,6 +251,7 @@ void TapeRotEditorContent::buildLampGroups()
                     param->beginChangeGesture();
                     param->setValueNotifyingHost (param->convertTo0to1 ((float) index));
                     param->endChangeGesture();
+                    report ("noiseCharacter");
                 }
             }
             else
@@ -241,6 +262,7 @@ void TapeRotEditorContent::buildLampGroups()
                     param->beginChangeGesture();
                     param->setValueNotifyingHost (now ? 0.0f : 1.0f);
                     param->endChangeGesture();
+                    report (faultToggles[(size_t) index]);
                 }
             }
         };
