@@ -431,3 +431,42 @@ padding and a 2 px radius.
 - **`shared/HEADER-PART.md` revision 3 is pending three build answers** — the meter's display
   clamp, its format at both ends, and the sign convention. Nothing on this panel changes
   either way.
+
+
+---
+
+## 11 · The About part — this casting's material
+
+**Shared contract: `../shared/ABOUT-PART.md` revision 2.** Nothing here restates its geometry; these
+are the five figures that are **this casting's** and the two coordinates that depend on its canvas.
+**Fitted in the prototype, change set 38.**
+
+### 11.1 The tab
+
+| | |
+|---|---|
+| Right edge | **1302** · bottom edge **770** (canvas height 790 − 20), height **24**, width shrink-to-fit on padding 10 |
+| Well face | `#241f18 → #2d2720` |
+| Ink | `#e6dcc4` — **10.82:1** on the well's lighter stop |
+| Face | Share Tech Mono **10 / 13**, this casting's own mono |
+| Hover | well one step lighter, ink to `#f2b25c` |
+
+**The ink is measured against the well, not the fascia** — `../shared/CONTRAST-CEILING.md` §1: no ink
+reaches 7:1 on a ground of luminance 0.100–0.300, and a mid-value fascia is exactly that. The recess
+is a surface this casting chooses.
+
+### 11.2 The box
+
+| | |
+|---|---|
+| Position | **230, 125** — x from §4's law, y = (790 − 540) / 2 |
+| Surface | `#100e0b`, this casting's display glass — **a screen, not a plate** |
+| Body ink | `#f2ebd8` — **16.20:1** |
+| Dim ink | `#a89c85` — **7.12:1** |
+| Accent / links | `#f2b25c` — **10.37:1** |
+| Repository | `github.com/trudslev/taperot-audio-plugin` |
+
+**Typeface credits, embedded faces only:** Barlow Condensed and Share Tech Mono, both under the SIL Open Font License.
+
+**The dim ink is the tight one across the suite** — TapeRot's 7.12 is the narrowest margin, so **no
+casting may darken its dim ink to taste.**

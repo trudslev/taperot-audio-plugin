@@ -9,8 +9,11 @@
 <x-dc>
 <helmet>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="crossorigin" />
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
 <style>
+
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 500; src: url('fonts/BarlowCondensed-Medium.ttf') format('truetype'); font-display: block; }
+  @font-face { font-family: 'Barlow Condensed'; font-weight: 600; src: url('fonts/BarlowCondensed-SemiBold.ttf') format('truetype'); font-display: block; }
+  @font-face { font-family: 'Share Tech Mono'; src: url('fonts/ShareTechMono-Regular.ttf') format('truetype'); font-display: block; }
   body { margin: 0; background: #6b665c; }
   a { color: #6d4a22; }
   a:hover { color: #3f2a11; }
@@ -30,7 +33,7 @@
 
   <div style="position:absolute;left:16px;top:16px;width:1308px;height:104px;box-sizing:border-box;border-radius:5px;background:linear-gradient(180deg,#2c2923,#201d18);box-shadow:inset 0 0 0 1px #0e0c09, inset 0 1px 0 rgba(255,255,255,.08), inset 0 -3px 8px rgba(0,0,0,.45), 0 2px 4px rgba(60,45,20,.28);">
     <div style="position:absolute;left:22px;top:14px;width:303px;height:84px;">
-      <img src="assets/taperot/taperot-wordmark.png" width="231.2" height="50" alt="TAPEROT" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));" />
+      <img onClick="{{ aboutOpen }}" title="About" src="assets/taperot/taperot-wordmark.png" width="231.2" height="50" alt="TAPEROT" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));cursor:help;" />
       <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:14px;line-height:17px;letter-spacing:.26em;color:#efe7d3;margin-top:4px;">TAPE DEGRADATION PROCESSOR</div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:11px;line-height:14px;letter-spacing:.20em;color:#ccc1a6;">MODEL MT-77 · STEREO</div>
     </div>
@@ -145,13 +148,43 @@
   <div style="position:absolute;left:359px;top:548px;width:282px;text-align:center;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:10px;line-height:13px;letter-spacing:.22em; text-indent: .22em;color:#3a3328;">GENERATION</div>
 
   <div style="position:absolute;left:26px;top:752px;width:400px;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:13px;letter-spacing:.18em;color:#5f5749;">MT-77 · SN 0143</div>
-  <div style="position:absolute;left:914px;top:752px;width:400px;text-align:right;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:13px;letter-spacing:.18em;color:#5f5749;">TAPEROT · v1.0</div>
+  <div onClick="{{ aboutOpen }}" title="About" style="position:absolute;right:38px;top:746px;height:24px;box-sizing:border-box;display:inline-flex;align-items:center;padding:0 10px;border-radius:2px;background:linear-gradient(180deg,#241f18,#2d2720);box-shadow:inset 0 0 0 1px #1a1611, inset 0 1px 3px rgba(0,0,0,.55);cursor:help;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:13px;letter-spacing:.18em;color:#e6dcc4;" style-hover="background:linear-gradient(180deg,#2d2720,#363028);color:#f2b25c;">TAPEROT &middot; v1.0.0</div>
 
+  <sc-if value="{{ aboutIsOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ aboutClose }}" style="position:absolute;inset:0;z-index:60;background:rgba(8,9,11,.72);cursor:default;"></div>
+    <div style="position:absolute;z-index:61;left:230px;top:125px;width:880px;height:540px;box-sizing:border-box;border-radius:3px;background:linear-gradient(#100e0b,#0b0a07);box-shadow:inset 0 0 0 1px #2e281f, 0 24px 60px rgba(0,0,0,.7);">
+      <div style="position:absolute;left:40px;top:40px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:34px;line-height:40px;letter-spacing:.10em;color:#f2ebd8;">TAPEROT</div>
+      <div style="position:absolute;left:40px;top:84px;font-family:'Share Tech Mono',monospace;font-size:18px;line-height:24px;letter-spacing:.14em;color:#f2b25c;">MODEL MT-77 &nbsp;&middot;&nbsp; VERSION 1.0.0</div>
+      <div style="position:absolute;left:40px;top:120px;width:800px;height:1px;background:rgba(242,245,246,.18);"></div>
+      <div style="position:absolute;left:40px;top:144px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:20px;line-height:26px;letter-spacing:.20em;color:#f2ebd8;">NEON FOUNDRY</div>
+      <div style="position:absolute;left:40px;top:174px;font-family:'Share Tech Mono',monospace;font-size:18px;line-height:24px;letter-spacing:.14em;color:#f2b25c;">SUITE RELEASE 1.2.1</div>
+      <div style="position:absolute;left:40px;top:210px;width:800px;height:1px;background:rgba(242,245,246,.18);"></div>
+      <div style="position:absolute;left:40px;top:234px;width:150px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:.22em;color:#a89c85;">LICENCE</div>
+      <div style="position:absolute;left:200px;top:234px;font-family:'Share Tech Mono',monospace;font-size:18px;line-height:24px;letter-spacing:.10em;color:#f2ebd8;">AGPLv3 &nbsp;&middot;&nbsp; SOURCE AVAILABLE</div>
+      <div style="position:absolute;left:40px;top:270px;width:150px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:.22em;color:#a89c85;">REPOSITORY</div>
+      <a href="https://github.com/trudslev/taperot-audio-plugin" target="_blank" rel="noopener" style="position:absolute;left:200px;top:270px;font-family:'Share Tech Mono',monospace;font-size:18px;line-height:24px;letter-spacing:.10em;color:#f2b25c;text-decoration:none;border-bottom:1px solid #f2b25c80;" style-hover="color:#f8c884;border-bottom-color:#f8c884;">github.com/trudslev/taperot-audio-plugin</a>
+      <div style="position:absolute;left:40px;top:306px;width:150px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:.22em;color:#a89c85;">FOUNDRY</div>
+      <a href="https://neonfoundry.io" target="_blank" rel="noopener" style="position:absolute;left:200px;top:306px;font-family:'Share Tech Mono',monospace;font-size:18px;line-height:24px;letter-spacing:.10em;color:#f2b25c;text-decoration:none;border-bottom:1px solid #f2b25c80;" style-hover="color:#f8c884;border-bottom-color:#f8c884;">neonfoundry.io</a>
+      <div style="position:absolute;left:40px;top:342px;width:800px;height:1px;background:rgba(242,245,246,.18);"></div>
+      <div style="position:absolute;left:40px;top:366px;width:150px;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:.22em;color:#a89c85;">TYPEFACES</div>
+      <div style="position:absolute;left:200px;top:366px;width:640px;font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:18px;line-height:24px;letter-spacing:.04em;color:#f2ebd8;text-wrap:pretty;">Barlow Condensed and Share Tech Mono, both under the SIL Open Font License.</div>
+      <div style="position:absolute;left:40px;top:426px;width:800px;font-family:'Barlow Condensed',sans-serif;font-weight:500;font-size:16px;line-height:21px;letter-spacing:.04em;color:#a89c85;text-wrap:pretty;">Full licence text ships as THIRD-PARTY-LICENCES.txt in this bundle&rsquo;s Resources.</div>
+      <div onClick="{{ aboutClose }}" style="position:absolute;left:744px;top:470px;width:96px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:3px;background:linear-gradient(180deg,#2d2720,#241f18);box-shadow:inset 0 0 0 1px #2e281f;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:16px;line-height:20px;letter-spacing:.22em;text-indent:.22em;color:#f2ebd8;" style-hover="color:#f2b25c;">CLOSE</div>
+    </div>
+  </sc-if>
 </div>
 </div>
+
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1420,&quot;height&quot;:980},&quot;programState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;factory&quot;,&quot;factory-edited&quot;,&quot;user&quot;,&quot;user-edited&quot;,&quot;naming&quot;],&quot;default&quot;:&quot;factory&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Panel state&quot;},&quot;generation&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1,&quot;min&quot;:1,&quot;max&quot;:8,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Panel state&quot;},&quot;noiseCharacter&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;TAPE&quot;,&quot;VCR&quot;,&quot;DUST&quot;],&quot;default&quot;:&quot;TAPE&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Machine&quot;},&quot;switchMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;FADE&quot;,&quot;CLUNK&quot;],&quot;default&quot;:&quot;FADE&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Machine&quot;},&quot;hum&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Machine&quot;},&quot;spread&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;LINKED&quot;,&quot;STEREO&quot;],&quot;default&quot;:&quot;LINKED&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Decay&quot;},&quot;failureActive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Decay&quot;},&quot;faultDropouts&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;},&quot;faultSnags&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;},&quot;faultCrinkles&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;},&quot;faultImbalance&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Failure types&quot;}}">
 class Component extends DCLogic {
+  state = { aboutOpen: false };
+  componentDidMount() {
+    this._esc = (e) => { if (e.key === 'Escape') this.setState({ aboutOpen: false }); };
+    window.addEventListener('keydown', this._esc);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this._esc); }
+
   // 270° sweep, −135 … +135. The build's figure (TapeRotTheme.h:236); its own spec's −120…+120 is stale.
   a(f) { return -135 + f * 270; }
 
@@ -303,6 +336,9 @@ class Component extends DCLogic {
     };
 
     return {
+      aboutIsOpen: !!this.state.aboutOpen,
+      aboutOpen: () => this.setState({ aboutOpen: true }),
+      aboutClose: () => this.setState({ aboutOpen: false }),
       caption: naming ? 'NAME PROGRAM' : 'PROGRAM',
       bankTag, programName, naming, knobs,
       saveInk: (!naming && edited ? lit : idle).ink, saveGlow: (!naming && edited ? lit : idle).glow,
