@@ -208,11 +208,19 @@ namespace Paint
 {
     /** A CSS `radial-gradient(circle at X% Y%, ...)` over a circular face.
 
-        **The radius has to reach the FAR edge of the face, not an arbitrary corner.** Written as a
-        gradient from the light point to `centre + (r, r)`, the ramp's radius comes out **2.01r**
-        where the face only spans 1.61r from that point - so the cap shows the inner 80 % of the
-        ramp and reads as flat ivory with no sculpting at all. That is what the first capture of
-        this panel showed, on all eleven knobs and all ten lamp buttons at once.
+        **A `circle` with no size given is `farthest-corner`, and the corner is the BOX's.** Every
+        one of this panel's five call sites is a round element in a square div, so the ramp reaches
+        the far corner of that square - `2.01r` from a 34/24 light point - and the visible face
+        shows only the inner 80 % of it. Sizing it to the far edge of the CIRCLE instead gives
+        1.61r, which reaches the outer colour a quarter of the way early and leaves the whole
+        lower-right quadrant flat at it.
+
+        That is the mistake this comment used to argue FOR, in a sentence about the face spanning
+        1.61r - true of the circle, and not what CSS measures. It cost 20 to 36 sum-RGB units
+        across the bottom and right of every cap, measured against the delivered prototype, and it
+        survived because it was written while fixing a real and much larger error beside it: the
+        ramp had been running from the light point to `centre + (r, r)`, a distance measured from
+        the wrong origin, which really did read as flat ivory on all eleven knobs at once.
 
         `juce::ColourGradient`'s radial form takes point1 as the centre and point2 as *a* point on
         the ramp's outer circle, so any point at the right distance will do - which is exactly why
@@ -226,7 +234,14 @@ namespace Paint
     {
         const juce::Point<float> lightAt (centre.x + radius * (lightX - 0.5f) * 2.0f,
                                           centre.y + radius * (lightY - 0.5f) * 2.0f);
-        const float reach = lightAt.getDistanceFrom (centre) + radius;
+
+        // farthest-corner: the largest distance from the light point to any corner of the box.
+        float reach = 0.0f;
+
+        for (const float sx : { -1.0f, 1.0f })
+            for (const float sy : { -1.0f, 1.0f })
+                reach = juce::jmax (reach, lightAt.getDistanceFrom ({ centre.x + sx * radius,
+                                                                     centre.y + sy * radius }));
 
         return { inner, lightAt, outer, lightAt.translated (reach, 0.0f), true };
     }
@@ -588,7 +603,17 @@ namespace Readouts
 
     /** §1's footer row, both ends. The middle dot is U+00B7 built from its codepoint. */
     inline constexpr float footerY = 752.0f;
-    inline constexpr float footerLeftX = 26.0f, footerRightCentre = 914.0f;
+    /** Both footer strings are inset **10 px from the block's own edges** and aligned outward —
+        the left one left-aligned from 26 (= blockX + 10), the right one **right-aligned to 1314**
+        (= blockX + blockW − 10). Symmetric, and it puts the version label under OUTPUT.
+
+        **This read `footerRightCentre = 914` and centred the string there, which is DECAY.** 914 is
+        the prototype's *left edge* of a 400-wide right-aligned box, and it coincides with DECAY's
+        centre (830 + 168/2) — so a figure read as a centre landed on a plausible-looking section
+        and stayed. The ink is 100.8 wide, so right-aligned it occupies 1213–1314 and centred it
+        occupied 863–964: two sections out, from one misread alignment. */
+    inline constexpr float footerLeftX  = 26.0f;
+    inline constexpr float footerRightX = 1314.0f;
     inline constexpr float footerCssPx = 10.0f, footerLineBox = 13.0f, footerTrackingEm = 0.18f;
     inline const juce::Colour footerInk { 0xFF5F5749 };
 }

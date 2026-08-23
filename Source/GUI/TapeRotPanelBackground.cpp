@@ -90,9 +90,9 @@ void TapeRotPanelBackground::renderStaticLayer (float deviceScale)
             longer true here, and deriving it from PROJECT_VERSION is what stops the footer being a
             fourth thing to remember at release.  */
         Text::drawTracked (g, "TAPEROT " + dot + " v" + juce::String (NF_VERSION_SHORT), font, tracking,
-                           { Readouts::footerRightCentre - 150.0f, Readouts::footerY, 300.0f,
+                           { Readouts::footerRightX - 400.0f, Readouts::footerY, 400.0f,
                              Readouts::footerLineBox },
-                           juce::Justification::centred, Readouts::footerInk);
+                           juce::Justification::right, Readouts::footerInk);
     }
 }
 

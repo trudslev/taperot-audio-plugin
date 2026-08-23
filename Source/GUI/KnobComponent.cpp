@@ -1,9 +1,46 @@
 #include "KnobComponent.h"
 
+#include <cmath>
+
 using namespace TapeRotTheme;
 
 namespace
 {
+    /*  **A CSS blur is a Gaussian, and its alpha across the edge is that Gaussian's CDF.** The
+        standard deviation is `blur / 2`, so full alpha is reached three sigma INSIDE the shape and
+        the edge itself sits at exactly half — never at 0 on one side and full on the other.
+
+        The obvious construction is a linear ramp between two radii, and it is wrong in both
+        directions at once: it reaches full alpha at the rim where CSS is at 0.77 of it, and it is
+        still a tenth of full alpha four pixels outside where CSS has decayed to a sixtieth.
+        Measured against the delivered prototype at DRIVE's own centre, the linear form left the
+        cap's bottom rim 63 sum-RGB units dark and the fascia 4.5 px to its right 45 units dark —
+        which is what "the creme knobs are too dark" was.  */
+    inline float gaussianEdge (float dist, float edge, float sigma)
+    {
+        return 0.5f * (1.0f + std::erf ((dist - edge)
+                                        / (sigma * juce::MathConstants<float>::sqrt2)));
+    }
+
+    /** A radial gradient whose alpha follows an arbitrary profile, sampled finely enough that the
+        linear interpolation `ColourGradient` does between stops cannot be seen. */
+    template <typename AlphaFn>
+    juce::ColourGradient profiledRadial (juce::Colour ink, juce::Point<float> centre, float reach,
+                                         AlphaFn&& alphaAt)
+    {
+        juce::ColourGradient grad (ink.withAlpha (alphaAt (0.0f)), centre,
+                                   ink.withAlpha (alphaAt (reach)),
+                                   centre.translated (reach, 0.0f), true);
+
+        for (int i = 1; i < 24; ++i)
+        {
+            const double p = (double) i / 24.0;
+            grad.addColour (p, ink.withAlpha (alphaAt ((float) p * reach)));
+        }
+
+        return grad;
+    }
+
     /** The component's box has to hold the numeral ring and the label, not just the cap. Numerals
         sit at r + 29.5 with their own 13 px line box, so the ring's outer edge is r + 36. */
     constexpr float ringPad = Layout::knobNumeralRadiusOffset + Type::scaleNumeral.lineBox * 0.5f;
@@ -85,52 +122,155 @@ float KnobComponent::angleForValue (float value) const
     return nf::sweepAngleDegrees (f, Layout::knobSweepDegrees);
 }
 
+/*  §3's cap, and **the prototype's shadow stack is four layers with stated blurs — not three
+    approximations of it.** Rebuilt 2026-08-23 after the panel came back reading too dark and the
+    shine reading wrong; both were one layer.
+
+        ivory      inset 0 0 0 1.5px #443e36
+                   inset 0 1px 0 rgba(255,255,255,.75)
+                   inset 0 -3px 8px rgba(0,0,0,.20)
+                   0 3px 6px rgba(0,0,0,.24)
+        signature  the same four, at 1.5px #0e0c09 / .14 / -3px 9px .6 / 0 4px 8px .38
+
+    **What was wrong: the inner bottom shadow was drawn as a linear gradient over the WHOLE face**,
+    transparent at the top to 20 % black at the bottom. `inset 0 -3px 8px` is a shadow hugging the
+    bottom rim with an 8 px blur — it reaches about a tenth of the disc. Spread across all of it,
+    the cap measured **#E9E4D6 at the light point against §3's #F8F2E3, #D8D1BF at the centre and
+    #BBB29D at the bottom inner edge** — 15 levels down at the top and 35 at the bottom, on every
+    ivory knob and every lamp cap.
+
+    That is worth keeping as the tell: **a wrong SHAPE for a shadow reads as a wrong COLOUR for the
+    thing under it.** The report was "the shade is too dark" and the fix is in the geometry of a
+    layer above it, not in the palette — `ivoryCapMid` was always exactly §3's `#efe7d2`.  */
 void KnobComponent::paintCap (juce::Graphics& g, juce::Point<float> centre, float radius) const
 {
     const bool signature = knobSpec.cap == Layout::Cap::signature;
+    const auto face = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
 
-    /*  §3's cap is `radial-gradient(circle at 34% 24%, ...)`. JUCE's ColourGradient is radial about
-        a centre, so the off-centre highlight is expressed by placing that centre at the stated
-        34 % / 24 % of the cap's box rather than by faking a second light source.  */
+    // §3's per-class figures, in the order the CSS lists them.
+    const float rimW        = 1.5f;
+    const float lipAlpha    = signature ? 0.14f : 0.75f;
+    const float innerAlpha  = signature ? 0.60f : 0.20f;
+    const float innerOffsetY = 3.0f;   // `-3px` in both classes
+    const float innerBlur   = signature ? 9.0f  : 8.0f;
+    const float castAlpha   = signature ? 0.38f : 0.24f;
+    const float castOffsetY = signature ? 4.0f  : 3.0f;
+    const float castBlur    = signature ? 8.0f  : 6.0f;
+
+    //== `0 Npx Mpx rgba(0,0,0,a)` — the cast shadow, under the cap ===========
+    /*  Drawn first so the fill covers its middle and only the fringe shows, which is what a drop
+        shadow is. It used to be a 2 px black STROKE ring, which is a hard outline rather than a
+        blurred drop and read as a dark line around every knob.  */
+    {
+        const juce::Point<float> at (centre.x, centre.y + castOffsetY);
+        const float sigma = castBlur * 0.5f;
+        const float reach = radius + castBlur * 2.0f;   // four sigma out is nothing at all
+
+        g.setGradientFill (profiledRadial (juce::Colours::black, at, reach,
+                                           [=] (float d)
+                                           {
+                                               return castAlpha * (1.0f - gaussianEdge (d, radius, sigma));
+                                           }));
+        g.fillEllipse (juce::Rectangle<float> (reach * 2.0f, reach * 2.0f).withCentre (at));
+    }
+
+    //== The radial fill =====================================================
     auto grad = Paint::sculptedFace (centre, radius, 0.34f, 0.24f,
                                      signature ? Colour::darkCapHi : Colour::ivoryCapHi,
                                      signature ? Colour::darkCapLo : Colour::ivoryCapLo);
-    grad.addColour (0.46, signature ? Colour::darkCapMid : Colour::ivoryCapMid);
-
+    grad.addColour (signature ? 0.46 : 0.45, signature ? Colour::darkCapMid : Colour::ivoryCapMid);
     g.setGradientFill (grad);
-    g.fillEllipse (centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f);
+    g.fillEllipse (face);
 
-    /*  §3's cap is four shadows as well as a fill, and the first pass drew only the fill and the
-        rim - which is why the capture came back reading as flat ivory discs.
-
-        The prototype's stack is `inset 0 0 0 1.5px <rim>`, `inset 0 1px 0 rgba(255,255,255,.75)`,
-        `inset 0 -3px 8px rgba(0,0,0,.20)` and a cast `0 3px 6px rgba(0,0,0,.24)`. What makes a knob
-        read as a physical object is the last two: a shadow pooling at its lower inside edge and one
-        under it on the fascia. Neither is decoration - remove them and the cap is a circle.  */
-    const auto face = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
-
-    // The cast shadow, under the cap and offset down. Drawn BEFORE nothing - the fill is already
-    // down, so this goes around it as a ring rather than beneath, which is what an inset would be.
+    //== `inset 0 -3px Npx rgba(0,0,0,a)` — confined to the rim ==============
+    /*  An inset shadow is cast by everything OUTSIDE the shape, offset by 3 px UP — which is what
+        biases the darkening to the bottom. So the profile is a function of the distance from a
+        centre 3 px above the cap's, half alpha at the cap's own radius, and the clip drops the
+        part that would fall outside.  */
     {
-        juce::Graphics::ScopedSaveState cast (g);
-        g.setColour (juce::Colours::black.withAlpha (0.24f));
-        g.drawEllipse (face.translated (0.0f, 3.0f).reduced (0.5f), 2.0f);
-    }
+        juce::Graphics::ScopedSaveState state (g);
+        juce::Path capPath;
+        capPath.addEllipse (face);
+        g.reduceClipRegion (capPath);
 
-    // The inner shadow pooling at the bottom, and the lip catching light at the top.
-    {
-        juce::ColourGradient pool (juce::Colours::transparentBlack, centre.x, centre.y - radius,
-                                   juce::Colours::black.withAlpha (signature ? 0.60f : 0.20f),
-                                   centre.x, centre.y + radius, false);
-        g.setGradientFill (pool);
+        const juce::Point<float> at (centre.x, centre.y - innerOffsetY);
+        const float sigma = innerBlur * 0.5f;
+        const float reach = radius + innerOffsetY;
+
+        g.setGradientFill (profiledRadial (juce::Colours::black, at, reach,
+                                           [=] (float d)
+                                           {
+                                               return innerAlpha * gaussianEdge (d, radius, sigma);
+                                           }));
         g.fillEllipse (face);
     }
 
-    g.setColour (juce::Colours::white.withAlpha (signature ? 0.14f : 0.75f));
-    g.drawEllipse (face.reduced (1.0f).withTrimmedBottom (radius), 1.0f);
+    //== `inset 0 1px 0 rgba(255,255,255,a)` — the lip =======================
+    /*  A 1 px inset shadow with no blur and no spread is the shape minus itself offset down 1 px:
+        a crescent along the top, **widest at twelve o'clock and tapering to nothing at three and
+        nine**. Two ellipses with even-odd winding give exactly that symmetric difference, and the
+        clip drops the matching crescent at the bottom.
 
+        It used to be a uniform 1 px arc across the whole top semicircle at the same alpha, which
+        reads as a bright ring rather than a lit edge.  */
+    {
+        juce::Graphics::ScopedSaveState state (g);
+        juce::Path capPath;
+        capPath.addEllipse (face);
+        g.reduceClipRegion (capPath);
+
+        juce::Path crescent;
+        crescent.setUsingNonZeroWinding (false);
+        crescent.addEllipse (face);
+        crescent.addEllipse (face.translated (0.0f, 1.0f));
+
+        g.setColour (juce::Colours::white.withAlpha (lipAlpha));
+        g.fillPath (crescent);
+    }
+
+    //== `inset 0 0 0 1.5px <rim>` — over the insets, as the CSS order puts it
     g.setColour (signature ? Colour::darkCapRim : Colour::ivoryCapRim);
-    g.drawEllipse (face.reduced (0.75f), 1.5f);
+    g.drawEllipse (face.reduced (rimW * 0.5f), rimW);
+
+    //== The specular — §3 draws it as its OWN element, over the cap =========
+    /*  `inset:7px` + `radial-gradient(20% 15% at 32% 18%, white .85, white .3 55%, transparent)`.
+
+        **This is the shine, and it was missing entirely.** The cap's own fill brightens toward
+        34/24 and reads as a lit sphere, which is exactly why its absence looked like a cap that
+        was merely too flat rather than one with a whole element unbuilt — the panel had a
+        plausible amount of light on it. Measured at MODEL's centre the miss is 473 sum-RGB units,
+        the largest single difference from the prototype anywhere on this panel; on the ivory caps
+        it is 38, small enough to read as a shade problem and be reported as one.
+
+        It is an ELLIPSE — 20 % of the inset box wide against 15 % tall — so a circular gradient is
+        drawn and squashed about its own centre. Note it is NOT conditional on the cap class: the
+        same white at the same alpha sits on the dark MODEL cap, which is what stops the signature
+        control reading as a hole in the fascia.  */
+    {
+        const float sr = radius - 7.0f;   // `inset:7px`
+
+        if (sr > 0.5f)
+        {
+            const auto box = juce::Rectangle<float> (sr * 2.0f, sr * 2.0f).withCentre (centre);
+            const juce::Point<float> at (box.getX() + 0.32f * box.getWidth(),
+                                         box.getY() + 0.18f * box.getHeight());
+            const float rx = 0.20f * box.getWidth();
+            const float ry = 0.15f * box.getHeight();
+
+            juce::Graphics::ScopedSaveState state (g);
+            juce::Path inner;
+            inner.addEllipse (box);
+            g.reduceClipRegion (inner);
+            g.addTransform (juce::AffineTransform::scale (1.0f, ry / rx, at.x, at.y));
+
+            juce::ColourGradient spec (juce::Colours::white.withAlpha (0.85f), at,
+                                       juce::Colours::transparentWhite,
+                                       at.translated (rx, 0.0f), true);
+            spec.addColour (0.55, juce::Colours::white.withAlpha (0.30f));
+            g.setGradientFill (spec);
+            g.fillEllipse (juce::Rectangle<float> (rx * 2.0f, rx * 2.0f).withCentre (at));
+        }
+    }
 }
 
 /*  Everything except the pointer, rendered once per (device scale, taper).
