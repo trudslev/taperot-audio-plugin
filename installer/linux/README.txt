@@ -5,6 +5,8 @@ This archive contains an unsigned bleeding-edge build from the `develop` branch:
 
   VST3/TapeRot.vst3       - the plugin bundle
   Standalone/TapeRot      - the standalone app
+  THIRD-PARTY-LICENCES.txt - copyright notices and licence text for the
+                            typefaces embedded in the binaries
 
 Installing the VST3
 --------------------

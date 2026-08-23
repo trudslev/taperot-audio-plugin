@@ -33,6 +33,10 @@ UninstallDisplayIcon={app}\TapeRot.exe
 [Files]
 Source: "{#MyStageDir}\Standalone\TapeRot.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyStageDir}\VST3\TapeRot.vst3\*"; DestDir: "{commoncf}\VST3\TapeRot.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Embedding a font in the binary is redistribution, and OFL 1.1 and Apache 2.0 both require the
+; notice and licence to travel with it. The VST3 bundle carries its own copy from CMake; the
+; Standalone is a bare .exe with no bundle, so this is its copy.
+Source: "{#MyStageDir}\THIRD-PARTY-LICENCES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\TapeRot"; Filename: "{app}\TapeRot.exe"

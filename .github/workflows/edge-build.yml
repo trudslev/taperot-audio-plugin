@@ -172,6 +172,9 @@ jobs:
           mkdir -p "$STAGE/VST3" "$STAGE/Standalone"
           cp -R build/TapeRot_artefacts/Release/VST3/TapeRot.vst3 "$STAGE/VST3/"
           cp build/TapeRot_artefacts/Release/Standalone/TapeRot.exe "$STAGE/Standalone/"
+          # The embedded fonts' licences. The VST3 bundle carries its own copy from CMake; the
+          # Standalone off Apple is a bare .exe with no bundle, so the installer places this one.
+          cp THIRD-PARTY-LICENCES.txt "$STAGE/"
           echo "STAGE=$STAGE" >> "$GITHUB_ENV"
 
       - name: Build installer (Inno Setup)
@@ -244,6 +247,9 @@ jobs:
           cp -R build/TapeRot_artefacts/Release/VST3/TapeRot.vst3 "$STAGE/VST3/"
           cp build/TapeRot_artefacts/Release/Standalone/TapeRot "$STAGE/Standalone/"
           cp installer/linux/README.txt "$STAGE/"
+          # Same reason as the Windows stage: the .vst3 carries its own copy, the bare Standalone
+          # binary cannot, so the tarball root carries one for the whole archive.
+          cp THIRD-PARTY-LICENCES.txt "$STAGE/"
           echo "STAGE=$STAGE" >> "$GITHUB_ENV"
 
       - name: Build tarball
