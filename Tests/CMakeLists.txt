@@ -2,6 +2,7 @@ juce_add_console_app(TapeRotTests PRODUCT_NAME "TapeRotTests")
 
 target_sources(TapeRotTests PRIVATE
     RealtimeSafetyTests.cpp
+    AboutPartTests.cpp
     CpuBaselineTests.cpp
     NumericalRobustnessTests.cpp
     InstrumentValidationTests.cpp
@@ -91,6 +92,7 @@ endif()
 target_compile_definitions(TapeRotTests PRIVATE
     # The test target compiles the GUI sources, and the panel footer reads this.
     NF_VERSION_SHORT="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+    NF_VERSION="${PROJECT_VERSION}"
     NF_CORE_PIN_COMMIT="${NF_CORE_PIN_COMMIT_VALUE}"
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

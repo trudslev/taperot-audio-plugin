@@ -282,6 +282,67 @@ void TapeRotEditorContent::buildLampGroups()
         addAndMakeVisible (*group);
         lampGroups.push_back (std::move (group));
     }
+
+    /*  `ABOUT-PART.md`. §9's materials and §1's five strings are all this casting supplies. */
+    {
+        constexpr int frameOriginX = 0;   // no rack ears: the frame IS the window
+
+        const nf::AboutMaterials aboutMaterials {
+            Colour::aboutGlass, Colour::aboutBody, Colour::aboutDim, Colour::aboutAccent,
+            Colour::aboutRing,
+            Colour::aboutWellTop, Colour::aboutWellBottom, Colour::aboutWellInk,
+            Font::barlowSemiBold(), Font::barlowMedium(), Font::mono(),
+            Cursor::help()
+        };
+
+        /*  §8: the credits name the faces this casting EMBEDS, not the ones it draws with — so
+            **Impact Label Reversed is not here**, and that is a licence fact rather than an
+            oversight. It is donationware and not embeddable, the wordmark's letterforms ship as
+            ARTWORK instead, and `design/fonts/ABSENT.md` records it. §9.3 says the same in words:
+            naming it would assert an embedding its licence forbids. */
+        const nf::AboutContent aboutContent {
+            "TAPEROT", "MT-77",
+            NF_VERSION,                 // semver, from PROJECT_VERSION - never a literal
+            nf::suiteRelease,           // §1: a separate string, and neither derives from the other
+            "github.com/trudslev/taperot-audio-plugin",
+            "Barlow Condensed and Share Tech Mono, both under the SIL Open Font License."
+        };
+
+        aboutBox = std::make_unique<nf::AboutBox> (aboutMaterials, aboutContent, frameOriginX);
+
+        /*  §2, revision 3: the tab takes **the face and size this casting's stamp already uses** —
+            §11.1's Share Tech Mono 10 / 13 / .18 em, which is what the footer's right-hand string
+            drew.
+
+            **The string is full semver, and the panel's was not.** Every delivered prototype that
+            spells its tab's version literally prints `v1.0.0` — this one, chorus-60, elmer and
+            gatecrasher — and §1 states the plugin version as semver. `NF_VERSION_SHORT` is right
+            for a panel stamp and wrong here, which is what Fifth Member's §12 says in as many
+            words about its own. */
+        aboutTab = std::make_unique<nf::AboutTab> (aboutMaterials, Font::mono(),
+                                                   "TAPEROT " + Text::middleDot()
+                                                       + " v" + juce::String (NF_VERSION),
+                                                   Readouts::footerCssPx,
+                                                   Readouts::footerTrackingEm);
+        aboutTab->onClick = [this] { aboutBox->open(); };
+
+        /*  §2a: the wordmark is the PRIMARY affordance, and this is one of the two castings whose
+            wordmark is a BITMAP — here because Impact Label Reversed cannot be embedded at all. A
+            hit region needs only a rectangle, and `HeaderGeometry::nameplate()` is the same
+            rectangle over artwork as over live text. It draws nothing. */
+        aboutWordmark = std::make_unique<nf::AboutWordmarkHit> (Cursor::help());
+        aboutWordmark->onClick = [this] { aboutBox->open(); };
+
+        /*  **Registered LAST, and that is not tidiness.** JUCE paints children in the order they
+            were added, so registering these beside their construction puts the tab under the panel
+            background — drawn, correct, and invisible in a capture. */
+        aboutTab->layoutFor (getHeight(), frameOriginX);
+        aboutWordmark->setBounds (nf::AboutWordmarkHit::zone (frameOriginX));
+        aboutBox->setBounds (getLocalBounds());
+        addAndMakeVisible (*aboutWordmark);
+        addAndMakeVisible (*aboutTab);
+        addChildComponent (*aboutBox);
+    }
 }
 
 /*  §7.3 is the ONE authority for every lamp on this panel, which is why they are all refreshed from

@@ -144,6 +144,52 @@ namespace Colour
         apply in this state, which §6 says in as many words. */
     inline const juce::Colour bypassVeil      { 0xFF808080 };
     inline constexpr float    bypassAlpha     = 0.50f;
+
+    /*  `ABOUT-PART.md` §9.1 and §9.2, and every ratio here is the spec's own measured figure.
+
+        §9: **the box is this casting's display GLASS, not its fascia** — a screen, not a plate.
+
+        §3: the About veil is `aboutGlass` at 0.72, a DARKENING scrim — deliberately not the grey
+        multiply four lines above. Different colour, opposite direction, so a reader can tell which
+        is which with both on screen, and they stack rather than suppressing each other.
+
+        §9.2: **the tab's ink is measured against the WELL, not the fascia.** The recess is a
+        surface this casting chooses; the fascia is not, and a 7:1 ceiling is set by the ground.
+
+        **`aboutDim` at 7.12 is the narrowest dim margin in the suite**, which is why §9.1 says no
+        casting may darken its dim ink to taste — this is the row that sets that bar. */
+    inline const juce::Colour aboutGlass      { 0xFF100E0B };   // §9.1
+    inline const juce::Colour aboutBody       { 0xFFF2EBD8 };   // 16.20 on glass
+    inline const juce::Colour aboutDim        { 0xFFA89C85 };   //  7.12 — the suite's narrowest
+    inline const juce::Colour aboutAccent     { 0xFFF2B25C };   // 10.37
+    inline const juce::Colour aboutRing       { 0xFF2E281F };   // §9.1, glass lightened ~18 %
+
+    inline const juce::Colour aboutWellTop    { 0xFF241F18 };   // §9.2
+    inline const juce::Colour aboutWellBottom { 0xFF2D2720 };
+    inline const juce::Colour aboutWellInk    { 0xFFE6DCC4 };   // 10.82 on the well
+}
+
+//==============================================================================
+namespace Cursor
+{
+    /*  §2b: `help`, not `pointer`. `pointer` says *this acts*; `help` says *this explains
+        something*, and an About box explains. JUCE has no help cursor in `StandardCursorType`, so
+        the delivered 64 x 64 @2x asset is embedded and a cursor built from it.
+
+        **Hotspot (7, 4) in image pixels**, which is the arrow's tip — read off the artwork rather
+        than assumed at the origin, because a cursor whose hotspot is wrong is off by the distance
+        from the corner to the tip on every click. */
+    inline juce::MouseCursor help()
+    {
+        static const juce::MouseCursor c = []
+        {
+            const auto img = juce::ImageFileFormat::loadFrom (BinaryData::aboutcursor2x_png,
+                                                              (size_t) BinaryData::aboutcursor2x_pngSize);
+            return img.isValid() ? juce::MouseCursor (img, 7, 4, 2.0f)
+                                 : juce::MouseCursor (juce::MouseCursor::PointingHandCursor);
+        }();
+        return c;
+    }
 }
 
 //==============================================================================

@@ -10,6 +10,8 @@
 #include "TapeRotPanelBackground.h"
 #include "TapeRotTheme.h"
 
+#include <nf/AboutPart.h>
+
 #include <memory>
 #include <vector>
 
@@ -56,6 +58,12 @@ private:
         area to be laid out in. Its bounds are what stop the list moving or overflowing the panel -
         see the constructor, and ../../CLAUDE.md's "The Program dropdown". */
     juce::Component menuHost;
+
+    /*  `ABOUT-PART.md`. The tab, the wordmark hit region and the box all live in `nf::AboutPart` —
+        this casting supplies §9's materials and §1's five strings and nothing else. */
+    std::unique_ptr<nf::AboutTab> aboutTab;
+    std::unique_ptr<nf::AboutWordmarkHit> aboutWordmark;
+    std::unique_ptr<nf::AboutBox> aboutBox;
 
     std::vector<std::unique_ptr<KnobComponent>> knobs;
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>> attachments;

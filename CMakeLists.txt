@@ -93,7 +93,10 @@ juce_add_binary_data(TapeRotBinaryData
         # NAME says nothing, and a type scale calibrated through `withPointHeight` moves with the
         # metrics. They do not move here.
         design/fonts/BarlowCondensed-Medium.ttf
-        design/fonts/share-tech-mono/ShareTechMono-Regular.ttf)
+        design/fonts/share-tech-mono/ShareTechMono-Regular.ttf
+        # ABOUT-PART.md §2b's cursor. JUCE has no help cursor in StandardCursorType, so the
+        # delivered asset is embedded and a MouseCursor is built from it.
+        design/assets/about-cursor-2x.png)
 
 # AU is Apple-only; Windows only ever builds VST3 + Standalone. VST3_COPY_DIR/AU_COPY_DIR are only
 # set on Apple - leaving them unset on Windows lets JUCE apply its own correct default
@@ -179,6 +182,7 @@ target_compile_definitions(TapeRot PUBLIC
     # PROJECT_VERSION like chorus-60's, reflect-84's and elmer's - one fewer thing to remember at
     # release, and one fewer place for the suite to disagree with itself about its own version.
     NF_VERSION_SHORT="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}"
+    NF_VERSION="${PROJECT_VERSION}"
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0

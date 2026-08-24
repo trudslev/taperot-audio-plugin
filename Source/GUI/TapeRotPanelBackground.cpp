@@ -84,15 +84,22 @@ void TapeRotPanelBackground::renderStaticLayer (float deviceScale)
                            { Readouts::footerLeftX, Readouts::footerY, 300.0f, Readouts::footerLineBox },
                            juce::Justification::left, Readouts::footerInk);
 
-        /*  NF_VERSION_SHORT rather than a baked "v1.0". Root `CLAUDE.md` lists TapeRot as one of
-            three castings that bake their version into the panel plate, so their footers read v1.0
-            as artwork and need a re-cut whenever the number moves. With the plate gone that is no
-            longer true here, and deriving it from PROJECT_VERSION is what stops the footer being a
-            fourth thing to remember at release.  */
-        Text::drawTracked (g, "TAPEROT " + dot + " v" + juce::String (NF_VERSION_SHORT), font, tracking,
-                           { Readouts::footerRightX - 400.0f, Readouts::footerY, 400.0f,
-                             Readouts::footerLineBox },
-                           juce::Justification::right, Readouts::footerInk);
+        /*  **The right-hand string is no longer drawn here: `ABOUT-PART.md` §2 PROMOTED it to a
+            recessed tab**, and the tab is `nf::AboutTab`, built in `TapeRotEditorContent`. Drawing
+            it in both places would double-print one string in two positions.
+
+            The LEFT string stays: `MT-77 · SN 0143` is a model and a serial, fixed width and not an
+            affordance, so neither of the promotion's reasons applies to it. Same split as Fifth
+            Member's foot row, where the spec line stays and the stamp moves.
+
+            **It also gains a field.** The panel drew `NF_VERSION_SHORT`; the delivered prototype's
+            tab reads `TAPEROT · v1.0.0`, and §1 states the plugin version as semver. The short form
+            is right for a panel stamp and wrong for the box's own identity line — which is what
+            Fifth Member's §12 says in as many words.
+
+            `footerRightX` now has no consumer — the fossil shape
+            `tools/check_unused_constants.py` reports, noted here so the next reader of that report
+            has the answer without going looking. */
     }
 }
 
