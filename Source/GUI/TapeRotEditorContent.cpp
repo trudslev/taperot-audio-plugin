@@ -291,7 +291,8 @@ void TapeRotEditorContent::buildLampGroups()
             Colour::aboutGlass, Colour::aboutBody, Colour::aboutDim, Colour::aboutAccent,
             Colour::aboutRing,
             Colour::aboutWellTop, Colour::aboutWellBottom, Colour::aboutWellInk,
-            Font::barlowSemiBold(), Font::barlowMedium(), Font::mono()
+            Font::barlowSemiBold(), Font::barlowMedium(), Font::mono(),
+            Cursor::help()
         };
 
         /*  §8: the credits name the faces this casting EMBEDS, not the ones it draws with — so
@@ -329,7 +330,7 @@ void TapeRotEditorContent::buildLampGroups()
             wordmark is a BITMAP — here because Impact Label Reversed cannot be embedded at all. A
             hit region needs only a rectangle, and `HeaderGeometry::nameplate()` is the same
             rectangle over artwork as over live text. It draws nothing. */
-        aboutWordmark = std::make_unique<nf::AboutWordmarkHit>();
+        aboutWordmark = std::make_unique<nf::AboutWordmarkHit> (Cursor::help());
         aboutWordmark->onClick = [this] { aboutBox->open(); };
 
         /*  **Registered LAST, and that is not tidiness.** JUCE paints children in the order they
