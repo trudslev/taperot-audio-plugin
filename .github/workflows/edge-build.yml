@@ -41,6 +41,7 @@ jobs:
       - name: Configure (ad-hoc signing, universal arm64+x86_64)
         run: |
           cmake -B build -G Xcode \
+            -DNF_COPY_PLUGIN_AFTER_BUILD=OFF \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_STYLE=Manual \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="-" \
             -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=YES \
@@ -145,7 +146,7 @@ jobs:
       # now ships VS2026, not VS2022). Omitting -G lets CMake auto-detect whichever VS is actually
       # installed and pick the matching generator itself; -A x64 still applies to that default.
       - name: Configure
-        run: cmake -B build -A x64
+        run: cmake -B build -A x64 -DNF_COPY_PLUGIN_AFTER_BUILD=OFF
 
       - name: Build (VST3/Standalone + tests)
         run: cmake --build build --config Release
@@ -217,7 +218,7 @@ jobs:
       # Single-config generator (Makefiles/Ninja) - CMAKE_BUILD_TYPE must be set at configure time,
       # unlike the Xcode/Visual Studio multi-config generators used on macOS/Windows.
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DNF_COPY_PLUGIN_AFTER_BUILD=OFF
 
       # Capped at 2 parallel jobs rather than the default (one per core, 4 on this runner) -
       # JUCE's amalgamated per-module translation units (juce_dsp.cpp, juce_gui_basics.cpp, etc.)

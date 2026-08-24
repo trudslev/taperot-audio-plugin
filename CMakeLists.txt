@@ -118,6 +118,19 @@ endif()
 set(TAPEROT_COMPANY_NAME "Neon Foundry")
 set(TAPEROT_PRODUCT_NAME "TapeRot")
 
+# **Local builds install into the user's plugin folders; CI must not.**
+#
+# A runner has no DAW to load them into, so the copy is pure waste there — but the reason it is an
+# option rather than a tidy-up is the other direction. On a machine that DOES have those folders, a
+# build overwrites what is installed, and this repository has already paid for that: a
+# defect-causing run copied a deliberately broken AU over the user's working one, minutes after the
+# fix was committed, with the tree clean and the remote up to date. Every signal said done.
+#
+# Defaults ON because the local loop depends on it — build, then load in the DAW. CI passes
+# -DNF_COPY_PLUGIN_AFTER_BUILD=OFF.
+option(NF_COPY_PLUGIN_AFTER_BUILD
+       "Install the built plugin into the user's plugin folders after building" ON)
+
 juce_add_plugin(TapeRot
     PRODUCT_NAME "${TAPEROT_PRODUCT_NAME}"
     COMPANY_NAME "${TAPEROT_COMPANY_NAME}"
@@ -147,7 +160,7 @@ juce_add_plugin(TapeRot
     NEEDS_MIDI_INPUT FALSE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
-    COPY_PLUGIN_AFTER_BUILD TRUE
+    COPY_PLUGIN_AFTER_BUILD ${NF_COPY_PLUGIN_AFTER_BUILD}
     ${TAPEROT_EXTRA_ARGS})
 
 target_sources(TapeRot PRIVATE
