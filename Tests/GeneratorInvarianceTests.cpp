@@ -160,8 +160,12 @@ public:
                 const auto w = compare ((juce::String ("NoiseSource ch") + juce::String (character)).toRawUTF8(),
                                         runAt (64), runAt (512));
 
-                rateFormExact = rateFormExact && (w == 0.0);
-                if (w != 0.0)
+                // `juce::exactlyEqual`, not `==`. The comparison used to live inside
+                // `expectEquals` and moving it here added two -Wfloat-equal warnings — caught by
+                // the per-class baseline, which is the ratchet working on a change I made rather
+                // than on a compiler change.
+                rateFormExact = rateFormExact && juce::exactlyEqual (w, 0.0);
+                if (! juce::exactlyEqual (w, 0.0))
                     rateFormRows += "\n    character " + juce::String (character)
                                         + ": " + juce::String (w, 9);
             }
