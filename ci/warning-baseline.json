@@ -1,0 +1,23 @@
+{
+  "macos": {
+    "-Wdeprecated-declarations": 2,
+    "-Wfloat-equal": 2,
+    "-Wimplicit-float-conversion": 2,
+    "-Wsign-conversion": 16,
+    "-Wunused-lambda-capture": 4,
+    "-Wunused-private-field": 4,
+    "-Wunused-variable": 2
+  },
+  "linux": {
+    "-Wdeprecated-declarations": 1,
+    "-Wfloat-equal": 9,
+    "-Woverloaded-virtual": 29,
+    "-Wshadow": 5,
+    "-Wsign-conversion": 8,
+    "-Wunused-but-set-variable": 1
+  },
+  "windows": {
+    "C4244": 5,
+    "C4458": 3
+  }
+}
