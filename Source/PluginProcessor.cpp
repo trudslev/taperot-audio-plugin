@@ -27,7 +27,7 @@ TapeRotAudioProcessor::TapeRotAudioProcessor(juce::File userDirectoryOverride)
     : AudioProcessor(BusesProperties()
                           .withInput("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts(*this, nullptr, "PARAMETERS", createTapeRotParameterLayout()),
+      apvts(*this, nullptr, ParamIDs::stateTreeType, createTapeRotParameterLayout()),
       store(nf::userProgramDirectory(pluginCompanyName, pluginProductName, userDirectoryOverride),
             getProgramFileExtension(),
             maxProgramNameLength)
