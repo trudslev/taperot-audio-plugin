@@ -2,6 +2,8 @@
 #include "../Source/DSP/NoiseSource.h"
 #include "../Source/DSP/FailureEngine.h"
 
+#include <nf/testing/ExpectedFailure.h>
+
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include <functional>
@@ -142,6 +144,9 @@ public:
             // requested == stored and no crossfade ever starts. That is a probe chosen at the one
             // value that cannot distinguish the hypothesis, which this sweep has already done once
             // with a pre-delay at 0 and 0.5.
+            bool rateFormExact = true;
+            juce::String rateFormRows;
+
             for (int character : { 0, 1, 2 })
             {
                 const auto runAt = [&] (int blockSize)
@@ -155,14 +160,24 @@ public:
                 const auto w = compare ((juce::String ("NoiseSource ch") + juce::String (character)).toRawUTF8(),
                                         runAt (64), runAt (512));
 
-                expectEquals (w, 0.0,
-                              "OPEN FINDING, DELIBERATELY RED — the block-coupling class, RATE "
-                              "form; a new member, filed 2026-08-18 in this casting's CLAUDE.md. "
-                              "Not a regression, and a green run here would mean the arm was "
-                              "relaxed. NoiseSource diverges with block size at character "
-                                  + juce::String (character) + " — its character crossfade is "
-                                  "started per prepare and stepped per block");
+                rateFormExact = rateFormExact && (w == 0.0);
+                if (w != 0.0)
+                    rateFormRows += "\n    character " + juce::String (character)
+                                        + ": " + juce::String (w, 9);
             }
+
+            // **One marker for the whole sweep, not one per character.** The arm claims that
+            // NoiseSource diverges with block size, not that every character does. Marking
+            // inside the loop makes a character that happens to be exact trip the "now
+            // PASSES" ratchet while its neighbours still fail — the same finding reported as
+            // resolved and as outstanding in one run.
+            nf::testing::expectedFailure (
+                *this, rateFormExact, "taperot.block-coupling-rate",
+                "OPEN FINDING, DELIBERATELY RED — the block-coupling class, RATE form; a new "
+                "member, filed 2026-08-18 in this casting's CLAUDE.md. Not a regression, and a "
+                "green run here would mean the arm was relaxed. NoiseSource diverges with "
+                "block size — its character crossfade is started per prepare and stepped per "
+                "block:" + rateFormRows);
         }
 
         beginTest ("FailureEngine — the EVENT COUNT, which is the quantity that matters");

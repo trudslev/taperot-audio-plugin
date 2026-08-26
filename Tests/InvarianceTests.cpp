@@ -1,6 +1,7 @@
 #include "../Source/PluginProcessor.h"
 
 #include <nf/testing/ProcessorHarness.h>
+#include <nf/testing/ExpectedFailure.h>
 
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -246,15 +247,29 @@ public:
                     "the self-comparison failed, so the other rows measured non-determinism rather "
                     "than block dependence");
 
+            // **Aggregated, because the arm's claim is "at least one of these diverges".** Marking
+            // inside the loop fires once per row, and a row that happens to be sample-exact then
+            // trips the "now PASSES" ratchet while its neighbours still fail — reporting the
+            // finding as resolved and as outstanding in the same run.
+            bool allExact = true;
+            juce::String rows;
+
             for (const auto& r : results)
-                expect (r.sampleExact,
+            {
+                allExact = allExact && r.sampleExact;
+                if (! r.sampleExact)
+                    rows += "\n    " + r.describe();
+            }
+
+            nf::testing::expectedFailure (
+                    *this, allExact, "taperot.noise-path-transient",
                         "OPEN FINDING, DELIBERATELY RED — the NOISE-path transient, filed as "
                         "LOCALISED-NOT-EXPLAINED in this casting's CLAUDE.md. Characterised down "
                         "to ~20 ms and six remaining candidates; the bisection was stopped on "
                         "cost/benefit, not abandoned. Not a regression, and a green run here would "
                         "mean the arm was relaxed. "
                         "block-size invariance failed — the same sample stream cut differently "
-                        "produced different output: " + r.describe());
+                        "produced different output:" + rows);
         }
 
         beginTest ("Block size — GEN and the transport gate, driven SEPARATELY");
@@ -443,7 +458,8 @@ public:
                             ? "CONFIRMED: the divergence scales with the LP ramp's distance"
                             : "REFUTED: LP's distance does not drive it — a third candidate out"));
 
-            expect (atLow > atTop * 2.0,
+            nf::testing::expectedFailure (
+                *this, atLow > atTop * 2.0, "taperot.noise-path-exclusion",
                     "OPEN FINDING, DELIBERATELY RED — an EXCLUSION arm of the same "
                     "localised-not-explained bisection, refuting ToneFilters' LP ramp as the "
                     "cause. It is the fifth of this casting's five red arms and its heading said "
