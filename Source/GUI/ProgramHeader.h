@@ -82,6 +82,14 @@ public:
     /** Asserted by the tests. **A cache with no rebuild counter is a cache nobody has checked.** */
     int staticLayerBuildCount() const noexcept { return staticBuilds; }
 
+    /** Test seam: enters naming mode, as SAVE's first press does.
+
+        Public for the same reason `staticLayerBuildCount()` is. The property under test - that the
+        caret animates rather than being frozen into a cached image - cannot be observed without
+        reaching this state, and a synthetic MouseEvent would be testing JUCE's hit-testing rather
+        than the caret. */
+    void beginNamingForTest();
+
 private:
     void timerCallback() override;
     void showProgramMenu();

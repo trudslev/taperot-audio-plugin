@@ -22,6 +22,8 @@ ProgramHeader::ProgramHeader(TapeRotAudioProcessor& p) : processorRef(p)
     setWantsKeyboardFocus(true);          // naming a User Program is typed straight into the LCD
 }
 
+void ProgramHeader::beginNamingForTest() { enterNamingMode(); }
+
 void ProgramHeader::enterNamingMode()
 {
     namingMode = true;
@@ -335,7 +337,7 @@ juce::String ProgramHeader::staticCacheKey() const
     return juce::String ((int) id.bank) + id.id
          + "|" + id.displayName
          + "|" + juce::String ((int) processorRef.isProgramModified())
-         + "|" + juce::String ((int) namingMode) + typedName
+         + "|" + juce::String ((int) namingMode)
          + "|" + juce::String ((int) menuOpen)
          + "|" + juce::String ((int) deleteEnabled())
          + "|" + readout.textAt (juce::Time::getMillisecondCounter());
@@ -550,8 +552,18 @@ void ProgramHeader::renderStaticLayer (float deviceScale, const juce::String& ke
                                inNeitherBank && ! namingMode ? Colour::lcdText.withAlpha (0.42f)
                                                              : Colour::lcdText);
 
-            Text::drawTracked (g, lcdText(), lcdFont, tracking, Header::nameCell(),
-                               juce::Justification::left, Colour::lcdText);
+            /*  **Not while naming.** `lcdText()` returns the readout or the CURRENT Program's
+                label and has no naming branch, so drawing it here left the previous Program's
+                name sitting in the field while the caption above it read NAME PROGRAM. Keystrokes
+                were recorded into `typedName` and rendered nowhere - so the field looked dead, and
+                a second SAVE press committed an empty name, which the store fell back to `TAKE n`
+                for. Reported from a real panel on 2026-08-30; the other five castings all draw it.
+
+                The typed name and its caret are drawn in the LIVE half of paint(), because the
+                caret blinks and this layer is a cache.  */
+            if (! namingMode)
+                Text::drawTracked (g, lcdText(), lcdFont, tracking, Header::nameCell(),
+                                   juce::Justification::left, Colour::lcdText);
         }
     }
 
@@ -645,5 +657,23 @@ void ProgramHeader::paint (juce::Graphics& g)
 
         level (Header::inWell(),  processorRef.getInputLevelDb());
         level (Header::outWell(), processorRef.getOutputLevelDb());
+
+        /*  **The name being typed, with the house block caret, live because it animates.**
+            U+2588 at 1 s / 50 % duty is the suite's form - Elmer's theme names it as such and
+            four other castings draw it. Built from the codepoint rather than written as a literal:
+            `juce::String`'s `const char*` constructor decodes Latin-1, so a non-ASCII glyph typed
+            into a string literal is mangled.
+
+            The whole run is drawn here rather than the caret alone, so nothing has to measure
+            where the typed text ends - one rect, the same cell the stored name uses.  */
+        if (namingMode)
+        {
+            const bool caretOn = (juce::Time::getMillisecondCounter() % 1000) < 500;
+            const auto caret   = juce::String::charToString ((juce::juce_wchar) 0x2588);
+
+            Text::drawTracked (g, typedName + (caretOn ? caret : juce::String()),
+                               font, tracking, Header::nameCell(),
+                               juce::Justification::left, Colour::lcdText);
+        }
     }
 }
